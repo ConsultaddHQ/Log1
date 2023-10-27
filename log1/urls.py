@@ -18,6 +18,8 @@ from jd_parser.views import MarketingMailListViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
+from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet,\
+    LeaveBalanceViewSets
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
     TimetrackEventMobileViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
@@ -79,10 +81,7 @@ router.register(r"vendor_company", VendorCompanyViewSets)
 router.register(r"vendor_contact", VendorContactViewSets)
 router.register(r"marketing_team", MarketingTeamViewSet)
 
-
 router.register(r"m_mail", MarketingMailListViewSet)
-
-
 router.register(r"project", ProjectViewSets)
 router.register(r"finance", FinanceTimeSheetViewSets)
 router.register(r"project_order", ProjectOrderViewSet)
@@ -141,6 +140,12 @@ router.register(r"util", TeamsTargetViewSet)
 router.register(r"petition", PetitionViewSets)
 router.register(r"petition_docs", PetitionDocsViewSets)
 router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
+
+# finance App routes
+router.register(r'leave_balance', LeaveBalanceViewSets)
+router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
+router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
+router.register(r'finance_timesheet', FinanceTimeSheetViewSet)  #FintimeViewSet
 
 # Twilio messaging app routes
 router.register(r"twilio", SMSViewSet)

@@ -2,14 +2,16 @@ from datetime import datetime
 from rest_framework import serializers
 
 from marketing.models import *
-from consultant.models import Consultant
 from django.db.models import Q
+from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
+
+CONSULTANT_EMPLOYEE_ID = 9999
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -186,7 +188,8 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
+        if (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or \
+                (('Assigned' or 'assigned') in obj.guest_type) and obj.coding_present is None:
             return False
         return True
 
@@ -215,6 +218,8 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
 class InterviewListSerializer(serializers.ModelSerializer):
     guest = serializers.SerializerMethodField()
+    guests = serializers.SerializerMethodField()
+    call_type = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
     supervisor_detail = serializers.SerializerMethodField()
@@ -242,11 +247,15 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant_name(obj):
-        return obj.consultant.name
+        return obj.consultant.name if obj.consultant else None
+
+    @staticmethod
+    def get_call_type(obj):
+        return obj.call_type.display_name if obj.call_type else "NA"
 
     @staticmethod
     def get_supervisor_detail(obj):
-        if obj.supervisor.employee_id == 9999:
+        if obj.supervisor.employee_id == CONSULTANT_EMPLOYEE_ID:
             data = {
                 "call_given_by": "Consultant",
                 "supervisor_name": obj.submission.consultant.name
@@ -267,7 +276,9 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
+        if obj.guest_type and obj.coding_present is None and (
+                (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or (
+                ('Assigned' or 'assigned') in obj.guest_type)):
             return False
         return True
 
@@ -279,6 +290,16 @@ class InterviewListSerializer(serializers.ModelSerializer):
         elif obj.supervisor_feedback.filter(question__form_name='interview') or obj.supervisor.employee_id == 9999:
             return True
         return False
+
+    @staticmethod
+    def get_guests(obj):
+        guests = []
+        for guest_obj in obj.guests.all():
+            guests.append({
+                "employee": {"id": guest_obj.user_id, "name": guest_obj.user.employee_name},
+                "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
+            })
+        return guests
 
 
 class TestListSerializer(serializers.ModelSerializer):
@@ -449,14 +470,18 @@ class SubmissionConProfile(serializers.ModelSerializer):
 
 
 class InterviewV2Serializer(serializers.ModelSerializer):
-    supervisor = serializers.SerializerMethodField()
     guest = UserDetailSerializer(many=True)
+    guests = serializers.SerializerMethodField()
+    call_type = serializers.SerializerMethodField()
+    supervisor = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
+    interview_type = serializers.SerializerMethodField()
     guest_feedback = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
     supervisor_feedback = serializers.SerializerMethodField()
+    interviewer_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
@@ -483,10 +508,48 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         return obj.submission.created_by.employee_name
 
     @staticmethod
+    def get_call_type(obj):
+        if obj.call_type:
+            return {"id": obj.call_type.id, "name": obj.call_type.display_name}
+        else:
+            return {}
+
+    @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
+        if obj.guest_type and ((obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or
+                               (('Assigned' or 'assigned') in obj.guest_type)) and obj.coding_present is None:
             return False
         return True
+
+    @staticmethod
+    def get_interview_type(obj):
+        if obj.coding_present is None:
+            assistance = False
+            coding_required = False
+            if obj.guest_type in ['Coder', 'Assigned Coder']:
+                coding_required = True
+            elif obj.guest_type in ['Assistance', 'Assigned Assistance']:
+                assistance = True
+            elif obj.guest_type in ['Coder & Assistance', 'Assigned Coder & Assistance']:
+                assistance = True
+                coding_required = True
+        else:
+            assistance = obj.assistance_required
+            coding_required = obj.coding_present
+        return {
+            "coding_required": coding_required, "assistance": assistance
+        }
+
+    @staticmethod
+    def get_guests(obj):
+        guests = []
+        qs = obj.guests.all()
+        for guest_obj in qs:
+            guests.append({
+                "employee": {"id": guest_obj.user_id, "name": guest_obj.user.employee_name},
+                "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
+            })
+        return guests
 
     @staticmethod
     def get_supervisor_feedback(obj):
@@ -505,15 +568,22 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         return None
 
     @staticmethod
+    def get_interviewer_profile(obj):
+        interviewers = obj.interviewers.all()
+        return interviewers.values('id', 'name', 'email', 'linkedin')
+
+    @staticmethod
     def get_supervisor(obj):
         if obj.supervisor.employee_id == 9999:
             data = {
                 "call_given_by": "Consultant",
+                "supervisor_id": obj.supervisor_id,
                 "supervisor_name": obj.submission.consultant.name
             }
         else:
             data = {
                 "call_given_by": "Interviewee",
+                "supervisor_id": obj.supervisor_id,
                 "supervisor_name": obj.supervisor.employee_name
             }
         return data
@@ -762,3 +832,10 @@ class TeamStructureSerializer(serializers.ModelSerializer):
             }
             return data
         return []
+
+
+class InterviewerProfileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = InterviewerProfile
+        fields = '__all__'

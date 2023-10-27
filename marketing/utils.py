@@ -7,8 +7,12 @@ from pytz import timezone
 from celery import shared_task
 from django.http import HttpResponse
 from datetime import datetime, timedelta
+
+from rest_framework import status
+from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 
 from constance import config
 from employee.models import User
@@ -16,9 +20,9 @@ from utils_app.models import Choice
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from notification.models import FCMDevice, UserNotification
-from marketing.models import Submission, Interview, Question, Answer
+from marketing.serializers import InterviewerProfileSerializer
+from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile, GuestInfo
 
-from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from notification.utils import push_notification_consultant, create_notification
@@ -111,16 +115,15 @@ def change_to_feedback_due():
             """
         tz = timezone('US/Eastern')
         time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
-        previous_interviews = Interview.objects.filter(
-            start_time__lte=time_est, status__in=['scheduled', 'rescheduled']
-        )
+        previous_interviews = Interview.objects.filter(end_time__lt=time_est, status__in=['scheduled', 'rescheduled'])
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
             data = {
                 "title": "interview feedback due",
                 "category": "alert",
-                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
+                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview"
+                               f" (I-{interview.id}) supervisor feedback is pending",
                 "parent_type": "submission",
                 "target_type": "interview",
                 "parent_id": interview.submission.id,
@@ -481,16 +484,19 @@ def get_interview_report(payload, request):
         writer = csv.writer(response)
         writer.writerow([
             "Interview Id", "Consultant Name", "Marketer Name", "Supervisor Name", "Client Name", "Vendor Name",
-            "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason", "Passed Reason"
+            "Call Type", "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason",
+            "Passed Reason"
         ])
         for data in payload:
             writer.writerow([
-                data.get('id', None), data.get('consultant_name', None), data['submission'].get('marketer_name', None),
-                f"{data['supervisor_detail']['supervisor_name']}({data['supervisor_detail']['call_given_by']})",
-                data['submission'].get('client', None), data['submission'].get('vendor', None), data.get('round', None),
-                data.get('start_time', None), data.get('interview_mode', None), data.get('screening_type', None),
-                data.get('tech_stack', None), data.get('status', None), data.get('failure_reason', None),
-                data.get('passed_reason', None),
+                data.get('id', None), data.get('consultant_name', None),
+                data.get('submission').get('marketer_name', None),
+                f"{data.get('supervisor_detail').get('supervisor_name')}"
+                f"({data.get('supervisor_detail').get('call_given_by')})",
+                data.get('submission').get('client', None), data.get('submission').get('vendor', None),
+                data.get('call_type'), data.get('round', None), data.get('start_time', None),
+                data.get('interview_mode', None), data.get('screening_type', None), data.get('tech_stack', None),
+                data.get('status', None), data.get('failure_reason', None), data.get('passed_reason', None)
             ])
         return response
     except Exception as error:
@@ -530,3 +536,106 @@ def delete_supervisor_notification():
     except Exception as error:
         write_exception(error, None)
         return str(error), False
+
+
+def add_interviewer_profiles(obj, request):
+    try:
+        interviewers_profiles = request.data.get('interviewer_profiles', [])
+        for interviewer in interviewers_profiles:
+            if interviewer.get('id', None):
+                interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
+                obj.interviewers.add(interviewer_obj)
+            else:
+                interviewer_obj = InterviewerProfile.objects.create(
+                    name=interviewer.get('name'), email=interviewer.get('email', None),
+                    created_by=request.user, linkedin=interviewer.get('linkedin', None), client=obj.submission.client
+                )
+            obj.interviewers.add(interviewer_obj)
+            obj.save()
+        return True
+    except Exception as error:
+        write_exception(error, request)
+        return str(error)
+
+
+def update_interviewer_profiles(obj, request):
+    try:
+        updated_interviewers = set()
+        client = obj.submission.client
+        interviewers_profiles = request.data.get('interviewer_profiles')
+        existing_interviewers = set(obj.interviewers.all())
+        for interviewer in interviewers_profiles:
+            if interviewer.get('id', None):
+                interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
+                serializer = InterviewerProfileSerializer(interviewer_obj, data=interviewer, partial=True)
+                if not serializer.is_valid():
+                    return Response(
+                        {"message": "Interviewers details are incorrect", "error": str(serializer.errors)},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                serializer.save()
+                updated_interviewers.add(interviewer_obj)
+            else:
+                interviewer_obj = InterviewerProfile.objects.create(
+                    name=interviewer.get('name'), email=interviewer.get('email', None),
+                    created_by=request.user, linkedin=interviewer.get('linkedin', None), client=client
+                )
+                obj.interviewers.add(interviewer_obj)
+                obj.save()
+        existing_interviewers.difference_update(updated_interviewers)
+        if existing_interviewers:
+            removed_interviewers = [elm for elm in existing_interviewers]
+            obj.interviewers.remove(*removed_interviewers)
+            obj.save()
+        return True
+    except Exception as error:
+        write_exception(error, request)
+        return False
+
+
+def get_guest_type(request):
+    guest_type = "Not Required"
+    coding_required = request.data.get('coding')
+    assistance_required = request.data.get('assistance')
+
+    if coding_required and not assistance_required:
+        guest_type = "Coder"
+    elif not coding_required and assistance_required:
+        guest_type = "Assistance"
+    elif coding_required and assistance_required:
+        guest_type = "Coder & Assistance"
+    return guest_type
+
+
+def add_or_update_guest(obj, request, guests=[]):
+    try:
+        resp = 'Not Assigned'
+        updated_guests = set()
+        existing_guest = set(obj.guests.all())
+        if not guests:
+            guests = request.data.get('guest_info', [])
+        for guest in guests:
+            if guest.get('user_id', None) is None:
+                continue
+            guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
+            if not guest_obj:
+                try:
+                    user_guest = get_object_or_404(User, id=guest.get('user_id'))
+                except ObjectDoesNotExist:
+                    return Response({"message": "Guest does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+                guest_obj = GuestInfo.objects.create(user=user_guest, type=guest.get('type', None))
+            if guest_obj not in existing_guest:
+                obj.guests.add(guest_obj)
+                obj.save()
+                resp = 'assigned'
+            updated_guests.add(guest_obj)
+
+        existing_guest.difference_update(updated_guests)
+        if existing_guest:
+            remove_guests = [elm for elm in existing_guest]
+            obj.guests.remove(*remove_guests)
+            obj.save()
+        return resp
+    except Exception as error:
+        write_exception(error, request)
+        return False

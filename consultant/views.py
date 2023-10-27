@@ -1191,6 +1191,18 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                         if team in teams:
                             marketer_data[team.name]['marketers'].append(marketer_info)
 
+                    if marketer.associated_to.all():
+                        for team in marketer.associated_to.all():
+                            if team:
+                                team_obj = get_object_or_404(Team, id=team.id)
+
+                                marketer_info = {
+                                    'id': marketer.id,
+                                    'name': marketer.employee_name
+                                }
+                                if team_obj in teams:
+                                    marketer_data[team.name]['marketers'].append(marketer_info)
+
                 for team_info in marketer_data.values():
                     team_marketer_ids = set(marketer['id'] for marketer in team_info['marketers'])
 

@@ -90,9 +90,10 @@ class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
         try:
             queryset = self.filter_queryset(self.get_queryset())
             queryset = (
-                queryset.filter(requirementMail=True if requirementMail == "1" else False).exclude(body_text__isnull=True)
+                queryset.filter(requirementMail=True if requirementMail ==
+                                "1" else False).exclude(body_text__isnull=True)
                 .exclude(body_text__exact="")
-                
+
             )
             if role:
                 filters = Q()
@@ -131,4 +132,17 @@ class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             # write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        mail_id = request.POST.get("mailId", None)
+        feedback = request.POST.get("feedback", None)
+        if (mail_id == None and feedback == None):
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+        try:
+            mail_obj = MMailScrap.objects.get(mail_id)
+            mail_obj.marketer_feedback = feedback
+            mail_obj.save()
+            return Response({"data": "Feedback updated successully."}, status=200)
+        except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
