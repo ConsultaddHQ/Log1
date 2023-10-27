@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 
 from django.db.models import Q
 from django.db import transaction
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -15,17 +16,21 @@ from rest_framework.authentication import TokenAuthentication
 from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
-from report.serializers import ReportSerializer
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
 from utils_app.thred_mail import send_email
 from employee.serializers import UserSerializer
+from report.serializers import ReportSerializer, ConsultantInfoSerializer, SubmissionInfoSerializer, \
+    InterviewInfoSerializer, ProjectInfoSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
+
+
+ERR_DURATION = "Please duration for the report"
 
 
 # Route - /report/
@@ -765,15 +770,15 @@ class MarketingReportViewSets(GenericViewSet):
             request = kwargs.get('request')
 
             bench_consultant = Consultant.objects.filter(
-                marketing__teams__in=team,
-                marketing__status='open'
+                marketing__teams__in=team, marketing__status='open',
+                created__gte=start, created__lte=end
             ).order_by('id').distinct('id')
             submission = Submission.objects.filter(
                 marketing_team__in=team,
                 created__gte=start, created__lte=end,
             ).exclude(status='draft').order_by('id').distinct('id')
             interview = Interview.objects.filter(
-                created__gte=start, created__lte=end,
+                start_time__gte=start, start_time__lte=end,
                 submission__marketing_team__in=team
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id')
             offer = Project.objects.filter(
@@ -1132,6 +1137,133 @@ class MarketingReportViewSets(GenericViewSet):
                 data.append(sup_data)
 
             return Response({'max_rounds': max_rounds, 'data': data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class DetailedReportViewSets(GenericViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @action(methods=['get'], detail=False, url_path='consultant')
+    def consultant(self, request):
+        try:
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
+            team = request.GET.get('team', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Consultant.objects.filter(
+                created__gte=start, created__lte=end, marketing__teams__dept='Marketing'
+            )
+
+            if team:
+                queryset = queryset.filter(marketing__teams=team, marketing__status='open').order_by('id').distinct('id')
+            else:
+                queryset = queryset.filter(marketing__status='open').order_by('id').distinct('id')
+
+            serializer = ConsultantInfoSerializer(queryset, many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='submission')
+    def submission(self, request):
+        try:
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            team = request.GET.get('team', None)
+            start = request.GET.get('start', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Submission.objects.filter(
+                created__gte=start, created__lte=end, marketing_team__dept='Marketing'
+            ).exclude(status='draft')
+
+            if team:
+                queryset = queryset.filter(marketing_team_id=team).order_by('id').distinct('id')
+            else:
+                queryset = queryset.order_by('id').distinct('id')
+
+            serializer = SubmissionInfoSerializer(queryset[first: last], many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='interview')
+    def interview(self, request):
+        try:
+            end = request.GET.get('end', None)
+            team = request.GET.get('team', None)
+            start = request.GET.get('start', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Interview.objects.filter(
+                start_time__gte=start, start_time__lte=end, submission__marketing_team__dept='Marketing'
+            ).exclude(status='cancelled')
+
+            if team:
+                queryset = queryset.filter(submission__marketing_team_id=team).order_by(
+                    'submission_id').distinct('submission_id')
+            else:
+                queryset = queryset.order_by('submission_id').distinct('submission_id')
+
+            serializer = InterviewInfoSerializer(queryset, many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='purchase_order')
+    def purchase_order(self, request):
+        try:
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            tab = request.GET.get('tab', None)
+            team = request.GET.get('team', None)
+            start = request.GET.get('start', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not tab and tab not in ['Offer', 'Joined', 'Complete', 'Terminated']:
+                return Response({"message": "Please provide correct tab name"}, status=status.HTTP_400_BAD_REQUEST)
+
+            if team:
+                queryset = Project.objects.filter(submission__marketing_team_id=team)
+            else:
+                queryset = Project.objects.filter(submission__marketing_team__dept='Marketing')
+
+            if tab == "Offer":
+                queryset = queryset.filter(created__gte=start, created__lte=end).order_by('id').distinct('id')
+
+            elif tab == "Joined":
+                queryset = queryset.filter(
+                    statuses__status='joined', statuses__created__gte=start, statuses__created__lte=end
+                ).order_by('id').distinct('id')
+
+            elif tab == "Complete":
+                queryset = queryset.filter(
+                    statuses__status='complete', statuses__created__gte=start, statuses__created__lte=end
+                ).order_by('id').distinct('id')
+
+            elif tab == "Terminated":
+                queryset = queryset.filter(
+                    statuses__status__istartswith='terminated', statuses__created__gte=start, statuses__created__lte=end
+                ).order_by('id').distinct('id')
+
+            serializer = ProjectInfoSerializer(queryset[first: last], many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
