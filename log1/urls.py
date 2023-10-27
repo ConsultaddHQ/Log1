@@ -105,6 +105,7 @@ router.register(r"choice", ChoiceViewSet)
 router.register(r"cmd", SlashCommandViewSets)
 
 router.register(r"report", ScrumMeetingReport)
+router.register(r"report_detail", ReportDetailViewSets)
 router.register(r"engineers", EngineerReportXposedViewSets)
 router.register(r"support_report", EngineeringReportViewSets)
 router.register(r"marketing_report", MarketingReportViewSets)
@@ -144,7 +145,6 @@ router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
 # finance App routes
 router.register(r'leave_balance', LeaveBalanceViewSets)
 router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
-router.register(r'leave_balance', LeaveBalanceViewSets)
 router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
 router.register(r'finance_timesheet', FinanceTimeSheetViewSet)  #FintimeViewSet
 
