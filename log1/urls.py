@@ -105,6 +105,7 @@ router.register(r"choice", ChoiceViewSet)
 router.register(r"cmd", SlashCommandViewSets)
 
 router.register(r"report", ScrumMeetingReport)
+router.register(r"report_detail", ReportDetailViewSets)
 router.register(r"engineers", EngineerReportXposedViewSets)
 router.register(r"support_report", EngineeringReportViewSets)
 router.register(r"marketing_report", MarketingReportViewSets)

@@ -182,6 +182,21 @@ class ConsultantV2ViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='report_list')
+    def report_list(self, request):
+        try:
+            first, last = get_page_limits(request)
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
+            if not filter_json.get('teams'):
+                return Response({'message': 'Please provide team'}, status=400) #initial commit
+            queryset = Consultant.objects.filter(marketing__teams__dept='Marketing', marketing__status='open',
+                                                 marketing__teams__id__in=filter_json.get('teams'))
+            queryset = queryset.order_by('id').distinct('id')
+            serializer = ConsultantV2ListSerializer(queryset[first:last], many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 # Route - /consultant/
 class ConsultantViewSets(ModelViewSet):
