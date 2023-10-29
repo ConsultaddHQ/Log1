@@ -881,66 +881,6 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='report_list')
-    def report_list(self, request):
-        try:
-            first, last = get_page_limits(request)
-            filter_json = json.loads(request.GET.get('filter_json', '{}'))
-            queryset = Project.objects.filter(submission__marketing_team__dept='Marketing')
-            if 'status' in filter_json:
-                if filter_json.get('status_created'):
-                    if not (filter_json.get('status_created', {}).get('gte') and
-                            filter_json.get('status_created', {}).get('lte')):
-                        return Response({'message': 'Please Provide Status Created Start date and End Date'},
-                                        status=400)
-                else:
-                    return Response({'message': 'Please Provide Status Created Date'}, status=400)
-                if 'complete' in filter_json.get('status') or 'joined' in filter_json.get('status'):
-                    queryset = queryset.filter(
-                        statuses__status__in=filter_json.get('status'),
-                        statuses__created__gte=filter_json.get('status_created', {}).get('gte'),
-                        statuses__created__lte=filter_json.get('status_created', {}).get('lte'),
-                    )
-                elif 'terminated' in filter_json.get('status'):
-                    termination_type = request.GET.get('termination_type', None)
-                    termination_mapping = {
-                        'Resigned': 'terminated-resigned',
-                        'Fired': 'terminated-fired',
-                    }
-                    is_start_with = termination_mapping.get(termination_type, 'terminated')
-                    if termination_type == "Other":
-                        queryset = queryset.filter(
-                            statuses__status=is_start_with,
-                            statuses__created__gte=filter_json.get('status_created', {}).get('gte'),
-                            statuses__created__lte=filter_json.get('status_created', {}).get('lte'),
-                        )
-                    else:
-                        queryset = queryset.filter(
-                            statuses__status__istartswith=is_start_with,
-                            statuses__created__gte=filter_json.get('status_created', {}).get('gte'),
-                            statuses__created__lte=filter_json.get('status_created', {}).get('lte'),
-                        )
-            else:
-                if filter_json.get('created'):
-                    if not (filter_json.get('created', {}).get('gte') and filter_json.get('created', {}).get('lte')):
-                        return Response({'message': 'Please Provide Created Start date and End Date'}, status=400)
-                else:
-                    return Response({'message': 'Please Provide Created Date'}, status=400)
-                queryset = queryset.filter(
-                    created__gte=filter_json.get('created', {}).get('gte'),
-                    created__lte=filter_json.get('created', {}).get('lte'),
-                )
-            if 'teams' in filter_json and len(filter_json.get('teams')) > 0:
-                queryset = queryset.filter(
-                    submission__marketing_team__id__in=filter_json.get('teams')
-                )
-            queryset = queryset.order_by('id').distinct('id')
-            serializer = self.serializer_class(queryset[first: last], many=True)
-            return Response({'data': serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
 
 class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
