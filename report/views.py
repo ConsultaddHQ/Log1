@@ -1248,7 +1248,9 @@ class DetailedReportViewSets(GenericViewSet):
                 queryset = Project.objects.filter(submission__marketing_team__dept='Marketing')
 
             if tab == "Offer":
-                queryset = queryset.filter(created__gte=start, created__lte=end).order_by('id').distinct('id')
+                queryset = queryset.filter(
+                    created__gte=start, created__lte=end, statuses__status__in=['new', 'received', 'on_boarded']
+                ).order_by('id').distinct('id')
 
             elif tab == "Joined":
                 queryset = queryset.filter(
