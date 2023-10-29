@@ -178,7 +178,7 @@ class ProjectInfoSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_submission(obj):
         submission = obj.submission
-        return {"client": submission.client, "vendor": submission.vendor.name if submission.vendor else "None"}
+        return {"client": submission.client, "vendor": submission.vendor.name if submission.vendor else None}
 
     @staticmethod
     def get_consultant(obj):
