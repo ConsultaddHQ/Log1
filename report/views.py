@@ -1144,8 +1144,8 @@ class MarketingReportViewSets(GenericViewSet):
 
 class DetailedReportViewSets(GenericViewSet):
     queryset = Consultant.objects.all()
-    # permission_classes = (IsAuthenticated,)
-    # authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
 
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
