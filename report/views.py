@@ -1144,8 +1144,8 @@ class MarketingReportViewSets(GenericViewSet):
 
 class DetailedReportViewSets(GenericViewSet):
     queryset = Consultant.objects.all()
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication,)
 
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
@@ -1203,6 +1203,7 @@ class DetailedReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='interview')
     def interview(self, request):
         try:
+            queryset = []
             first, last = get_page_limits(request)
             end = request.GET.get('end', None)
             team = request.GET.get('team', None)
@@ -1211,18 +1212,25 @@ class DetailedReportViewSets(GenericViewSet):
             if not start and not end:
                 return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
 
-            queryset = Interview.objects.filter(
-                start_time__gte=start, start_time__lte=end, submission__marketing_team__dept='Marketing'
-            ).exclude(status='cancelled')
-
             if team:
-                queryset = queryset.filter(submission__marketing_team_id=team).order_by(
-                    'submission_id').distinct('submission_id')
+                sub_ids = Interview.objects.filter(
+                    start_time__gte=start, start_time__lte=end, submission__marketing_team_id=team
+                ).exclude(status='cancelled'
+                          ).order_by('submission_id').distinct('submission_id').values_list('submission_id', flat=True)
             else:
-                queryset = queryset.order_by('submission_id').distinct('submission_id')
+                sub_ids = Interview.objects.filter(
+                    start_time__gte=start, start_time__lte=end, submission__marketing_team__dept='Marketing'
+                ).exclude(status='cancelled'
+                          ).order_by('submission_id').distinct('submission_id').values_list('submission_id', flat=True)
+
+            for sub_id in sub_ids:
+                latest_interview = Interview.objects.filter(
+                    submission=sub_id).exclude(status='cancelled').order_by('-id').first()
+                if latest_interview:
+                    queryset.append(latest_interview)
 
             serializer = InterviewInfoSerializer(queryset[first: last], many=True)
-            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data, "count": len(queryset)}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
