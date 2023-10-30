@@ -240,17 +240,17 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                     'to': to,
                     'cc': [],
                     'bcc': ['shreyas.k@consultadd.com'],
-                    'subject': 'Reset Log1 Password',
+                    'subject': 'Reset Timetrack Application Password',
                     'template': '../templates/con_password_reset.html',
                     'context': {
                         'name': consultant.name,
                         'token': token.key,
                     },
                 }
-                res, error = consultant.send_mail(mail_data)
-                if error == 'error':
-                    write_info(message=res, function='token_request')
-                    return Response({'error': str(res)}, status=400)
+                msg, resp, _ = send_email(mail_data, "product@consultadd.com", request)
+                if not resp:
+                    write_exception(msg, request)
+                    return Response({'error': msg}, status=400)
         return Response({'status': 'OK'}, status=200)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
