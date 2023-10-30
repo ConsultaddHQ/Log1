@@ -2,7 +2,7 @@ import csv
 import json
 from datetime import datetime, date, timedelta
 
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
@@ -824,7 +824,7 @@ class MarketingReportViewSets(GenericViewSet):
                     scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
 
             team_id = team[0].id if team_data else 0
-            team_name = team[0].name.title() if team_data else 'Total'
+            team_name = team[0].name if team_data else 'Total'
             scrum_master = scrum_master
             offer_count = offer.count()
             joining_count = joining.count()
@@ -1158,14 +1158,15 @@ class DetailedReportViewSets(GenericViewSet):
             if not start and not end:
                 return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
 
-            queryset = Consultant.objects.filter(
-                created__gte=start, created__lte=end, marketing__teams__dept='Marketing'
-            )
-
             if team:
-                queryset = queryset.filter(marketing__teams=team, marketing__status='open').order_by('id').distinct('id')
+                team_obj = get_object_or_404(Team, id=team)
+                queryset = Consultant.objects.filter(
+                    created__gte=start, created__lte=end, marketing__teams__in=[team_obj], marketing__status='open'
+                ).order_by('id').distinct('id')
             else:
-                queryset = queryset.filter(marketing__status='open').order_by('id').distinct('id')
+                queryset = Consultant.objects.filter(
+                    created__gte=start, created__lte=end, marketing__teams__dept='Marketing', marketing__status='open'
+                ).order_by('id').distinct('id')
 
             serializer = ConsultantInfoSerializer(queryset[first: last], many=True)
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
