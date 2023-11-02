@@ -25,7 +25,7 @@ from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, Consult
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
-    EngineerReportXposedViewSets, DetailedReportViewSets
+    EngineerReportXposedViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
     ConsultantRevisionViewSet, ProjectPaymentTermViewSet
@@ -105,7 +105,6 @@ router.register(r"choice", ChoiceViewSet)
 router.register(r"cmd", SlashCommandViewSets)
 
 router.register(r"report", ScrumMeetingReport)
-router.register(r"report_detail", DetailedReportViewSets)
 router.register(r"engineers", EngineerReportXposedViewSets)
 router.register(r"support_report", EngineeringReportViewSets)
 router.register(r"marketing_report", MarketingReportViewSets)

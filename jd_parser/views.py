@@ -138,7 +138,7 @@ class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
         mail_id = kwargs.get('pk')
         feedback = request.data.get("feedback")
         if (mail_id == None and feedback == None):
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": "Bad request: feedback must not be null."}, status=400)
         try:
             mail_obj = get_object_or_404(MMailScrap, pk=mail_id)
             mail_obj.marketer_feedback = feedback
