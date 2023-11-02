@@ -122,7 +122,6 @@ class LeaveSerializer(serializers.ModelSerializer):
         model = Leave
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
                   'description', 'attachment', 'duration_type',"remarks")
-    @staticmethod
     def get_status(obj):
         return obj.get_status_display()
 

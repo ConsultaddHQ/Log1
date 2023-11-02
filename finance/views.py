@@ -244,7 +244,6 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-
 # Route - /finance_timesheet
 class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = TimeSheet.objects.all()
@@ -261,6 +260,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             timesheet_qs = TimeSheet.objects.filter(project=project_id).order_by('-created')
 
             if filter_json:
+
                 if 'start' in filter_json:
                     timesheet_qs = timesheet_qs.filter(start__gte=filter_json.get('start'))
 
@@ -565,7 +565,6 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 project_id = kwargs.get('pk', None)
                 if not project_id:
                     return Response({"error": "project not available"}, status=status.HTTP_400_BAD_REQUEST)
-
                 requested_timesheets = TimesheetRequest.objects.filter(project=project_id)
 
                 if 'timesheet_status' in filter_json:
