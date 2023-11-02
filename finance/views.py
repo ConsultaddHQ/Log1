@@ -689,7 +689,14 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
         try:
             check_access(request)
-            consultants = Consultant.objects.all().exclude(status='terminated').order_by('id').distinct('id')
+            consultants = Consultant.objects.all().exclude(status='terminated')
+
+            data = {
+                "pending_level_2": Leave.objects.filter(consultant__in=consultants, status='applied').count(),
+                "pending_level_1": Leave.objects.filter(consultant__in=consultants, status='pending').count(),
+                "rejected_level_1": Leave.objects.filter(consultant__in=consultants,
+                                                         status='rejected_1st_level').count(),
+            }
 
             if filter_json:
                 if 'leave_status' in filter_json:
@@ -712,33 +719,32 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
                 consultants = consultants.filter(
                     Q(name__istartswith=query) |
                     Q(email__istartswith=query)
-                ).order_by('id').distinct('id')
+                )
 
-            data = {
-                "pending_level_2": Leave.objects.filter(consultant__in = consultants, status='applied').count(),
-                "pending_level_1": Leave.objects.filter(consultant__in = consultants, status='pending').count(),
-                "rejected_level_1": Leave.objects.filter(consultant__in = consultants, status='rejected_1st_level').count(),
-            }
+            consultants = consultants.annotate(
+                custom_order=Case(
+                    When(leaves__status='pending', then=Value(1)),
+                    When(leaves__status='applied', then=Value(2)),
+                    When(leaves__status='rejected_1st_level', then=Value(3)),
+                    When(leaves__status='rejected', then=Value(4)),
+                    When(leaves__status='approved', then=Value(5)),
+                    default=Value(6),
+                    output_field=CharField()
+                )
+            )
 
-            status_order = {
-                'pending': 1,
-                'applied': 2,
-                'rejected_1st_level': 3,
-                'rejected': 4,
-                'approved': 5,
-            }
+            # Order the queryset based on custom_order and created date
+            # consultants = consultants.annotate(custom_order=custom_order).order_by('custom_order', '-created')
 
-            # Function to get sorting key for a consultant
-            def consultant_sort_key(consultant):
-                leave_status = consultant.leaves.latest().status if consultant.leaves.count() != 0 else ""
-                return status_order.get(leave_status, 6), consultant.id
-
-            # Sort the consultants based on the custom key
-            sorted_consultants = sorted(consultants, key=consultant_sort_key)
+            duplicate_project_ids = consultants.order_by('custom_order').values_list('id', flat=True)
+            distinct_project_ids = make_unique_preserve_order(duplicate_project_ids)
+            id_to_order = {id: order for order, id in enumerate(distinct_project_ids)}
+            custom_order_queryset = Consultant.objects.filter(id__in=id_to_order)
+            consultants = sorted(custom_order_queryset, key=lambda x: id_to_order[x.id])
 
             consultant_list = []
 
-            for consultant in sorted_consultants[first:last]:
+            for consultant in consultants[first:last]:
                 employers = PayrollEmployer.objects.filter(consultant=consultant).order_by('-created')
                 consultant = {
                     "id": consultant.id,
@@ -754,7 +760,7 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
             data["consultants"] = consultant_list
 
-            total = consultants.count()
+            total = len(consultants)
             # serializer = ConsultantTimeSheetSerializer(consultants[first:last], many=True)
             return Response({"data": data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
