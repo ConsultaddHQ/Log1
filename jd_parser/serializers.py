@@ -37,6 +37,7 @@ class MarketingMailSerializer(serializers.ModelSerializer):
             "body_text",
             "body_html",
             "keywords",
+            "marketer_feedback"
         )
 
     def to_representation(self, instance):

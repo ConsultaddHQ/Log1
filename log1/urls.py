@@ -11,7 +11,6 @@ from rest_framework_swagger.views import get_swagger_view
 
 from activity.views import CommentViewSet
 from attachment.views import AttachmentGetView, AttachmentView
-from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet
 from ckiller.views import CkillerSubmissionViewSet
 from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from impersonate.views import ImpersonateViewSets
@@ -19,12 +18,14 @@ from jd_parser.views import MarketingMailListViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
+from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet,\
+    LeaveBalanceViewSets
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
     TimetrackEventMobileViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
-    EngineerReportXposedViewSets
+    EngineerReportXposedViewSets, DetailedReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
     ConsultantRevisionViewSet, ProjectPaymentTermViewSet
@@ -104,6 +105,7 @@ router.register(r"choice", ChoiceViewSet)
 router.register(r"cmd", SlashCommandViewSets)
 
 router.register(r"report", ScrumMeetingReport)
+router.register(r"report_detail", DetailedReportViewSets)
 router.register(r"engineers", EngineerReportXposedViewSets)
 router.register(r"support_report", EngineeringReportViewSets)
 router.register(r"marketing_report", MarketingReportViewSets)
@@ -141,6 +143,7 @@ router.register(r"petition_docs", PetitionDocsViewSets)
 router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
 
 # finance App routes
+router.register(r'leave_balance', LeaveBalanceViewSets)
 router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
 router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
 router.register(r'finance_timesheet', FinanceTimeSheetViewSet)  #FintimeViewSet

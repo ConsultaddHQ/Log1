@@ -5,7 +5,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from jd_parser.models import MarketingMail, MMailScrap
 from jd_parser.serializers import MarketingMailListSerializer, MarketingMailSerializer
@@ -90,9 +90,10 @@ class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
         try:
             queryset = self.filter_queryset(self.get_queryset())
             queryset = (
-                queryset.filter(requirementMail=True if requirementMail == "1" else False).exclude(body_text__isnull=True)
+                queryset.filter(requirementMail=True if requirementMail ==
+                                "1" else False).exclude(body_text__isnull=True)
                 .exclude(body_text__exact="")
-                
+
             )
             if role:
                 filters = Q()
@@ -131,4 +132,17 @@ class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             # write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        mail_id = kwargs.get('pk')
+        feedback = request.data.get("feedback")
+        if (mail_id == None and feedback == None):
+            return Response({"message": ERROR_MSG, "error": "Bad request: feedback must not be null."}, status=400)
+        try:
+            mail_obj = get_object_or_404(MMailScrap, pk=mail_id)
+            mail_obj.marketer_feedback = feedback
+            mail_obj.save()
+            return Response({"data": "Feedback updated successully."}, status=200)
+        except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

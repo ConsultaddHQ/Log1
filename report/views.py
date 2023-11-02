@@ -2,8 +2,9 @@ import csv
 import json
 from datetime import datetime, date, timedelta
 
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.db import transaction
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -19,12 +20,17 @@ from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
 from utils_app.thred_mail import send_email
 from employee.serializers import UserSerializer
+from report.serializers import ReportSerializer, ConsultantInfoSerializer, SubmissionInfoSerializer, \
+    InterviewInfoSerializer, ProjectInfoSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
+
+
+ERR_DURATION = "Please duration for the report"
 
 
 # Route - /report/
@@ -87,8 +93,8 @@ class ScrumMeetingReport(GenericViewSet):
                 "text": text,
             }
             # post_msg_using_webhook(config.loud_speakers_url, data)
-            return Response({"message": "message sent"}, status=200)
-        return Response({"message": "Previous meeting not found"}, status=400)
+            return Response({"message": "message sent"}, status=status.HTTP_200_OK)
+        return Response({"message": "Previous meeting not found"}, status.HTTP_400_BAD_REQUEST)
 
     @transaction.atomic
     @action(methods=['get'], detail=False, url_path='set_meeting')
@@ -98,7 +104,7 @@ class ScrumMeetingReport(GenericViewSet):
             meeting.previous = False
             meeting.save()
         ScrumMeeting.objects.get_or_create(held_on=datetime.today(), is_previous=True)
-        return Response({"message": "success"}, status=201)
+        return Response({"message": "success"}, status=status.HTTP_201_CREATED)
 
 
 # Route - /cmd/
@@ -327,13 +333,13 @@ command - {command}\n\n
         try:
             api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"text": "Unauthorized"}, status=200)
+                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
 
             query = request.GET.get('text', None)
             command = request.GET.get('command', None)
 
             if not query and len(query) > 3:
-                return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
+                return Response({"text": f"{command} {query} \n Bad Input"}, status=status.HTTP_200_OK)
 
             data_type = query.split(" ")[0]
             name = query.split(" ")[1]
@@ -388,22 +394,22 @@ command - {command} {query}\n
 
                     text += f"| {consultant.name} | {days_on_bench} | {consultant.status} | {submission_count} | {interview_count} | {project_count} |\n"
 
-            return Response({"text": text}, status=200)
+            return Response({"text": text}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"text": "Bad Request", "error": str(error)}, status=200)
+            return Response({"text": "Bad Request", "error": str(error)}, status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
             api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"text": "Unauthorized"}, status=200)
+                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
 
             query = request.GET.get('text', None)
             command = request.GET.get('command', None)
             if not query and len(query) < 3:
-                return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
+                return Response({"text": f"{command} {query} \n Bad Input"}, status=status.HTTP_200_OK)
 
             date_filter = query.split(" ")[0]
             name = query.split(" ")[1]
@@ -436,24 +442,24 @@ command - {command} {query}\n
                 consultant_assigned = con_assigned if len(con_assigned) > 0 else None
 
                 text += f"""| {user.employee_name} | {user.team.name} |  {submission_count} | {interview_count} | {offer_count} |  {consultant_assigned} |\n"""
-            return Response({"text": text}, status=200)
+            return Response({"text": text}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"text": "Bad Request", "error": str(error)}, status=200)
+            return Response({"text": "Bad Request", "error": str(error)}, status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
             api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"text": "Unauthorized"}, status=200)
+                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
 
             query = request.GET.get('text', None)
             command = request.GET.get('command', None)
             arguments = query.split()
             slash_command = f"{command} {query}"
             if not query and len(arguments) > 0:
-                return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
+                return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
             text = slash_command
             arg1 = arguments[0]
 
@@ -468,7 +474,7 @@ command - {command} {query}\n
                     year = datetime.today().year
                     month = int(arg2) if arg2.isdigit() else None
                     if not month:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
                     if month > this_month:
                         year = datetime.today().year - 1
                     text = self.team_data_by_month(month, year, slash_command)
@@ -484,7 +490,7 @@ command - {command} {query}\n
                     arg2 = arguments[1]
                     day = int(arg2) if arg2.isdigit() else None
                     if not day:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
                     text = self.team_data_by_day(day, this_month, year, slash_command)
 
                 elif len(arguments) == 3:
@@ -493,9 +499,9 @@ command - {command} {query}\n
                     day = int(arg1) if arg1.isdigit() else None
                     month = int(arg2) if arg2.isdigit() else None
                     if not day:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
                     if not month:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
                     if month > this_month:
                         year = datetime.today().year - 1
                     text = self.team_data_by_day(day, month, year, slash_command)
@@ -545,12 +551,12 @@ command - {slash_command}\n
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
             else:
-                return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
+                return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
 
-            return Response({"text": text}, status=200)
+            return Response({"text": text}, status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"text": "Bad request", "error": str(error)}, status=200)
+            return Response({"text": "Bad request", "error": str(error)}, status.HTTP_200_OK)
 
 
 # Route - /support_report/
@@ -659,10 +665,10 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             serializer = ProjectSupportDetailSerializer(
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
-            return Response({"data": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
+            return Response({"data": serializer.data, "counts": data_count, "page_count": page_count}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+            return Response({"message": ERROR_MSG, 'error': error}, status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /marketing_report/
@@ -699,7 +705,7 @@ class MarketingReportViewSets(GenericViewSet):
                 employees = employees.filter(team__name=filter_by_team)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
-                return Response({'message': 'Invalid date filter'}, status=400)
+                return Response({'message': 'Invalid date filter'}, status.HTTP_400_BAD_REQUEST)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -750,10 +756,126 @@ class MarketingReportViewSets(GenericViewSet):
                         data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv",
                         request, "Marketing Report"
                     )
-            return Response({"data": data, "total": total, "file_url": url}, status=200)
+            return Response({"data": data, "total": total, "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @staticmethod
+    def get_marketing_team_report_data(team, **kwargs):
+        try:
+            start = kwargs.get('start')
+            end = kwargs.get('end')
+            team_data = kwargs.get('team_data')
+            request = kwargs.get('request')
+
+            bench_consultant = Consultant.objects.filter(
+                marketing__teams__in=team, marketing__status='open',
+                created__gte=start, created__lte=end
+            ).order_by('id').distinct('id')
+            submission = Submission.objects.filter(
+                marketing_team__in=team,
+                created__gte=start, created__lte=end,
+            ).exclude(status='draft').order_by('id').distinct('id')
+            interview = Interview.objects.filter(
+                start_time__gte=start, start_time__lte=end,
+                submission__marketing_team__in=team
+            ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id')
+            offer = Project.objects.filter(
+                submission__marketing_team__in=team,
+                created__gte=start, created__lte=end,
+            ).order_by('id').distinct('id')
+            joining = Project.objects.filter(
+                statuses__status='joined',
+                submission__marketing_team__in=team,
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id')
+            completion = Project.objects.filter(
+                statuses__status='complete',
+                submission__marketing_team__in=team,
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id')
+
+            termination_type = request.GET.get("termination_type", None)
+            termination_mapping = {
+                "Resigned": "terminated-resigned",
+                "Fired": "terminated-fired",
+            }
+            is_start_with = termination_mapping.get(termination_type, "terminated")
+
+            if termination_type == "Other":
+                termination = Project.objects.filter(
+                    statuses__status=is_start_with,
+                    submission__marketing_team__in=team,
+                    statuses__created__gte=start, statuses__created__lte=end,
+                ).order_by('id').distinct('id')
+            else:
+                termination = Project.objects.filter(
+                    statuses__status__istartswith=is_start_with,
+                    submission__marketing_team__in=team,
+                    statuses__created__gte=start, statuses__created__lte=end,
+                ).order_by('id').distinct('id')
+
+            scrum_master = ''
+            if team_data:
+                scrum_masters = User.objects.filter(team__name__iexact=team[0].name, role__name='admin', is_active=True)
+                scrum_master = None
+                if scrum_masters:
+                    scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
+
+            team_id = team[0].id if team_data else 0
+            team_name = team[0].name if team_data else 'Total'
+            scrum_master = scrum_master
+            offer_count = offer.count()
+            joining_count = joining.count()
+            interview_count = interview.count()
+            bench_consultant_count = bench_consultant.count()
+            submission_count = submission.count()
+            completion_count = completion.count()
+            termination_count = termination.count()
+
+            team_data = {
+                'data': {
+                    "id": team_id,
+                    "team": team_name,
+                    "offer": {'count': offer_count,
+                              'data': ReportSerializer(offer[0:3], many=True, context={'model': 'Project'}).data},
+                    "scrum_master": scrum_master,
+                    "joined": {'count': joining_count,
+                               'data': ReportSerializer(joining[0:3], many=True, context={'model': 'Project'}).data},
+                    "interview": {'count': interview_count,
+                                  'data': ReportSerializer(interview[0:3], many=True,
+                                                           context={'model': 'Interview'}).data},
+                    "bench_consultant": {'count': bench_consultant_count,
+                                         'data': ReportSerializer(bench_consultant[0:3], many=True,
+                                                                  context={'model': 'Consultant'}).data},
+                    "submission": {'count': submission_count,
+                                   'data': ReportSerializer(submission[0:3], many=True,
+                                                            context={'model': 'Submission'}).data},
+                    "completion": {'count': completion_count,
+                                   'data': ReportSerializer(completion[0:3], many=True,
+                                                            context={'model': 'Project'}).data},
+                    "termination": {'count': termination_count,
+                                    'data': ReportSerializer(termination[0:3], many=True,
+                                                             context={'model': 'Project'}).data},
+                },
+                'count': {
+                    "id": team_id,
+                    "team": team_name,
+                    "scrum_master": scrum_master,
+                    "offer_count": offer_count,
+                    "joined_count": joining_count,
+                    "bench_consultant": bench_consultant_count,
+                    "interview_count": interview_count,
+                    "completion_count": completion_count,
+                    "submission_count": submission_count,
+                    "termination_count": termination_count,
+                }
+            }
+            return team_data
+        except Exception as error:
+            write_exception(error, request)
+            return {}
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
@@ -764,101 +886,28 @@ class MarketingReportViewSets(GenericViewSet):
 
             if start and end and datetime.strptime(
                     start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
-                return Response({'message': 'Invalid date filter'}, status=400)
+                return Response({'message': 'Invalid date filter'}, status.HTTP_400_BAD_REQUEST)
 
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
                 end = date.today()
-            end = end + timedelta(days=1) if type(end) is not str else datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
+            end = end + timedelta(days=1) if type(end) is not str else \
+                datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
             data, url = list(), ""
-            total_bench = total_submissions = total_interviews = total_joining = total_offers \
-                = total_termination = total_completion = 0
             teams = Team.objects.filter(dept='Marketing')
+            data = []
+            export_data = []
             for team in teams:
-                team_id = team.id
-                bench_consultant = Consultant.objects.filter(
-                    marketing__teams__id=team_id,
-                    marketing__status='open'
-                ).order_by('id').distinct('id').count()
-                submission_count = Submission.objects.filter(
-                    marketing_team__id=team_id,
-                    created__gte=start, created__lte=end,
-                ).exclude(status='draft').order_by('id').distinct('id').count()
-                interview_count = Interview.objects.filter(
-                    created__gte=start, created__lte=end,
-                    submission__marketing_team__id=team_id
-                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
-                offer_count = Project.objects.filter(
-                    submission__marketing_team__id=team_id,
-                    created__gte=start, created__lte=end,
-                ).order_by('id').distinct('id').count()
-                joining_count = Project.objects.filter(
-                    statuses__status='joined',
-                    submission__marketing_team__id=team_id,
-                    statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id').count()
-                completion_count = Project.objects.filter(
-                    statuses__status='complete',
-                    submission__marketing_team__id=team_id,
-                    statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id').count()
+                team_data = self.get_marketing_team_report_data(team=[team], start=start, end=end, request=request,
+                                                                team_data=True)
+                data.append(team_data.get('data'))
+                export_data.append(team_data.get('count'))
 
-                termination_type = request.GET.get("termination_type", None)
-                termination_mapping = {
-                    "Resigned": "terminated-resigned",
-                    "Fired": "terminated-fired",
-                }
-                is_start_with = termination_mapping.get(termination_type, "terminated")
-
-                if termination_type == "Other":
-                    termination_count = Project.objects.filter(
-                        statuses__status=is_start_with,
-                        submission__marketing_team__id=team_id,
-                        statuses__created__gte=start, statuses__created__lte=end,
-                    ).order_by('id').distinct('id').count()
-                else:
-                    termination_count = Project.objects.filter(
-                        statuses__status__istartswith=is_start_with,
-                        submission__marketing_team__id=team_id,
-                        statuses__created__gte=start, statuses__created__lte=end,
-                    ).order_by('id').distinct('id').count()
-
-                scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
-                scrum_master = None
-                if scrum_masters:
-                    scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
-                data.append({
-                    "id": team.id,
-                    "team": team.name.title(),
-                    "offer_count": offer_count,
-                    "scrum_master": scrum_master,
-                    "joined_count": joining_count,
-                    "interview_count": interview_count,
-                    "bench_consultant": bench_consultant,
-                    "submission_count": submission_count,
-                    "completion_count": completion_count,
-                    "termination_count": termination_count,
-                })
-                total_offers += offer_count
-                total_joining += joining_count
-                total_bench += bench_consultant
-                total_interviews += interview_count
-                total_submissions += submission_count
-                total_completion += completion_count
-                total_termination += termination_count
-            data.append({
-                "id": 0,
-                "team": "Total",
-                "scrum_master": "",
-                "offer_count": total_offers,
-                "joined_count": total_joining,
-                "bench_consultant": total_bench,
-                "interview_count": total_interviews,
-                "completion_count": total_completion,
-                "submission_count": total_submissions,
-                "termination_count": total_termination,
-            })
+            team_data = self.get_marketing_team_report_data(team=teams, start=start, end=end, request=request,
+                                                            team_data=False)
+            data.append(team_data.get('data'))
+            export_data.append(team_data.get('count'))
 
             col_name = [
                 {"name": "team", "display_name": "Team Name"},
@@ -873,13 +922,13 @@ class MarketingReportViewSets(GenericViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    export_data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                     "Marketing Team Report"
                 )
-            return Response({"data": data, "file_url": url}, status=200)
+            return Response({"data": data, "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=True, url_path='team_data')
     def team_data(self, request, pk):
@@ -922,10 +971,10 @@ class MarketingReportViewSets(GenericViewSet):
                 {"display_name": "Joined Count", "count": joining_count, "default": submission_count},
                 {"display_name": "Termination Count", "count": termination_count, "default": submission_count}
             ]
-            return Response({"data": counts_data}, status=200)
+            return Response({"data": counts_data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
@@ -985,10 +1034,10 @@ class MarketingReportViewSets(GenericViewSet):
                         data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                         "Marketing Consultant Report"
                     )
-            return Response({'data': data, "total": total, "file_url": url}, status=200)
+            return Response({'data': data, "total": total, "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='supervisor')
     def supervisor(self, request):
@@ -1001,7 +1050,7 @@ class MarketingReportViewSets(GenericViewSet):
 
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
-                return Response({'message': 'Invalid date filter'}, status=400)
+                return Response({'message': 'Invalid date filter'}, status.HTTP_400_BAD_REQUEST)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -1047,10 +1096,10 @@ class MarketingReportViewSets(GenericViewSet):
                     data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                     "Marketing Supervisor Report"
                 )
-            return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=200)
+            return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='compare_supervisors')
     def compare_supervisors(self, request):
@@ -1062,13 +1111,14 @@ class MarketingReportViewSets(GenericViewSet):
 
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
-                return Response({'message': 'Invalid date filter'}, status=400)
+                return Response({'message': 'Invalid date filter'}, status.HTTP_400_BAD_REQUEST)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
                 end = date.today() + timedelta(days=1)
 
-            interviews = Interview.objects.filter(supervisor_id__in=supervisors, start_time__gte=start, start_time__lte=end)\
+            interviews = Interview.objects.filter(supervisor_id__in=supervisors, start_time__gte=start,
+                                                  start_time__lte=end) \
                 .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).order_by('-round')
             max_rounds = interviews.first().round if interviews else 0
             for sup_id in supervisors:
@@ -1078,18 +1128,175 @@ class MarketingReportViewSets(GenericViewSet):
                 sup_data = {
                     "id": supervisor.id, "name": supervisor.employee_name, "rounds": []
                 }
-                for round_number in range(1, sup_max_rounds+1):
+                for round_number in range(1, sup_max_rounds + 1):
                     pass_interviews = queryset.filter(round=round_number, status__in=['next_round', 'offer']).count()
                     fail_interviews = queryset.filter(round=round_number, status='failed').count()
                     sup_data['rounds'].append({
-                            "pass": pass_interviews, "fail": fail_interviews
-                        })
+                        "pass": pass_interviews, "fail": fail_interviews
+                    })
                 data.append(sup_data)
 
-            return Response({'max_rounds': max_rounds, 'data': data}, status=200)
+            return Response({'max_rounds': max_rounds, 'data': data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+
+class DetailedReportViewSets(GenericViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @action(methods=['get'], detail=False, url_path='consultant')
+    def consultant(self, request):
+        try:
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
+            team = request.GET.get('team', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            if team:
+                team_obj = get_object_or_404(Team, id=team)
+                queryset = Consultant.objects.filter(
+                    created__gte=start, created__lte=end, marketing__teams__in=[team_obj], marketing__status='open'
+                ).order_by('id').distinct('id')
+            else:
+                queryset = Consultant.objects.filter(
+                    created__gte=start, created__lte=end, marketing__teams__dept='Marketing', marketing__status='open'
+                ).order_by('id').distinct('id')
+
+            serializer = ConsultantInfoSerializer(queryset[first: last], many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='submission')
+    def submission(self, request):
+        try:
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            team = request.GET.get('team', None)
+            start = request.GET.get('start', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Submission.objects.filter(
+                created__gte=start, created__lte=end, marketing_team__dept='Marketing'
+            ).exclude(status='draft')
+
+            if team:
+                queryset = queryset.filter(marketing_team_id=team).order_by('id').distinct('id')
+            else:
+                queryset = queryset.order_by('id').distinct('id')
+
+            serializer = SubmissionInfoSerializer(queryset[first: last], many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='interview')
+    def interview(self, request):
+        try:
+            queryset = []
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            team = request.GET.get('team', None)
+            start = request.GET.get('start', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            if team:
+                sub_ids = Interview.objects.filter(
+                    start_time__gte=start, start_time__lte=end, submission__marketing_team_id=team
+                ).exclude(status='cancelled'
+                          ).order_by('submission_id').distinct('submission_id').values_list('submission_id', flat=True)
+            else:
+                sub_ids = Interview.objects.filter(
+                    start_time__gte=start, start_time__lte=end, submission__marketing_team__dept='Marketing'
+                ).exclude(status='cancelled'
+                          ).order_by('submission_id').distinct('submission_id').values_list('submission_id', flat=True)
+
+            for sub_id in sub_ids:
+                latest_interview = Interview.objects.filter(
+                    submission=sub_id).exclude(status='cancelled').order_by('-id').first()
+                if latest_interview:
+                    queryset.append(latest_interview)
+
+            serializer = InterviewInfoSerializer(queryset[first: last], many=True)
+            return Response({"data": serializer.data, "count": len(queryset)}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='purchase_order')
+    def purchase_order(self, request):
+        try:
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            tab = request.GET.get('tab', None)
+            team = request.GET.get('team', None)
+            start = request.GET.get('start', None)
+            termination_type = request.GET.get('type', None)
+
+            if not start and not end:
+                return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not tab and tab not in ['Offer', 'Joined', 'Complete', 'Terminated']:
+                return Response({"message": "Please provide correct tab name"}, status=status.HTTP_400_BAD_REQUEST)
+
+            if team:
+                queryset = Project.objects.filter(submission__marketing_team_id=team)
+            else:
+                queryset = Project.objects.filter(submission__marketing_team__dept='Marketing')
+
+            if tab == "Offer":
+                queryset = queryset.filter(
+                    created__gte=start, created__lte=end, statuses__status__in=['new', 'received', 'on_boarded']
+                ).order_by('id').distinct('id')
+
+            elif tab == "Joined":
+                queryset = queryset.filter(
+                    statuses__status='joined', statuses__created__gte=start, statuses__created__lte=end
+                ).order_by('id').distinct('id')
+
+            elif tab == "Complete":
+                queryset = queryset.filter(
+                    statuses__status='complete', statuses__created__gte=start, statuses__created__lte=end
+                ).order_by('id').distinct('id')
+
+            elif tab == "Terminated":
+                termination_mapping = {
+                    'Resigned': 'terminated-resigned',
+                    'Fired': 'terminated-fired',
+                }
+                is_start_with = termination_mapping.get(termination_type, 'terminated')
+                if termination_type == "Other":
+                    queryset = queryset.filter(
+                        statuses__status=is_start_with, statuses__created__gte=start, statuses__created__lte=end
+                    ).order_by('id').distinct('id')
+                elif termination_type:
+                    queryset = queryset.filter(
+                        statuses__status__istartswith=is_start_with,
+                        statuses__created__gte=start, statuses__created__lte=end
+                    ).order_by('id').distinct('id')
+                else:
+                    queryset = queryset.filter(
+                        statuses__status__istartswith='terminated',
+                        statuses__created__gte=start, statuses__created__lte=end
+                    ).order_by('id').distinct('id')
+
+            serializer = ProjectInfoSerializer(queryset[first: last], many=True)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /engineers/
@@ -1100,7 +1307,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
     @staticmethod
     def verify_api_key(api_key):
         if not APIKey.objects.is_valid(api_key):
-            return Response({"message": "Unauthorized"}, status=401)
+            return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
         return True
 
     @action(methods=['get'], detail=False, url_path='project/support')
@@ -1113,7 +1320,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
             # cycle_info = request.GET.get('cycle', 1)
             cycle_info = 1
             if request.GET.get('emp_id') is None and request.GET.get('project_id') is None:
-                return Response({"message": "Employee ID and project ID does not exist"}, status=200)
+                return Response({"message": "Employee ID and project ID does not exist"}, status=status.HTTP_200_OK)
             if request.GET.get('emp_id'):
                 try:
                     engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
@@ -1121,12 +1328,12 @@ class EngineerReportXposedViewSets(GenericViewSet):
                         "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
                     }
                 except Exception:
-                    return Response({"message": "Employee Id does not exist"}, status=400)
+                    return Response({"message": "Employee Id does not exist"}, status.HTTP_400_BAD_REQUEST)
             if request.GET.get('project_id'):
                 try:
                     project = Project.objects.get(pk=request.GET.get('project_id'))
                 except Exception:
-                    return Response({"message": "project not found"}, status=400)
+                    return Response({"message": "project not found"}, status.HTTP_400_BAD_REQUEST)
 
             if cycle_info:
                 if cycle_info == '1':
@@ -1205,10 +1412,10 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id
                 }
                 count += 1
-            return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=200)
+            return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='okr/send_mail')
     def okr_send_mail(self, request, *args, **kwargs):
@@ -1234,14 +1441,14 @@ class EngineerReportXposedViewSets(GenericViewSet):
 
             for key in required_keys:
                 if not mail_data[key]:
-                    return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
+                    return Response({"message": f"Key '{key}' is missing or empty."}, status.HTTP_400_BAD_REQUEST)
 
             try:
                 send_email(mail_data, request.data.get('from', 'product@consultadd.com'), None)
             except Exception as e:
-                return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(e)}, status.HTTP_400_BAD_REQUEST)
 
-            return Response({"message": "Mail sent successfully"}, status=200)
+            return Response({"message": "Mail sent successfully"}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
