@@ -144,6 +144,7 @@ class InterviewInfoSerializer(serializers.ModelSerializer):
     def get_submission(obj):
         submission = obj.submission
         return {
+            "sub_id": submission.id,
             "client": submission.client,
             "title": submission.lead.job_title,
             "vendor": submission.vendor.name if submission.vendor else None,
@@ -179,7 +180,8 @@ class ProjectInfoSerializer(serializers.ModelSerializer):
     def get_submission(obj):
         submission = obj.submission
         return {
-            "client": submission.client, "vendor": submission.vendor.name if submission.vendor else None,
+            "sub_id": submission.id, "client": submission.client,
+            "vendor": submission.vendor.name if submission.vendor else None,
             "position": submission.lead.position.display_name if submission.lead.position else None
         }
 
