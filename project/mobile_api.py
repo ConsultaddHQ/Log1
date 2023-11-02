@@ -529,8 +529,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['GET'], detail=True, url_path='balance')
     def balance(self, request, pk):
         try:
-            year = date.today().year
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year, is_expired=False)
+            # year = date.today().year
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False)
             # leaves = ConsultantLeave.objects.filter(consultant_id=pk)
             serial = ConsultantLeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
