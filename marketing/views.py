@@ -474,7 +474,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
             handover_ids = get_authenticated_users(request)
-            if (submission.created_by in handover_ids) or (user_id in supervisors) or ('engineer' in request.user.roles):
+            if (submission.created_by in handover_ids) or (user_id in supervisors) or (
+                    'engineer' in request.user.roles):
                 visibility = True
                 queryset = submission.attachments.all()
                 data = AttachmentSerializer(queryset, many=True).data
