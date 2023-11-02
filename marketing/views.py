@@ -1872,7 +1872,7 @@ class InterviewViewSets(ModelViewSet):
 
             interview.status = 'rescheduled'
             if interview.guest_type in ['Coder', 'Assistance'] or 'Assigned' in interview.guest_type:
-                interview.guest.clear()
+                interview.guests.clear()
             interview.save()
 
             submission = interview.submission

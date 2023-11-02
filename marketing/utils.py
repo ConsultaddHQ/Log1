@@ -65,7 +65,7 @@ def get_users_and_attendees(request, interview):
                 user_list.append(user)
                 attendees.append({"email": user.email})
 
-        for user in interview.guest.all():
+        for user in interview.guests.all():
             user_list.append(user)
             attendees.append({"email": user.email})
 

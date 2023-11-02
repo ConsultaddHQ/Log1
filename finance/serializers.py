@@ -121,14 +121,15 @@ class LeaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Leave
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
-                  'description', 'attachment', 'duration_type',"remarks")
+                  'description', 'attachment', 'duration_type', "remarks")
+
+    @staticmethod
     def get_status(obj):
         return obj.get_status_display()
 
     @staticmethod
     def get_leave_type(obj):
         return obj.leave_type.leave_type.display_name
-
 
     @staticmethod
     def get_attachment(obj):
