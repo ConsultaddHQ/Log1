@@ -30,7 +30,6 @@ from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
 
 
-
 ERR_DURATION = "Please duration for the report"
 
 
@@ -461,7 +460,6 @@ command - {command} {query}\n
             slash_command = f"{command} {query}"
             if not query and len(arguments) > 0:
                 return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
-
             text = slash_command
             arg1 = arguments[0]
 
@@ -1454,4 +1452,3 @@ class EngineerReportXposedViewSets(GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
-
