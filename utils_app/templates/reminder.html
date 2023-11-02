@@ -537,9 +537,10 @@
                                     <div class="f-fallback">
                                         <h2>Hello {{ consultant }},</h2>
                                         <h3>Hope you are doing well.</h3>
-                                        <h4 style="font-weight: 300;font-size: 14px;">This is a reminder to send in all the approved timesheets that are pending from your side.In case you have the approved timesheets for the current week upload that as well
-                                            <br>Kindly submit the timesheets on the Consultadd Timetrack Application as soon as possible.</h4>
-                                            <table class="tableheading">
+                                        <h4 style="font-weight: 300;font-size: 14px;">This is a reminder to send in all the approved {{ work_type }} that are pending from your side.In case you have the approved {{ work_type }} for the current week upload that as well
+                                            <br>Kindly submit the {{ work_type }}  on the Consultadd Timetrack Application as soon as possible.</h4>
+                                              {% if timesheet_list %}
+                                              <table class="tableheading">
                                               <tr>
                                                 <th style="width: 120px;text-align:center;font-weight: 500;font-size: 14px;">Week</th>
                                                 <th style="width: 80px;text-align: center;font-weight: 500;font-size: 14px;">Client</th>
@@ -555,6 +556,7 @@
                                               </tr>
                                               {% endfor %}
                                             </table>
+                                        {% endif %}
                                              <br>
                                         <p> <strong>Thanks,
                                             <br>Sakshi Shetty</strong>
