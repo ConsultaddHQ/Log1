@@ -10,7 +10,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.db.models import F, Max, Count
 from django.db.models.functions import Lower
-from  django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -1203,7 +1203,7 @@ class InterviewViewSets(ModelViewSet):
             if filter_for == 'my':
                 if 'engineer' in request.user.roles:
                     queryset = queryset.filter(
-                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guests__id=user_id)
+                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guests__user_id=user_id)
                     )
                 else:
                     queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
@@ -1652,13 +1652,35 @@ class InterviewViewSets(ModelViewSet):
                 # if interview.guest_type in ['coder', 'assistance'] and (
                 #         pre_guest_type == 'not_required' or pre_guest_type is None):
                 #     coder_request_notification(interview, "Coding request", request)
+                prev_guest_type = interview.guest_type
+                guest_type = get_guest_type(request)
+
+                if prev_guest_type != guest_type:
+                    if guest_type == "Coder":
+                        interview.assistance_tech = None
+                        interview.assistance_remarks = None
+                    elif guest_type == "Assistance":
+                        interview.coding_info = None
+                        interview.tech_stack = None
+                    elif guest_type == "Not Required":
+                        interview.coding_info = None
+                        interview.tech_stack = None
+                        interview.assistance_tech = None
+                        interview.assistance_remarks = None
 
                 add_or_update_guest(interview, request)
 
-                if (pre_guest_type in ['Coder', 'Assistance'] or 'Assigned' in pre_guest_type) and \
-                        interview.guest_type == 'Not Required':
+                if pre_guest_type in GUEST_TYPE and guest_type == 'Not Required':
                     # coder_request_notification(interview, "Coding not required for this Interview", request)
-                    interview.guest.clear()
+                    interview.guests.clear()
+                    interview.save()
+
+                if guest_type != "Not Required" and interview.guests.all() and ('Assigned' or 'assigned') not in guest_type:
+                    interview.guest_type = 'Assigned ' + guest_type
+                else:
+                    interview.guest_type = guest_type
+
+                interview.save()
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -2282,7 +2304,7 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='guest_feedback')
     def guest_feedback(self, request, pk):
         try:
-            queryset = Interview.objects.filter(id=pk, guest__in=[request.user])
+            queryset = Interview.objects.filter(id=pk, guests__user_id__in=[request.user.id])
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             interview = queryset.first()
@@ -2295,7 +2317,7 @@ class InterviewViewSets(ModelViewSet):
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
-            add_or_update_guest(interview, request)
+            add_or_update_guest(interview, request, json.loads(request.data.get('guest_info', '[]')))
 
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
@@ -2389,6 +2411,15 @@ class InterviewViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='guests')
+    def get_guests(self, request, pk):
+        try:
+            interview_obj = get_object_or_404(Interview, id=pk)
+            interviewers = interview_obj.guests.values("id", "user_id", "type").annotate(name=F('user__employee_name'))
+            return Response({"data": interviewers}, status=status.HTTP_200_OK)
+        except ObjectDoesNotExist:
+            return Response({"message": "Interview ID does not exist"}, status=400)
 
 
 # Route - /test/

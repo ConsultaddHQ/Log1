@@ -135,10 +135,12 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     Q(consultant__name__istartswith=query) |
                     Q(submission__client__istartswith=query) |
                     Q(submission__lead__vendor_company__name__istartswith=query) |
+
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
             if filter_json:
+
                 if 'client' in filter_json:
                     project_qs = project_qs.filter(submission__client__in=filter_json.get('client'))
 
@@ -525,6 +527,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     remote_engineer_email=F('consultant__email'),
                     vendor=F('submission__lead__vendor_company__name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
+
                 ).values('id', 'client', 'vendor', 'work_type', 'remote_engineer', 'remote_engineer_email',
                          'consultant_name').order_by('id', '-start_date').distinct('id')
                 return Response({'result': projects, 'total': projects.count()}, status=status.HTTP_200_OK)
@@ -1006,3 +1009,4 @@ class LeaveBalanceViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+

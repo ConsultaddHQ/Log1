@@ -144,7 +144,6 @@ router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
 # finance App routes
 router.register(r'leave_balance', LeaveBalanceViewSets)
 router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
-router.register(r'leave_balance', LeaveBalanceViewSets)
 router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
 router.register(r'finance_timesheet', FinanceTimeSheetViewSet)  #FintimeViewSet
 
