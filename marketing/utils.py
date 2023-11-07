@@ -65,9 +65,9 @@ def get_users_and_attendees(request, interview):
                 user_list.append(user)
                 attendees.append({"email": user.email})
 
-        for user in interview.guest.all():
-            user_list.append(user)
-            attendees.append({"email": user.email})
+        for user in interview.guests.all():
+            user_list.append(user.user)
+            attendees.append({"email": user.user.email})
 
         email = vendor_account_manager(interview.submission.lead.vendor_company.name)
         if email:
