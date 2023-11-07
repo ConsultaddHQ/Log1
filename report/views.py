@@ -1303,19 +1303,16 @@ class EngineerReportXposedViewSets(GenericViewSet):
                                                                 statuses__is_current=True,
                                                                 support__employee_id=employee_id,
                                                                 )
-                project_support = project_support.order_by('project__id').distinct('project__id')
                 project_ids = set(project_support.values_list('project__id', flat=True))
                 project = Project.objects.filter(id__in=project_ids)
             else:
-                project = Project.objects.filter(statuses__status__in=['joined', 'extended'], statuses__is_current=True)
-                if employee_id:
-                    try:
-                        user = get_object_or_404(User, employee_id=employee_id)
-                        consultant = get_object_or_404(Consultant, email=user.email)
-                    except Exception as error:
-                        return Response({"message": 'No Projects found'}, status=status.HTTP_400_BAD_REQUEST)
-                    project = project.filter(consultant=consultant)
-                project = project.order_by('id').distinct('id')
+                try:
+                    user = get_object_or_404(User, employee_id=employee_id)
+                    consultant = get_object_or_404(Consultant, email=user.email)
+                except Exception as error:
+                    return Response({"message": 'No Consultant found'}, status=status.HTTP_400_BAD_REQUEST)
+                project = Project.objects.filter(consultant=consultant, statuses__status__in=['joined', 'extended'],
+                                                 statuses__is_current=True).order_by('id').distinct('id')
             serializer = TimesheetProjectSerializer(project, many=True)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -1328,9 +1325,8 @@ class EngineerReportXposedViewSets(GenericViewSet):
             self.verify_api_key(request.GET.get('api_key'))
             test = Test.objects.filter(engineer__employee_id=request.GET.get('employee_id'),
                                        submit_date__date=request.GET.get('date'),
-                                       status='feedback_due')
+                                       status__in=['feedback_due', 'passed', 'failed'])
             serializer = TimesheetTestSerializer(test, many=True)
-            # print(serializer.data)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
