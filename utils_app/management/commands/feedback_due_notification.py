@@ -144,7 +144,7 @@ class Command(BaseCommand):
 
             for interview in interviews:
                 count_coder = count_coder + 1
-                guest = ", ".join(interview.guest.filter(
+                guest = ", ".join(interview.guests.filter(
                     role__name='engineer').values_list('employee_name', flat=True))
                 coder_text += f"""<tr>
                             <td style="padding:5px 8px 5px 8px;font-size: 2.5em;font-size: 2.5em;">{count_coder}</td>

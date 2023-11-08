@@ -318,10 +318,10 @@ class MessageCard:
                     },
                 ]
             }
-            if title == 'Coding Assignment' and interview.guest.all():
+            if title == 'Coding Assignment' and interview.guests.all():
                 coding_experts = ", ".join(
                     [f"<@{coder.slack_id}>" if coder.slack_id else coder.employee_name for coder in
-                     interview.guest.all()]
+                     interview.guests.all()]
                 )
                 block = {
                     "type": "section",
