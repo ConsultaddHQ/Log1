@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from employee.models import User
 from marketing.models import Test
 from project.models import Project
 
@@ -37,11 +38,13 @@ class ReportSerializer(serializers.Serializer):
 
 
 class TimesheetProjectSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
     companies = serializers.SerializerMethodField()
+    project_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'companies')
+        fields = ('id', 'companies', 'display_name', 'project_type')
 
     @staticmethod
     def get_companies(obj):
@@ -53,15 +56,25 @@ class TimesheetProjectSerializer(serializers.ModelSerializer):
             }
         return None
 
+    @staticmethod
+    def get_display_name(obj):
+        return f'{obj.id}:{obj.submission.client}'
+
+    def get_project_type(self, obj):
+        return self.context.get('project_type')
+
 
 class TimesheetTestSerializer(serializers.ModelSerializer):
     test_id = serializers.IntegerField(source='id')
     companies = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
+    submit_date = serializers.SerializerMethodField()
+    assign_to = serializers.SerializerMethodField()
+    submit_month = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
-        fields = ('test_id', 'companies', 'consultant')
+        fields = ('test_id', 'companies', 'consultant', 'submit_date', 'assign_to', 'submit_month')
 
     @staticmethod
     def get_companies(obj):
@@ -80,3 +93,44 @@ class TimesheetTestSerializer(serializers.ModelSerializer):
             'id': consultant.id,
             'name': consultant.name
         }
+
+    @staticmethod
+    def get_submit_date(obj):
+        if obj.submit_date:
+            return obj.submit_date.date()
+        return None
+
+    @staticmethod
+    def get_assign_to(obj):
+        engineers = obj.assign_to.all()
+        data = []
+        if engineers:
+            for engineer in engineers:
+                data.append({'employee_id': engineer.employee_id, 'name': engineer.employee_name})
+            return data
+        return None
+
+    @staticmethod
+    def get_submit_month(obj):
+        submit_date = obj.submit_date
+        if submit_date:
+            return f'{submit_date.date().year}-{str(submit_date.date().month).zfill(2)}'
+        return None
+
+
+class TimesheetUserSerializer(serializers.ModelSerializer):
+    team = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('employee_name', 'email', 'team')
+
+    @staticmethod
+    def get_team(obj):
+        team = obj.team
+        if team:
+            return {
+                'name': team.name,
+                'department': team.dept
+            }
+        return None
