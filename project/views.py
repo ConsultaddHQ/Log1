@@ -639,7 +639,9 @@ class ProjectViewSets(ModelViewSet):
             err = None
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
+            util = ProjectUtil(project, request)
             prev_employer = project.employer
+            prev_consultant_id = project.consultant.id
             prev_status_obj = project.statuses.get(is_current=True)
             prev_rate, prev_start_date = project.rate, project.start_date
             all_status, cancellation_status, termination_status = fetch_project_status()
@@ -662,6 +664,16 @@ class ProjectViewSets(ModelViewSet):
             project.invoicing_period = request.data.get('invoicing_period', project.invoicing_period)
             project.reporting_details = request.data.get('reporting_details', project.reporting_details)
 
+            remote_consultant_id = request.data.get('remote_consultant_id', None)
+            breakpoint()
+
+            if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "joined":
+                # Setting password for User (consultant)
+                password, new_user = set_consultant_password(project.consultant)
+                resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
+                util.send_join_notification()
+                project.is_mail_sent = True
+
             consultant = create_remote_consultant(request)
             if consultant:
                 project.consultant = consultant
@@ -675,7 +687,6 @@ class ProjectViewSets(ModelViewSet):
                 activity_created = True
                 send_employer_change_notification(project, data, request)
 
-            util = ProjectUtil(project, request)
             desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -723,6 +734,8 @@ class ProjectViewSets(ModelViewSet):
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
+                    project.is_mail_sent = True
+                    project.save()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:

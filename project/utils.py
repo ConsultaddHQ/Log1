@@ -24,13 +24,15 @@ from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent
 
 def set_consultant_password(consultant):
     try:
-        if not consultant.is_active:
+        if not consultant.is_active and consultant.first_login:
+            breakpoint()
             password = password_generator(password_length=10, strength=3)
             consultant.set_password(password)
             consultant.is_active = True
             consultant.save()
             return password, True
-        return "password", False
+        breakpoint()
+        return consultant.get_password(), False
     except Exception as error:
         write_exception(message=error)
 
