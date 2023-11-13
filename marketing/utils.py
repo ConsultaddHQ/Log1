@@ -431,7 +431,9 @@ def interview_card_data(obj, request):
                     "answer_type": feedback.question.answer_type
                 }
                 coding_feedback_data.append(coding_feedback)
-            guest = " ".join([f"`<@{i.slack_id}>`" if i.slack_id else f"`{i.employee_name}`" for i in obj.guest.all()])
+            guest = " ".join([
+                f"`<@{i.user.slack_id}>`" if i.user.slack_id else f"`{i.user.employee_name}`" for i in obj.guests.all()
+            ])
             coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
             coding_feedback_data.insert(
                 1, {"question": "Coding Present", "answer": "Yes" if obj.coding_present else "No"}
