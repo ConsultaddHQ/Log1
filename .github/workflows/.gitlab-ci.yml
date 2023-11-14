@@ -1,13 +1,13 @@
-name: CI-Log1-Backend-Prod
+name: CI-Log1-Backend-Staging
 
 on:
   push:
     branches:
-      - master
+      - staging
 
 jobs:
   deploy:
-    runs-on: log1-backend-prod
+    runs-on: log1-staging
 
     steps:
       - name: Checkout code
