@@ -13,7 +13,8 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'request_timesheet', 'timesheet_frequency', 'consultant', 'submission')
+        fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'request_timesheet',
+                  'timesheet_frequency', 'consultant', 'submission')
 
     def get_timesheet_status(self, obj):
         status = self.context.get('timesheet_status')
@@ -101,7 +102,7 @@ class FinanceDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_list_page_status(obj):
-        if obj.status=="updated" or obj.status=="submitted":
+        if obj.status == "updated" or obj.status == "submitted":
             return "pending"
         return obj.status
 
@@ -121,14 +122,15 @@ class LeaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Leave
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
-                  'description', 'attachment', 'duration_type',"remarks")
+                  'description', 'attachment', 'duration_type', "remarks")
+
+    @staticmethod
     def get_status(obj):
         return obj.get_status_display()
 
     @staticmethod
     def get_leave_type(obj):
         return obj.leave_type.leave_type.display_name
-
 
     @staticmethod
     def get_attachment(obj):
