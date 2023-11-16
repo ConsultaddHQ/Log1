@@ -21,10 +21,11 @@ from utils_app.utils import export_to_csv
 from utils_app.thred_mail import send_email
 from employee.serializers import UserSerializer
 from report.serializers import ReportSerializer, ConsultantInfoSerializer, SubmissionInfoSerializer, \
-    InterviewInfoSerializer, ProjectInfoSerializer
+    InterviewInfoSerializer, ProjectInfoSerializer, TimesheetProjectSerializer, TimesheetTestSerializer, \
+    TimesheetUserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
-from marketing.models import Submission, Interview
+from marketing.models import Submission, Interview, Test
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
@@ -1452,3 +1453,75 @@ class EngineerReportXposedViewSets(GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='timesheet/project')
+    def timesheet_project(self, request, *args, **kwargs):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            project_type = request.GET.get('project_type')
+            employee_id = request.GET.get('employee_id', None)
+            project_id = request.GET.get('project_id', None)
+            if project_type == 'support':
+                if project_id:
+                    project_support = ProjectSupport.objects.filter(project__id=project_id)
+                else:
+                    project_support = ProjectSupport.objects.filter(statuses__frequency__in=['active', 'less_active'],
+                                                                    statuses__is_current=True,
+                                                                    support__employee_id=employee_id,
+                                                                    )
+                project_ids = set(project_support.values_list('project__id', flat=True))
+                project = Project.objects.filter(id__in=project_ids)
+            elif project_type == 'remote':
+                if project_id:
+                    project = Project.objects.filter(id=project_id).order_by('id').distinct('id')
+                else:
+                    try:
+                        user = get_object_or_404(User, employee_id=employee_id)
+                        consultant = get_object_or_404(Consultant, email=user.email)
+                    except Exception as error:
+                        return Response({"message": 'No Consultant found'}, status=status.HTTP_400_BAD_REQUEST)
+                    project = Project.objects.filter(consultant=consultant, statuses__status__in=['joined', 'extended'],
+                                                     statuses__is_current=True).order_by('id').distinct('id')
+            else:
+                return Response({'message': 'Project Type is required'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = TimesheetProjectSerializer(project, many=True, context={'project_type': project_type})
+            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='timesheet/test')
+    def timesheet_test(self, request, *args, **kwargs):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            submit_date = request.GET.get('submit_date', None)
+            test_id = request.GET.get('test_id', None)
+            submit_month = request.GET.get('submit_month', None)
+            employee_id = request.GET.get('employee_id', None)
+            if test_id:
+                test = Test.objects.filter(id=test_id)
+            else:
+                test = Test.objects.filter(status__in=['feedback_due', 'passed', 'failed'])
+
+            if employee_id:
+                test = test.filter(engineer__employee_id=employee_id)
+            if submit_date:
+                test = test.filter(submit_date__date=submit_date)
+            if submit_month:
+                year, month = submit_month.split('-')
+                test = test.filter(submit_date__year=year, submit_date__month=month)
+            serializer = TimesheetTestSerializer(test, many=True)
+            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='timesheet/users')
+    def timesheet_users(self, request, *args, **kwargs):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            users = User.objects.filter(team__dept='Engineering')
+            serializer = TimesheetUserSerializer(users, many=True)
+            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
