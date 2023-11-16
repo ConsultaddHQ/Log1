@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: log1-staging
+    runs-on: log1-backend-staging
 
     steps:
       - name: Checkout code
