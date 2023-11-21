@@ -16,11 +16,11 @@ from google.oauth2.service_account import Credentials
 from email.mime import application, multipart, text, base, image, audio
 # from google_auth_oauthlib.flow import InstalledAppFlow
 # SCOPES = ['https://mail.google.com/','https://www.googleapis.com/auth/gmail.readonly']
-# SERVICE_ACCOUNT_FILE = 'service.json'
+SERVICE_ACCOUNT_FILE = '/home/ubuntu/log1/service.json'
 SCOPES = ['https://mail.google.com/']
 
 
-def cred(mail_id):
+def cred(mail_id, file_dst=None):
     if os.environ.get('ENV', 'local') != 'prod':
         mail_id = "suman.m@consultadd.com"
         
@@ -28,9 +28,9 @@ def cred(mail_id):
         mail_id = "suman.m@consultadd.com"
 
     credentials = Credentials.from_service_account_file(
-        filename="service.json",
-        scopes=SCOPES,
+        filename=SERVICE_ACCOUNT_FILE if file_dst else 'service.json',
         subject=mail_id,
+        scopes=SCOPES,
     )
     service = build('gmail', 'v1', credentials=credentials)
     return service, mail_id 
@@ -176,10 +176,10 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
 
 
 @shared_task
-def send_email(mail_data, from_email, request=None):
+def send_email(mail_data, from_email, cron_execution=None, request=None):
     try:
         from_email = "product@consultadd.com"
-        service, from_mail_id = cred(from_email)
+        service, from_mail_id = cred(from_email, cron_execution)
         msg = create_message(from_mail_id, mail_data)
         message = (service.users().messages().send(userId="me", body=msg).execute())
         return message['id'], True, from_mail_id
@@ -193,11 +193,11 @@ def send_email(mail_data, from_email, request=None):
 
 
 @shared_task
-def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
+def send_email_without_template(mail_data, from_email, request=None, mail_id=None, cron_execution=None):
     try:
         if from_email:
             from_email = "product@consultadd.com"
-        service, from_mail_id = cred(from_email)
+        service, from_mail_id = cred(from_email, cron_execution)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = MIMEText(mail_data["body"])
@@ -218,9 +218,9 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
                 message['bcc'] = ','.join(mail_data["bcc"])
                 
             else:
-                message['to'] = ','.join(
-                    ['piyush.y@consultadd.com', 'shreyas.k@consultadd.com', 'prashant.k@consultadd.com', 'gufran.a@consultadd.com']
-                )
+                message['to'] = ','.join([
+                    'shreyas.k@consultadd.com', 'prashant.k@consultadd.com', 'gufran.a@consultadd.com'
+                ])
                 message['cc'] = ''
                 message['bcc'] = ''
             message['from'] = 'product@consultadd.com'
@@ -237,12 +237,12 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
 
 
 @shared_task
-def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None):
+def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None, cron_execution=None):
     try:
         from_email = "product@consultadd.com"
-        service, from_mail_id = cred(from_email)
+        service, from_mail_id = cred(from_email, cron_execution)
         if mail_id is not None:
-            email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
+            email_data = service.users().messages().get(userId='me', id=mail_id).execute()
             message = multipart.MIMEMultipart()
 
             subject = get_field(email_data, 'subject')
