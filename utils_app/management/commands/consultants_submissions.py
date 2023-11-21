@@ -46,7 +46,9 @@ class Command(BaseCommand):
                         }
                     )
                     count += 1
-                    users = User.objects.filter(team=submission.marketing_team, role__name__in=['admin', 'proxy'], is_active=True)
+                    users = User.objects.filter(
+                        team=submission.marketing_team, role__name__in=['admin', 'proxy'], is_active=True
+                    )
                     for user in users:
                         scrum_masters.append(user.email)
                     submission_ids.append(submission.id)
@@ -66,9 +68,14 @@ class Command(BaseCommand):
 
                 reply_to = [config.RELATIONS]
                 try:
-                    send_email(mail_data, "marketing@consultadd.com", None)
-                    mail_res = True
+                    resp, status, from_mail_id = send_email(mail_data, "marketing@consultadd.com", None, True)
+                    if not status:
+                        mail_res = False
+                        create_cron_error(job, f"{resp} while sending mail to {consultant.name} {consultant.email}")
+                    else:
+                        mail_res = True
                 except Exception as e:
+                    create_cron_error(job, f"Error while sending mail to {consultant.name} {consultant.email}")
                     mail_res = False
 
                 submission_data.append({
@@ -95,7 +102,7 @@ class Command(BaseCommand):
                 },
             }
             if submission_data:
-                send_email(mail_data, "marketing@consultadd.com")
+                send_email(mail_data, "marketing@consultadd.com", None, True)
         except Exception as error:
             _, _, tb = sys.exc_info()
             lineno = tb.tb_lineno
