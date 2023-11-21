@@ -176,7 +176,7 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
 
 
 @shared_task
-def send_email(mail_data, from_email, cron_execution=None, request=None):
+def send_email(mail_data, from_email, request=None, cron_execution=None):
     try:
         from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email, cron_execution)

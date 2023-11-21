@@ -61,7 +61,7 @@ class Command(BaseCommand):
                     'subject': f"Reminder: Visa expiry reminder of On-Project consultants",
                     'context': {'data': data}
                 }
-                res, ok, _ = send_email(mail_data, "product@consultadd.com", True, None)
+                res, ok, _ = send_email(mail_data, "product@consultadd.com", None, True)
                 if not ok:
                     create_cron_error(job, res)
 
