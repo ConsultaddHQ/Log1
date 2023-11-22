@@ -13,7 +13,8 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'request_timesheet', 'timesheet_frequency', 'consultant', 'submission')
+        fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'request_timesheet',
+                  'timesheet_frequency', 'consultant', 'submission')
 
     def get_timesheet_status(self, obj):
         status = self.context.get('timesheet_status')
@@ -101,7 +102,7 @@ class FinanceDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_list_page_status(obj):
-        if obj.status=="updated" or obj.status=="submitted":
+        if obj.status == "updated" or obj.status == "submitted":
             return "pending"
         return obj.status
 
