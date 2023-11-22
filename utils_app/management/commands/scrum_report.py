@@ -9,7 +9,7 @@ import pandas as pd
 from project.models import Project
 from employee.models import User, Team
 from marketing.models import Interview
-from utils_app.mailing import send_email_attachment_multiple
+from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -17,18 +17,13 @@ def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
     try:
         path = [path]
         mail_data = {
+            'attachments': path,
             'to': scrum_masters, 'cc': [], 'bcc': [],
-            'subject': 'Scrum Report of {} from {} to {}'.format(team_name, this_week, yesterday),
             'template': '../templates/scrum_report.html',
-            'context': {
-                'end': yesterday,
-                'offers': offers,
-                'team': team_name,
-                'start': this_week,
-            },
-            'attachments': path
+            'subject': 'Scrum Report of {} from {} to {}'.format(team_name, this_week, yesterday),
+            'context': {'end': yesterday, 'offers': offers, 'team': team_name, 'start': this_week}
         }
-        res, msg = send_email_attachment_multiple(mail_data, 'Log1@consultadd.com')
+        res, msg, _ = send_email_attachment_multiple(mail_data, 'Log1@consultadd.com', None, None, None, True)
         if not msg:
             return res, "error"
         return res, "ok"
