@@ -585,16 +585,17 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
             return f"{months} months"
         else:
             return f"{days} days"
-        
+
     @staticmethod
     def get_interviews(obj):
         interview_info = [
             {
-                f'R{index}': {
-                    'supervisor': interview.supervisor.employee_name,
-                    'coders': [coder.employee_name for coder in interview.guests.all()]
+                f'Round {interview.round}': {
+                    'coders': [coder.employee_name for coder in interview.guests.all()],
+                    'supervisor': interview.supervisor.employee_name
+                    if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}" ,
                 }
-            } for index, interview in enumerate(obj.interviews.all(), start=1)
+            } for interview in obj.interviews.all()
         ]
 
         return interview_info
