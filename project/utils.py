@@ -654,10 +654,16 @@ def get_country(city):
     return city_obj.first().country if city_obj else None
 
 
-def assign_project_associates(project, request, **kwargs):
+def assign_project_associates(project, request=None, **kwargs):
     try:
-        vp = get_object_or_404(User, employee_id=2572)
-        lead_sm = get_object_or_404(User, employee_id=2491)
+        city = project.submission.lead.city.split(",")
+        if city and city[1] != 'CA':
+            vp = get_object_or_404(User, employee_id=2572)
+            lead_sm = get_object_or_404(User, employee_id=2491)
+        else:
+            lead_sm = None
+            vp = get_object_or_404(User, employee_id=2452)
+
         recruiter_poc = ConsultantPOC.objects.filter(
             consultant=project.submission.consultant, poc_type__iexact='Recruiter', end=None
         ).first()
