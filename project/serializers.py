@@ -9,7 +9,7 @@ from marketing.serializers import SubmissionSerializer
 from project.utils import get_project_check_list, get_country
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -521,3 +521,54 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_payment_term_type(obj):
         return obj.get_payment_term_type_display()
+
+class ProjectAssociatesSerializer(serializers.ModelSerializer):
+    vp = serializers.SerializerMethodField()
+    interviews = serializers.SerializerMethodField()
+    lead_sm = serializers.SerializerMethodField()
+    team_lead = serializers.SerializerMethodField()
+    marketer = serializers.SerializerMethodField()
+    support_persons = serializers.SerializerMethodField()
+    recruiter = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectAssociates
+        fields = ('id', 'total_hours', 'initial_notification', 'secondary_notification', 'vp', 'interviews', 'lead_sm', 'team_lead', 'recruiter', 'marketer', 'support_persons')
+
+
+    @staticmethod
+    def get_vp(obj):
+        return obj.vp.employee_name
+
+    @staticmethod
+    def get_lead_sm(obj):
+        return obj.lead_sm.employee_name
+
+    @staticmethod
+    def get_team_lead(obj):
+        return obj.team_lead.employee_name
+
+    @staticmethod
+    def get_marketer(obj):
+        return obj.marketer.employee_name
+
+    @staticmethod
+    def get_recruiter(obj):
+        return obj.recruiter.employee_name
+
+    @staticmethod
+    def get_support_persons(obj):
+        return [person.employee_name for person in obj.support_persons.all()]
+
+    @staticmethod
+    def get_interviews(obj):
+        interview_info = [
+            {
+                f'R{index}': {
+                    'supervisor': interview.supervisor.employee_name,
+                    'coders': [coder.employee_name for coder in interview.guests.all()]
+                }
+            } for index, interview in enumerate(obj.interviews.all(), start=1)
+        ]
+
+        return interview_info

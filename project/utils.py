@@ -695,7 +695,7 @@ def update_project_associate(obj, request, **kwargs):
                 obj.save()
 
         if kwargs.get('update_type', '') == 'total_hours':
-            obj.total_hours = kwargs.get('total_hours')
+            obj.total_hours += kwargs.get('total_hours')
             obj.save()
     except Exception as error:
         write_exception(error, request)
