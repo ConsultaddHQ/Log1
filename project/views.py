@@ -2307,8 +2307,8 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-class ProjectAssociatesViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin,
-                                DestroyModelMixin):
+
+class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin):
     queryset = ProjectAssociates.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ProjectAssociatesSerializer
