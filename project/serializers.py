@@ -558,8 +558,34 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_persons(obj):
-        return [person.employee_name for person in obj.support_persons.all()]
+        support_info = [
+            {
+                'support_name': support.support.employee_name,
+                'status': support.statuses.filter(is_current=True).first().frequency,
+                'duration': ProjectAssociatesSerializer.get_duration(support)
+            } for support in obj.support_persons.all()
+        ]
 
+        return support_info
+
+    @staticmethod
+    def get_duration(support):
+        start_date = support.start
+        end_date = support.end
+        if end_date:
+            diff = end_date - start_date
+        else:
+            diff = date.today() - start_date
+
+        months = diff.days // 30  # Assuming an average of 30 days per month
+        days = diff.days % 30
+        if months > 0 and days > 0:
+            return f"{months} months and {days} days"
+        elif months > 0:
+            return f"{months} months"
+        else:
+            return f"{days} days"
+        
     @staticmethod
     def get_interviews(obj):
         interview_info = [

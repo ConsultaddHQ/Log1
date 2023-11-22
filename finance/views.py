@@ -236,9 +236,9 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             paystub.status_updated_by = request.user
             paystub.save()
 
-            if paystub.status is not "rejected":
-                project = Project.object.get(id=paystub.project)
-                project_associates = ProjectAssociates.objects.filter(project=paystub.project)
+            if paystub.status == 'approved':
+                project = Project.objects.get(id=paystub.project)
+                project_associates = ProjectAssociates.objects.filter(project=project)
                 if not project_associates:
                     assign_project_associates(project,request)
                 data = {"total_hours": paystub.hour+paystub.additional_hours, "update_type": "total_hours"}
@@ -447,9 +447,9 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             timesheet.status_updated_by = request.user
             timesheet.save()
 
-            if timesheet.status is not "rejected":
+            if timesheet.status == 'approved':
                 project = Project.objects.get(id=timesheet.project.id)
-                project_associates = ProjectAssociates.objects.filter(project=timesheet.project)
+                project_associates = ProjectAssociates.objects.filter(project=project)
                 if not project_associates:
                     assign_project_associates(project, request)
                 data = {"total_hours": timesheet.hours + timesheet.additional_hours, "update_type": "total_hours"}

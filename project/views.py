@@ -2319,6 +2319,10 @@ class ProjectAssociatesViewSet(GenericViewSet, CreateModelMixin, ListModelMixin,
         try:
             if not project_id:
                 return Response({"error":"project not found"}, status=400)
+            project = Project.objects.get(id=project_id)
+            project_associates = ProjectAssociates.objects.filter(project=project)
+            if not project_associates:
+                assign_project_associates(project, request)
             try:
                 project_associates = ProjectAssociates.objects.get(project=project_id)
             except:
