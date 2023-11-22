@@ -1,4 +1,4 @@
-name: CI-Log1-Backend-Staging
+name: CI-Log1-Backend-Prod
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: log1-backend-staging
+    runs-on: log1-backend-prod
 
     steps:
       - name: Checkout code
