@@ -37,7 +37,7 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
     SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push, get_country
+    mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
@@ -230,8 +230,8 @@ class ProjectViewSets(ModelViewSet):
             retention = consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
-            if project.employer == 'Consultadd':
-                to.append(config.VENDOR_MANAGEMENT)
+            # if project.employer == 'Consultadd':
+            #     to.append(config.VENDOR_MANAGEMENT)
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
@@ -723,6 +723,7 @@ class ProjectViewSets(ModelViewSet):
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
+                    assign_project_associates(project, request)
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -1095,6 +1096,10 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 SupportStatus.objects.create(
                     is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
                 )
+
+                if project.associate:
+                    data = {"obj": support_person, "update_type": "support"}
+                    update_project_associate(project.associate, request, **data)
 
             if request.user.id == support_person.id:
                 if project_support.is_proxy_support:

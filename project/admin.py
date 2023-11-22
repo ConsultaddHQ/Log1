@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from project.models import Project, ProjectSupport, SupportStatus, ProjectStatus, ProjectOrder, TimeSheet, \
-    PayrollSchedule, ConsultantFeedback, ConsultantLeave, Leave, TimesheetRequest, ProjectPaymentTerm
+    PayrollSchedule, ConsultantFeedback, ConsultantLeave, Leave, TimesheetRequest, ProjectPaymentTerm, ProjectAssociates
 
 
 @admin.register(Project)
@@ -108,9 +108,18 @@ class TimesheetRequestAdmin(ExportActionModelAdmin):
     search_fields = ('id', 'start', 'project__consultant__name')
     list_display = ('id', 'start', 'end', 'status', 'project', 'reviewed_by', 'reviewer_comment', 'consultant_comment')
 
+
 @admin.register(ProjectPaymentTerm)
 class ProjectPaymentTermAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('payment_term_type',)
     search_fields = ('id', 'project__consultant__name', 'project__id')
     list_display = ('id', 'consultant_payment_term', 'payment_term', 'payment_term_type', 'comment', 'project')
+
+
+@admin.register(ProjectAssociates)
+class ProjectAssociatesAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    search_fields = ('id', 'project__id')
+    list_display = ('id', 'project', 'marketer', 'recruiter', 'team_lead', 'vp', 'total_hours', 'initial_notification',
+                    'secondary_notification')
