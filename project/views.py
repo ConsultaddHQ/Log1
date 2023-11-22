@@ -2318,19 +2318,15 @@ class ProjectAssociatesViewSet(GenericViewSet, CreateModelMixin, ListModelMixin,
         project_id = kwargs.get('pk',None)
         try:
             if not project_id:
-                return Response({"error":"project not found"}, status=400)
-            project = Project.objects.get(id=project_id)
-            project_associates = ProjectAssociates.objects.filter(project=project)
-            if not project_associates:
-                assign_project_associates(project, request)
+                return Response({"message":"Project not found"}, status=status.HTTP_400_BAD_REQUEST)
             try:
                 project_associates = ProjectAssociates.objects.get(project=project_id)
             except:
-                return Response({"error": "project doesn't have any associated users"}, status=400)
+                return Response({"message": "Project associates not found"}, status=status.HTTP_204_NO_CONTENT)
 
             serializer = self.serializer_class(project_associates)
-            return Response({"data": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
 
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
