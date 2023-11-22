@@ -3,7 +3,7 @@ name: CI-Log1-Backend-Prod
 on:
   push:
     branches:
-      - staging
+      - master
 
 jobs:
   deploy:
