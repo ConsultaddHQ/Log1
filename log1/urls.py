@@ -26,11 +26,11 @@ from notification.views import EmployeeNotificationViewSet, ConsultantNotificati
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
     EngineerReportXposedViewSets, DetailedReportViewSets
-from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
-    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
-    ConsultantRevisionViewSet, ProjectPaymentTermViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
+    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
+    ConsultantRevisionViewSet, ProjectPaymentTermViewSet, ProjectAssociatesViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets, CertificateViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
@@ -90,6 +90,7 @@ router.register(r"engineer_report", EngineerReportViewSet)
 router.register(r"timesheet_event", TimetrackEventViewSet)
 router.register(r"eng_project", EngineeringProjectsViewSets)
 router.register(r"rate_revision", ConsultantRevisionViewSet)
+router.register(r"project_associates", ProjectAssociatesViewSet)
 router.register(r'project_payment_term', ProjectPaymentTermViewSet)
 router.register(r"project/(?P<project_id>[0-9]+)/updates", ProjectUpdateViewSet)
 router.register(r"project/(?P<project_id>[0-9]+)/support", ProjectSupportViewSet)

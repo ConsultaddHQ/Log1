@@ -34,13 +34,13 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
 
 
 # Route - /project/
@@ -2306,3 +2306,27 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+class ProjectAssociatesViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin,
+                                DestroyModelMixin):
+    queryset = ProjectAssociates.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProjectAssociatesSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def retrieve(self, request, *args, **kwargs):
+        project_id = kwargs.get('pk',None)
+        try:
+            if not project_id:
+                return Response({"message":"Project not found"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                project_associates = ProjectAssociates.objects.get(project=project_id)
+            except:
+                return Response({"message": "Project associates not found"}, status=status.HTTP_204_NO_CONTENT)
+
+            serializer = self.serializer_class(project_associates)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
