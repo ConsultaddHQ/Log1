@@ -590,12 +590,13 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
     def get_interviews(obj):
         interview_info = [
             {
-                f'Round {interview.round}': {
-                    'coders': [coder.employee_name for coder in interview.guests.all()],
-                    'supervisor': interview.supervisor.employee_name
-                    if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}" ,
-                }
-            } for interview in obj.interviews.all()
+                f'round': interview.round,
+                'coders': [coder.employee_name for coder in interview.guests.filter(
+                    type__in=['Assistant', 'Coder', 'Coder & Assistant']
+                )],
+                'supervisor': interview.supervisor.employee_name
+                if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}"
+            } for interview in obj.interviews.all().order_by('id').distinct('id')
         ]
 
         return interview_info
