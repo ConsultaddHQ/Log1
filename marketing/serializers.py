@@ -703,13 +703,15 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     permission = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
+    is_associate = serializers.SerializerMethodField()
     remote_consultant = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'status', 'feedback', 'check_list', 'attachments', 'created', 'city', 'remote_consultant',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote', 'permission')
+                  'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote', 'permission',
+                  'is_associate')
 
     @staticmethod
     def get_remote_consultant(obj):
@@ -724,6 +726,13 @@ class ProjectV2Serializer(serializers.ModelSerializer):
         if status:
             return status.first().status
         return None
+
+    @staticmethod
+    def get_is_associate(obj):
+        if hasattr(obj, 'associate'):
+            return True
+        else:
+            return False
 
     def get_permission(self, obj):
         user = self.context.get('user')

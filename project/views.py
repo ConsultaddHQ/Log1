@@ -1098,7 +1098,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 )
 
                 if project.associate:
-                    data = {"obj": support_person, "update_type": "support"}
+                    data = {"obj": project_support, "update_type": "support"}
                     update_project_associate(project.associate, request, **data)
 
             if request.user.id == support_person.id:
