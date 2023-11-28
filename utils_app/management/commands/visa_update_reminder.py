@@ -38,7 +38,7 @@ class Command(BaseCommand):
                                     f"Please Update the work authorisation on log1."
                         }
                         try:
-                            send_email_without_template(mail_data, "product@consultadd.com", None, None)
+                            send_email_without_template(mail_data, "product@consultadd.com", None, None, True)
                         except Exception as e:
                             mail_error.append((consultant.id, f"mail not send {str(e)}"))
             if len(mail_error) > 0:
@@ -61,7 +61,7 @@ class Command(BaseCommand):
                     'subject': f"Reminder: Visa expiry reminder of On-Project consultants",
                     'context': {'data': data}
                 }
-                res, ok, _ = send_email(mail_data, "product@consultadd.com")
+                res, ok, _ = send_email(mail_data, "product@consultadd.com", None, True)
                 if not ok:
                     create_cron_error(job, res)
 
