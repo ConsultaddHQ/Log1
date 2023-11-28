@@ -522,19 +522,21 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
     def get_payment_term_type(obj):
         return obj.get_payment_term_type_display()
 
+
 class ProjectAssociatesSerializer(serializers.ModelSerializer):
     vp = serializers.SerializerMethodField()
-    interviews = serializers.SerializerMethodField()
+    remote = serializers.SerializerMethodField()
     lead_sm = serializers.SerializerMethodField()
-    team_lead = serializers.SerializerMethodField()
     marketer = serializers.SerializerMethodField()
-    support_persons = serializers.SerializerMethodField()
+    team_lead = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
+    interviews = serializers.SerializerMethodField()
+    support_persons = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectAssociates
-        fields = ('id', 'total_hours', 'initial_notification', 'secondary_notification', 'vp', 'interviews', 'lead_sm', 'team_lead', 'recruiter', 'marketer', 'support_persons')
-
+        fields = ('id', 'total_hours', 'initial_notification', 'secondary_notification', 'vp', 'interviews', 'lead_sm',
+                  'team_lead', 'recruiter', 'marketer', 'support_persons', 'project', 'remote')
 
     @staticmethod
     def get_vp(obj):
@@ -545,8 +547,14 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
         return obj.lead_sm.employee_name
 
     @staticmethod
+    def get_remote(obj):
+        return {
+            "is_remote": obj.project.is_remote, "remote_consultant": obj.project.consultant.name
+        }
+
+    @staticmethod
     def get_team_lead(obj):
-        return obj.team_lead.employee_name
+        return obj.team_lead.employee_name if obj.team_lead else None
 
     @staticmethod
     def get_marketer(obj):
@@ -554,18 +562,21 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_recruiter(obj):
-        return obj.recruiter.employee_name
+        return obj.recruiter.employee_name if obj.recruiter else "Not Assigned"
 
     @staticmethod
     def get_support_persons(obj):
-        support_info = [
-            {
-                'support_name': support.support.employee_name,
-                'status': support.statuses.filter(is_current=True).first().frequency,
-                'duration': ProjectAssociatesSerializer.get_duration(support)
-            } for support in obj.support_persons.all()
-        ]
-
+        support_info = []
+        for support in obj.support_persons.all():
+            frequency = support.statuses.filter(is_current=True).first()
+            support_info.append(
+                {
+                    "start": support.start, "end": support.end,
+                    "support_name": support.support.employee_name,
+                    "duration": ProjectAssociatesSerializer.get_duration(support),
+                    "status": " ".join(frequency.frequency.split("_")).capitalize() if frequency else None
+                }
+            )
         return support_info
 
     @staticmethod
@@ -574,6 +585,8 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
         end_date = support.end
         if end_date:
             diff = end_date - start_date
+        elif start_date > date.today():
+            return "Not Started"
         else:
             diff = date.today() - start_date
 
@@ -591,9 +604,9 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
         interview_info = [
             {
                 f'round': interview.round,
-                'coders': [coder.employee_name for coder in interview.guests.filter(
-                    type__in=['Assistant', 'Coder', 'Coder & Assistant']
-                )],
+                'coders': interview.guests.filter(type__in=['Assistant', 'Coder', 'Coder & Assistant']).values_list(
+                    'user__employee_name', flat=True
+                ),
                 'supervisor': interview.supervisor.employee_name
                 if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}"
             } for interview in obj.interviews.all().order_by('id').distinct('id')

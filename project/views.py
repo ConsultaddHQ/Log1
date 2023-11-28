@@ -1097,7 +1097,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
                 )
 
-                if project.associate:
+                if hasattr(project, 'associate'):
                     data = {"obj": project_support, "update_type": "support"}
                     update_project_associate(project.associate, request, **data)
 
