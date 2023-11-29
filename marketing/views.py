@@ -2713,17 +2713,22 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 writer = csv.writer(file)
                 writer.writerow(['Test Id', 'Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name',
                                  'Link', 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status',
-                                 'Marketer Feedback', 'Engineer Associated', 'Test Type'])
+                                 'Marketer Feedback', 'Engineer Associated', 'Engineer Feedback', 'Test Type'])
                 for obj in queryset:
-                    engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
-                    test_type = obj.engineer_feedback.filter(question__title='Select type of test'
-                                                             ).values('answer').first()
+                    test_type = obj.engineer_feedback.filter(question__title='Select type of test').values('answer').first()
+                    if obj.status in ['new', 'assigned', 'cancelled']:
+                        engineer_feedback = 'Not Added Yet'
+                        engineers = obj.assign_to.values_list('employee_name', flat=True)
+                    else:
+                        engineer_feedback = obj.engineer_remarks
+                        engineers = obj.engineer.values_list('employee_name', flat=True)
+
                     writer.writerow([
                         obj.id, obj.submission.consultant.name, obj.submission.created_by.employee_name,
                         obj.submission.client, obj.submission.lead.job_title, obj.submission.lead.vendor_company.name,
                         obj.link, obj.created.date(), obj.deadline, obj.skills,
                         obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
-                        obj.feedback, engineer_associated,
+                        obj.feedback, ", ".join(engineers), engineer_feedback,
                         test_type.get('answer') if test_type else 'offline' if obj.is_offline else 'online',
                     ])
                 file.close()
