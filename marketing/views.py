@@ -1231,9 +1231,9 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'coding_interview' in filters:
                     if filters["coding_interview"] == 'yes':
-                        queryset = queryset.filter(guest_type__in=['Coder', 'Assigned Coder']).exclude(status='cancelled')
+                        queryset = queryset.exclude(guest_type='Not Required').exclude(status='cancelled')
                     elif filters["coding_interview"] == 'no':
-                        queryset = queryset.exclude(guest_type__in=['Coder', 'Assigned Coder']).exclude(status='cancelled')
+                        queryset = queryset.filter(guest_type='Not Required').exclude(status='cancelled')
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1343,15 +1343,8 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
-        coder_names = obj.guests.filter(type__in=['Coder', 'Assistant'])
-        coders = ''
-        n = 0
-        for name in coder_names:
-            if n == 0:
-                coders = name.employee_name
-                n += 1
-            else:
-                coders = coders + ', ' + name.employee_name
+        coder_names = obj.guests.filter(type__in=['Coder', 'Assistant']).values_list('user__employee_name', flat=True)
+        coders = ', '.join(coder_names)
         supervisor_feedback, guest_feedback = '', ''
         for answer_obj in interview_answer_qs:
             if iter_count == 0:
@@ -3096,7 +3089,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
                            test.engineer.filter()],
             }
-            slack.send_test_feedback(payload, config.slack_test_channel_url)
+            res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
+            if not res:
+                write_exception(msg, request)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
         except Exception as error:

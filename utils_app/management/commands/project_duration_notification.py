@@ -6,6 +6,12 @@ from project.models import ProjectAssociates
 from utils_app.utils import create_cron_error, create_cron_object
 
 
+NOTIFICATION_TYPE = [
+    {"hour": 160, "du_check": "160_HOUR"}, {"hour": 320, "du_check": "320_HOUR"},
+    {"hour": 480, "du_check": "480_HOUR"}, {"hour": 640, "du_check": "640_HOUR"}, {"hour": 800, "du_check": "800_HOUR"}
+]
+
+
 class Command(BaseCommand):
 
     @staticmethod
@@ -49,14 +55,20 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = create_cron_object(name='project_duration_notification')
         try:
-            associates_qs = ProjectAssociates.objects.filter(total_hours__gte=160, initial_notification=False)
-            for obj in associates_qs:
-                msg, resp, _ = self.send_project_completion_notification(obj, 160)
-                if resp:
-                    obj.initial_notification=True
-                    obj.save()
-                else:
-                    create_cron_error(job, msg)
+            for notification_type in NOTIFICATION_TYPE:
+                check = {
+                    'total_hours__gte': notification_type["hour"],
+                    f'notification_type__{notification_type["du_check"]}': False,
+                }
+                associates_qs = ProjectAssociates.objects.filter(**check)
+                for obj in associates_qs:
+                    msg, resp, _ = self.send_project_completion_notification(obj, notification_type["hour"])
+                    if resp:
+                        obj.notification_type[notification_type["du_check"]] = True
+                        obj.initial_notification = True
+                        obj.save()
+                    else:
+                        create_cron_error(job, msg)
 
             associates_qs = ProjectAssociates.objects.filter(
                 total_hours__gte=1000, initial_notification=True, secondary_notification=False
