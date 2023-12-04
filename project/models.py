@@ -435,6 +435,7 @@ class ProjectPaymentTerm(TimeStampedModel):
 
 
 class ProjectAssociates(TimeStampedModel):
+    notification_type = models.JSONField(null=True)
     total_hours = models.FloatField(_("Total Hours"))
     initial_notification = models.BooleanField(_("Notification For 160 hrs"), default=False)
     secondary_notification = models.BooleanField(_("Notification For 1000 hrs"), default=False)
