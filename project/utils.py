@@ -692,17 +692,17 @@ def assign_project_associates(project, request=None, **kwargs):
         return None
 
 
-def update_project_associate(obj, request, **kwargs):
+def update_project_associate(associate_obj, request, **kwargs):
     try:
         if kwargs.get('update_type', '') == 'support':
             support_person = kwargs.get("obj", '')
-            if support_person not in obj.support_persons:
-                obj.support_persons.add(obj)
-                obj.save()
+            if support_person not in associate_obj.support_persons.all():
+                associate_obj.support_persons.add(support_person)
+                associate_obj.save()
 
         if kwargs.get('update_type', '') == 'total_hours':
-            obj.total_hours += kwargs.get('total_hours')
-            obj.save()
+            associate_obj.total_hours += kwargs.get('total_hours')
+            associate_obj.save()
     except Exception as error:
         write_exception(error, request)
         return None

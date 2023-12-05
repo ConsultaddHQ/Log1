@@ -15,10 +15,12 @@ class Command(BaseCommand):
             mail_data = {
                 "to": [config.FINANCE], "bcc": [],
                 'template': '../templates/project_completion.html',
-                'subject': f"Congratulations!!! {submission.consultant.name}'s project with {submission.client} completed {hours}",
+                'subject': f"Successful Completion of {obj.total_hours}-Hour Project by Consultant "
+                           f"{submission.consultant.name}",
                 "cc": [obj.marketer.email, obj.vp.email, obj.team_lead.email, obj.lead_sm.email],
                 "context": {
                     "vendor_company": submission.vendor.name,
+                    "start_date": obj.project.start_date,
                     "url": config.APP_URL, "consultant_name": submission.consultant.name,
                     "client_company": submission.client, "project_hours": obj.total_hours,
                     "redirection_url": f"{config.APP_URL}/#/details/{submission.id}/project?id={obj.project_id}"
