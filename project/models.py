@@ -5,10 +5,10 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
-from marketing.models import Submission
 from consultant.models import Consultant
 from attachment.models import Attachment
 from employee.models import User, Tagging
+from marketing.models import Submission, Interview
 from utils_app.models import TimeStampedModel, Choice
 
 FEEDBACK_CHOICES = (
@@ -22,6 +22,12 @@ FEEDBACK_CHOICES = (
     ('rate_increment', 'Rate Increment'),
     ('engineering_issue', 'Engineering Issue'),
 )
+
+
+DURATION_COMPLETION_NOTIFICATION_TYPE = [
+    {"hour": 160, "du_check": "160_HOUR"}, {"hour": 320, "du_check": "320_HOUR"},
+    {"hour": 480, "du_check": "480_HOUR"}, {"hour": 640, "du_check": "640_HOUR"}, {"hour": 800, "du_check": "800_HOUR"}
+]
 
 
 class Project(TimeStampedModel):
@@ -432,3 +438,40 @@ class ProjectPaymentTerm(TimeStampedModel):
 
     def __str__(self):
         return self.payment_term_type
+
+
+class ProjectAssociates(TimeStampedModel):
+    notification_type = models.JSONField(null=True)
+    total_hours = models.FloatField(_("Total Hours"))
+    initial_notification = models.BooleanField(_("Notification For 160 hrs"), default=False)
+    secondary_notification = models.BooleanField(_("Notification For 1000 hrs"), default=False)
+    vp = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name='VP', related_name='vp')
+    interviews = models.ManyToManyField(Interview, verbose_name='Interview', related_name='project_interviews')
+    lead_sm = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name='Lead SM', related_name='lead_sm')
+    project = models.OneToOneField(Project, on_delete=models.PROTECT, verbose_name='Project', related_name='associate')
+    team_lead = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='team_projects',
+        verbose_name='Team Lead',
+        null=True, blank=True
+    )
+    marketer = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='marketed_consultants',
+        verbose_name='Marketer'
+    )
+    recruiter = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='recruited_consultants',
+        verbose_name='Recruiter',
+        null=True, blank=True,
+    )
+    support_persons = models.ManyToManyField(
+        ProjectSupport,
+        null=True, blank=True,
+        verbose_name='Support Person',
+        related_name='supported_projects'
+    )
+
+    def __str__(self):
+        return f"{self.project.consultant.name}-{self.project.submission.client}"
