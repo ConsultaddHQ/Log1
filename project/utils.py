@@ -19,7 +19,8 @@ from django.contrib.contenttypes.models import ContentType
 from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from engineering.models import TrainingCheckList, ProjectDescription
-from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent, ProjectAssociates
+from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent, ProjectAssociates, \
+    DURATION_COMPLETION_NOTIFICATION_TYPE
 
 
 def set_consultant_password(consultant):
@@ -673,8 +674,8 @@ def assign_project_associates(project, request=None, **kwargs):
         ).first()
 
         obj = ProjectAssociates.objects.create(
-            project=project, lead_sm=lead_sm, team_lead=team_lead, recruiter=recruiter,
-            vp=vp, marketer=project.created_by, total_hours=kwargs.get('total_hours', 0)
+            vp=vp, project=project, lead_sm=lead_sm, team_lead=team_lead, recruiter=recruiter,
+            notification_type={}, marketer=project.created_by, total_hours=kwargs.get('total_hours', 0)
         )
 
         interviews = project.submission.screening.exclude(status='cancelled')
@@ -685,6 +686,8 @@ def assign_project_associates(project, request=None, **kwargs):
         if support_persons:
             obj.support_persons.add(*support_persons)
 
+        for notification_type in DURATION_COMPLETION_NOTIFICATION_TYPE:
+            obj.notification_type[notification_type["du_check"]] = False
         obj.save()
         return "assigned"
     except Exception as error:

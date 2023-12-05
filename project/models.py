@@ -24,6 +24,12 @@ FEEDBACK_CHOICES = (
 )
 
 
+DURATION_COMPLETION_NOTIFICATION_TYPE = [
+    {"hour": 160, "du_check": "160_HOUR"}, {"hour": 320, "du_check": "320_HOUR"},
+    {"hour": 480, "du_check": "480_HOUR"}, {"hour": 640, "du_check": "640_HOUR"}, {"hour": 800, "du_check": "800_HOUR"}
+]
+
+
 class Project(TimeStampedModel):
     TIMESHEET_FREQUENCIES = (
         ('weekly', 'Weekly'),

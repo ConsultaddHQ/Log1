@@ -2,14 +2,8 @@ from constance import config
 from django.core.management import BaseCommand
 
 from utils_app.thred_mail import send_email
-from project.models import ProjectAssociates
 from utils_app.utils import create_cron_error, create_cron_object
-
-
-NOTIFICATION_TYPE = [
-    {"hour": 160, "du_check": "160_HOUR"}, {"hour": 320, "du_check": "320_HOUR"},
-    {"hour": 480, "du_check": "480_HOUR"}, {"hour": 640, "du_check": "640_HOUR"}, {"hour": 800, "du_check": "800_HOUR"}
-]
+from project.models import ProjectAssociates, DURATION_COMPLETION_NOTIFICATION_TYPE
 
 
 class Command(BaseCommand):
@@ -20,10 +14,10 @@ class Command(BaseCommand):
             submission = obj.project.submission
             mail_data = {
                 "to": [config.FINANCE], "bcc": [],
+                "cc": [obj.marketer.email, obj.vp.email],
                 'template': '../templates/project_completion.html',
                 'subject': f"Successful Completion of {obj.total_hours}-Hour on Project by Consultant "
                            f"{submission.consultant.name}",
-                "cc": [obj.marketer.email, obj.vp.email, obj.team_lead.email, obj.lead_sm.email],
                 "context": {
                     "start_date": obj.project.start_date,
                     "vendor_company": submission.vendor.name,
@@ -32,6 +26,11 @@ class Command(BaseCommand):
                     "redirection_url": f"{config.APP_URL}#/details/{submission.id}/project?id={obj.project_id}"
                 }
             }
+
+            if obj.lead_sm:
+                mail_data.get("cc").append(obj.lead_sm.email)
+            if obj.team_lead:
+                mail_data.get("cc").append(obj.team_lead.email)
 
             support_persons = obj.project.support.filter(
                 is_proxy_support=False, support__is_active=True).values_list('support__email', flat=True)
@@ -47,7 +46,7 @@ class Command(BaseCommand):
             if coders:
                 mail_data["cc"].extend(coders)
 
-            msg, resp, _ = send_email(mail_data, "product@consultadd.com", None, True)
+            msg, resp, _ = send_email(mail_data, "product@consultadd.com", None, False)
             return msg, resp, _
         except Exception as error:
             return f"{error} error while sending mail", False, None
@@ -55,8 +54,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = create_cron_object(name='project_duration_notification')
         try:
-            for notification_type in NOTIFICATION_TYPE:
+            for notification_type in DURATION_COMPLETION_NOTIFICATION_TYPE:
                 check = {
+                    'total_hours__lte': 1000,
                     'total_hours__gte': notification_type["hour"],
                     f'notification_type__{notification_type["du_check"]}': False,
                 }
