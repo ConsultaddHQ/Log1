@@ -1343,7 +1343,8 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
-        coder_names = obj.guests.filter(type__in=['Coder', 'Assistant']).values_list('user__employee_name', flat=True)
+        coder_names = obj.guests.filter(
+            type__in=['Coder', 'Assistant', 'Coder & Assistant']).values_list('user__employee_name', flat=True)
         coders = ', '.join(coder_names)
         supervisor_feedback, guest_feedback = '', ''
         for answer_obj in interview_answer_qs:

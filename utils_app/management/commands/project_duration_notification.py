@@ -46,7 +46,7 @@ class Command(BaseCommand):
             if coders:
                 mail_data["cc"].extend(coders)
 
-            msg, resp, _ = send_email(mail_data, "product@consultadd.com", None, False)
+            msg, resp, _ = send_email(mail_data, "product@consultadd.com", None, True)
             return msg, resp, _
         except Exception as error:
             return f"{error} error while sending mail", False, None
