@@ -24,6 +24,12 @@ FEEDBACK_CHOICES = (
 )
 
 
+DURATION_COMPLETION_NOTIFICATION_TYPE = [
+    {"hour": 160, "du_check": "160_HOUR"}, {"hour": 320, "du_check": "320_HOUR"},
+    {"hour": 480, "du_check": "480_HOUR"}, {"hour": 640, "du_check": "640_HOUR"}, {"hour": 800, "du_check": "800_HOUR"}
+]
+
+
 class Project(TimeStampedModel):
     TIMESHEET_FREQUENCIES = (
         ('weekly', 'Weekly'),
@@ -435,6 +441,7 @@ class ProjectPaymentTerm(TimeStampedModel):
 
 
 class ProjectAssociates(TimeStampedModel):
+    notification_type = models.JSONField(null=True)
     total_hours = models.FloatField(_("Total Hours"))
     initial_notification = models.BooleanField(_("Notification For 160 hrs"), default=False)
     secondary_notification = models.BooleanField(_("Notification For 1000 hrs"), default=False)
