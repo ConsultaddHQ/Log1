@@ -21,7 +21,7 @@ from legal.models import Petition
 from utils_app.models import Choice
 from notification.models import Notification, FCMDevice
 from consultant.models import Consultant, PayrollEmployer
-from project.models import Project, Leave, TimeSheet, TimesheetRequest, ConsultantLeave
+from project.models import Project, Leave, TimeSheet, TimesheetRequest, ConsultantLeave, ProjectAssociates
 
 from project.serializers import ConsultantLeaveSerializer
 from finance.serializers import FinanceDetailSerializer, FinanceSerializer, LeaveSerializer, \
@@ -29,9 +29,9 @@ from finance.serializers import FinanceDetailSerializer, FinanceSerializer, Leav
 
 from utils_app.thred_mail import send_email as send_email_
 from notification.utils import push_notification_consultant
-from project.utils import create_notification_and_send_push
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
 from finance.utils import check_access, make_unique_preserve_order, return_leave_status
+from project.utils import create_notification_and_send_push, update_project_associate, assign_project_associates
 
 
 # Route - /finance_payStubs
@@ -235,6 +235,15 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             paystub.status_updated_at = timezone.now()
             paystub.status_updated_by = request.user
             paystub.save()
+
+            if paystub.status == 'approved':
+                project = Project.objects.get(id=paystub.project_id)
+                project_associates = ProjectAssociates.objects.filter(project=project)
+                if not project_associates:
+                    assign_project_associates(project, request)
+                data = {"total_hours": paystub.hours + paystub.additional_hours, "update_type": "total_hours"}
+                update_project_associate(project.associate, request, **data)
+
             notification_type = "rejected" if request.data.get('status') == 'rejected' else "Approved"
             create_notification_and_send_push(paystub, request, notification_type)
             serializer = self.serializer_class(paystub)
@@ -437,6 +446,15 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             timesheet.status_updated_at = datetime.now()
             timesheet.status_updated_by = request.user
             timesheet.save()
+
+            if timesheet.status == 'approved':
+                project = Project.objects.get(id=timesheet.project_id)
+                project_associates = ProjectAssociates.objects.filter(project=project)
+                if not project_associates:
+                    assign_project_associates(project, request)
+                data = {"total_hours": timesheet.hours + timesheet.additional_hours, "update_type": "total_hours"}
+                update_project_associate(project.associate, request, **data)
+
             notification_type = "rejected" if request.data.get('status') == 'rejected' else "Approved"
             create_notification_and_send_push(timesheet, request, notification_type)
             serializer = FinanceDetailSerializer(timesheet)
