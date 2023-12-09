@@ -1,3 +1,4 @@
+import os
 import json
 from datetime import datetime, date, timedelta
 
@@ -27,10 +28,10 @@ from project.serializers import ConsultantLeaveSerializer
 from finance.serializers import FinanceDetailSerializer, FinanceSerializer, LeaveSerializer, \
     TimesheetRequestSerializer
 
-from utils_app.thred_mail import send_email as send_email_
 from notification.utils import push_notification_consultant
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
 from finance.utils import check_access, make_unique_preserve_order, return_leave_status
+from utils_app.thred_mail import send_email as send_email_, send_mail_in_thread, send_email
 from project.utils import create_notification_and_send_push, update_project_associate, assign_project_associates
 
 
@@ -237,11 +238,11 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             paystub.save()
 
             if paystub.status == 'approved':
-                project = Project.objects.get(id=paystub.project)
+                project = Project.objects.get(id=paystub.project_id)
                 project_associates = ProjectAssociates.objects.filter(project=project)
                 if not project_associates:
-                    assign_project_associates(project,request)
-                data = {"total_hours": paystub.hour+paystub.additional_hours, "update_type": "total_hours"}
+                    assign_project_associates(project, request)
+                data = {"total_hours": paystub.hours + paystub.additional_hours, "update_type": "total_hours"}
                 update_project_associate(project.associate, request, **data)
 
             notification_type = "rejected" if request.data.get('status') == 'rejected' else "Approved"
@@ -448,7 +449,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             timesheet.save()
 
             if timesheet.status == 'approved':
-                project = Project.objects.get(id=timesheet.project.id)
+                project = Project.objects.get(id=timesheet.project_id)
                 project_associates = ProjectAssociates.objects.filter(project=project)
                 if not project_associates:
                     assign_project_associates(project, request)
@@ -692,6 +693,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+
 # Route - /finance_leave
 class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Leave.objects.all()
@@ -864,6 +866,19 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
             leave.status = leave_status
             leave.save()
+
+            if leave.status in ["applied", "rejected_1st_level"]:
+                mail_data = {
+                    "template": "../templates/leave_update.html",
+                    "to": [consultant.email], "cc": [], "bcc": [],
+                    "subject": f"Leave initial level approval {'granted' if leave_status == 'applied' else 'rejected'}",
+                    "context": {
+                        "start_date": leave.from_date, "consultant_name": consultant.name,
+                        "end_date": leave.to_date, "hours": leave.total_hours, "sender_name": request.user.employee_name
+                    }
+                }
+                cal_id, res, _ = send_email_(mail_data, "sid@consultadd.com", request)
+
             sender_content_type = ContentType.objects.get(model='user')
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
@@ -894,7 +909,8 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
                 FCMDevice.objects.filter(
                     object_id__in=list(object_ids), content_type__model='consultanttoken'
                 ).values_list('device_id', flat=True))
-            push_notification_consultant(registration_ids, message_body)
+            if os.environ.get('ENV', 'local') == 'prod':
+                push_notification_consultant(registration_ids, message_body)
 
             return Response({"message": "Leave updated successfully"}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -908,7 +924,7 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             approval = request.data.get('action', True)
             count = 0
             consultant_ids = request.data.get('consultant_ids', [])
-            message =  "Consultant Approval Updated"
+            message = "Consultant Approval Updated"
 
             for consultant_id in consultant_ids:
                 exit_pending = Leave.objects.filter(consultant=consultant_id, status__in=['pending', 'applied'])

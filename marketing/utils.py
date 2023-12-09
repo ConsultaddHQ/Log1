@@ -49,7 +49,9 @@ def get_scrum_masters(request):
 def get_users_and_attendees(request, interview):
     try:
         user_list = [interview.supervisor]
-        attendees = [{'email': interview.supervisor.email}, {'email': interview.submission.created_by.email}]
+        attendees = [{'email': interview.submission.created_by.email}]
+        if interview.supervisor.is_active:
+            attendees.append({'email': interview.supervisor.email})
         if 'engineer' not in request.user.roles:
             scrum_masters = User.objects.filter(
                 team=request.user.team, role__name__in=['admin', 'proxy'], account_login=True
@@ -69,9 +71,9 @@ def get_users_and_attendees(request, interview):
             user_list.append(user.user)
             attendees.append({"email": user.user.email})
 
-        email = vendor_account_manager(interview.submission.lead.vendor_company.name)
-        if email:
-            attendees.append({"email": email})
+        # email = vendor_account_manager(interview.submission.lead.vendor_company.name)
+        # if email:
+        #     attendees.append({"email": email})
 
         if interview.consultant.id == "948":
             attendees.append({"email": "jyothsna.consultadd@gmail.com"})

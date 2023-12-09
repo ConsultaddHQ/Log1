@@ -1,10 +1,11 @@
 import csv
 import json
+import copy
 from datetime import datetime, date, timedelta
 
-from django.db.models import Q, Max
 from django.db import transaction
 from rest_framework import status
+from django.db.models import Q, Max
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -14,12 +15,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from constance import config
+
 from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
+from activity.views import create_activity
 from utils_app.thred_mail import send_email
+from engineering.models import ProjectUpdate
+from engineering.utils import tag_and_notify
 from employee.serializers import UserSerializer
+from attachment.models import create_attachment
+from engineering.serializers import ProjectUpdateSerializer
 from report.serializers import ReportSerializer, ConsultantInfoSerializer, SubmissionInfoSerializer, \
     InterviewInfoSerializer, ProjectInfoSerializer, TimesheetProjectSerializer, TimesheetTestSerializer, \
     TimesheetUserSerializer
@@ -1523,5 +1530,39 @@ class EngineerReportXposedViewSets(GenericViewSet):
             users = User.objects.filter(team__dept='Engineering')
             serializer = TimesheetUserSerializer(users, many=True)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+
+    @action(methods=['put'], detail=True, url_path='remote_project/update')
+    def project_update(self, request, pk):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            data = copy.copy(request.data)
+            user = User.objects.get(employee_id=9998)
+            data['update_by'] = user.id
+            data['project'] = pk
+            serializer = ProjectUpdateSerializer(data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            update = ProjectUpdate.objects.get(id=serializer.data['id'])
+            for file in request.FILES.getlist('files'):
+                file_data = {
+                    "file": file,
+                    "object_id": update.id,
+                    "creator": user,
+                    "model": "projectupdate",
+                    "type": 'project_update',
+                }
+                create_attachment(file_data)
+
+            tags = request.data.get('tagged_user', None)
+            if tags:
+                tag_and_notify(update, tags, user, 'create')
+
+            # Activity
+            desc = f"{user.employee_name} added project Update-{update.id}"
+            create_activity(data['project'], 'projectupdate', user, desc, 'created')
+            return Response({"message": "Project Update is added successfully"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
