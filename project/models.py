@@ -447,8 +447,13 @@ class ProjectAssociates(TimeStampedModel):
     secondary_notification = models.BooleanField(_("Notification For 1000 hrs"), default=False)
     vp = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name='VP', related_name='vp')
     interviews = models.ManyToManyField(Interview, verbose_name='Interview', related_name='project_interviews')
-    lead_sm = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name='Lead SM', related_name='lead_sm')
     project = models.OneToOneField(Project, on_delete=models.PROTECT, verbose_name='Project', related_name='associate')
+    lead_sm = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Lead SM',
+        related_name='lead_sm',
+        null=True, blank=True
+    )
     team_lead = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='team_projects',
