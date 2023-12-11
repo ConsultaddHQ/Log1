@@ -733,6 +733,7 @@ class ProjectViewSets(ModelViewSet):
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
+                    assign_project_associates(project, request)
                     project.save()
 
                 # Project Cancelled
