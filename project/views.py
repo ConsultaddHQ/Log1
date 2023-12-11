@@ -666,18 +666,18 @@ class ProjectViewSets(ModelViewSet):
 
             remote_consultant_id = request.data.get('remote_consultant_id', None)
 
-            if prev_consultant_id != remote_consultant_id  and remote_consultant_id is not None and project.status == "Joined":
-                # Setting password for User (consultant)
-                password, new_user = set_consultant_password(project.consultant)
-                resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
-                util.send_join_notification()
-                util.assign_leave()
-
             consultant = create_remote_consultant(request)
             if consultant:
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
+
+            if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "Joined":
+                # Setting password for User (consultant)
+                password, new_user = set_consultant_password(project.consultant)
+                resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
+                util.send_join_notification()
+                util.assign_leave()
 
             activity_created = False
 
@@ -733,7 +733,6 @@ class ProjectViewSets(ModelViewSet):
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
-                    project.is_mail_sent = True
                     project.save()
 
                 # Project Cancelled

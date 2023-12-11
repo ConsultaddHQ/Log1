@@ -58,8 +58,6 @@ class Project(TimeStampedModel):
         _('Is Message Sent'),
         help_text='Message sent on Offer-announcement channel ?',
         default=False)
-
-
     submission = models.OneToOneField(
         Submission, on_delete=models.PROTECT,
         related_name='project',
