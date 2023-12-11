@@ -63,7 +63,7 @@ class Command(BaseCommand):
                     'end': str(date.today().strftime('%m/%d/%Y')),
                 },
             }
-            send_email_attachment_multiple(mail_data, 'product@consultadd.com')
+            send_email_attachment_multiple(mail_data, 'product@consultadd.com', None, None, None, True)
             delete_temp_file([file.name])
         except Exception as error:
             create_cron_error(job, error)

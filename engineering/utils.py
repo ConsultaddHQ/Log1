@@ -178,6 +178,7 @@ def calculate_mcq_points(no_of_mcq):
     return round(points, 2)
 
 
+@staticmethod
 def calculate_points(test_platform_name, test_type, test_current_status, no_of_people_involved=0, no_mcq_q=0,
                      no_coding_q=0):
     points = 0

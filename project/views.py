@@ -34,13 +34,13 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push, get_country
+    mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
 
 
 # Route - /project/
@@ -64,14 +64,14 @@ class ProjectViewSets(ModelViewSet):
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'to': [project.consultant.email], 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
-                'bcc': ['shreyas.k@consultadd.com'],
+                'bcc': ['piyush.y@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
                     'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
                     'client': project.submission.client.title(), 'consultant_email': project.consultant.email,
                 },
             }
-            res, msg = send_email(mail_data, config.RELATIONS, request=request)
+            res, msg = send_email_(mail_data, config.RELATIONS, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -230,8 +230,8 @@ class ProjectViewSets(ModelViewSet):
             retention = consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
-            if project.employer == 'Consultadd':
-                to.append(config.VENDOR_MANAGEMENT)
+            # if project.employer == 'Consultadd':
+            #     to.append(config.VENDOR_MANAGEMENT)
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
@@ -665,14 +665,13 @@ class ProjectViewSets(ModelViewSet):
             project.reporting_details = request.data.get('reporting_details', project.reporting_details)
 
             remote_consultant_id = request.data.get('remote_consultant_id', None)
-            breakpoint()
 
-            if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "joined":
+            if prev_consultant_id != remote_consultant_id  and remote_consultant_id is not None and project.status == "Joined":
                 # Setting password for User (consultant)
                 password, new_user = set_consultant_password(project.consultant)
                 resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                 util.send_join_notification()
-                project.is_mail_sent = True
+                util.assign_leave()
 
             consultant = create_remote_consultant(request)
             if consultant:
@@ -1108,6 +1107,10 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 SupportStatus.objects.create(
                     is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
                 )
+
+                if hasattr(project, 'associate'):
+                    data = {"obj": project_support, "update_type": "support"}
+                    update_project_associate(project.associate, request, **data)
 
             if request.user.id == support_person.id:
                 if project_support.is_proxy_support:
@@ -2314,3 +2317,27 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin):
+    queryset = ProjectAssociates.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProjectAssociatesSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def retrieve(self, request, *args, **kwargs):
+        project_id = kwargs.get('pk',None)
+        try:
+            if not project_id:
+                return Response({"message":"Project not found"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                project_associates = ProjectAssociates.objects.get(project=project_id)
+            except:
+                return Response({"message": "Project associates not found"}, status=status.HTTP_204_NO_CONTENT)
+
+            serializer = self.serializer_class(project_associates)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

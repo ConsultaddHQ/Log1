@@ -25,11 +25,12 @@ def get_display_choice(data, data_type, request):
 
 
 def get_status_emoji(status):
+    emoji = ''
     if status == 'next_round':
         emoji = ':+1:'
     elif status == 'failed':
         emoji = ':-1:'
-    if status == 'offer':
+    elif status == 'offer':
         emoji = ':v:'
     return emoji
 
@@ -1403,4 +1404,4 @@ class MessageCard:
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
         except Exception as error:
-            return error, "error"
+            return False, error

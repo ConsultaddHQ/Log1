@@ -7,32 +7,31 @@ from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-from consultant.models import Consultant
 from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from utils_app.mailing import send_email as mail
-from notification.models import Notification,FCMDevice
+from notification.models import Notification, FCMDevice
+from consultant.models import Consultant, ConsultantPOC
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
 from django.contrib.contenttypes.models import ContentType
 from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from engineering.models import TrainingCheckList, ProjectDescription
-from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent
+from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent, ProjectAssociates, \
+    DURATION_COMPLETION_NOTIFICATION_TYPE
 
 
 def set_consultant_password(consultant):
     try:
         if not consultant.is_active and consultant.first_login:
-            breakpoint()
             password = password_generator(password_length=10, strength=3)
             consultant.set_password(password)
             consultant.is_active = True
             consultant.save()
             return password, True
-        breakpoint()
-        return consultant.get_password(), False
+        return "Use your old password", False
     except Exception as error:
         write_exception(message=error)
 
@@ -654,3 +653,59 @@ def get_country(city):
             name=split_city[0], state=split_city[1]
         )
     return city_obj.first().country if city_obj else None
+
+
+def assign_project_associates(project, request=None, **kwargs):
+    try:
+        city = project.submission.lead.city.split(",")
+        if city and city[1] != 'CA':
+            vp = get_object_or_404(User, employee_id=2572)
+            lead_sm = get_object_or_404(User, employee_id=2491)
+        else:
+            lead_sm = None
+            vp = get_object_or_404(User, employee_id=2452)
+
+        recruiter_poc = ConsultantPOC.objects.filter(
+            consultant=project.submission.consultant, poc_type__iexact='Recruiter', end=None
+        ).first()
+        recruiter = recruiter_poc.poc if recruiter_poc else None
+        team_lead = User.objects.filter(
+            role__name='admin', team=project.submission.marketing_team, is_active=True, account_login=True
+        ).first()
+
+        obj = ProjectAssociates.objects.create(
+            vp=vp, project=project, lead_sm=lead_sm, team_lead=team_lead, recruiter=recruiter,
+            notification_type={}, marketer=project.created_by, total_hours=kwargs.get('total_hours', 0)
+        )
+
+        interviews = project.submission.screening.exclude(status='cancelled')
+        if interviews:
+            obj.interviews.add(*interviews)
+
+        support_persons = project.support.filter(is_proxy_support=False)
+        if support_persons:
+            obj.support_persons.add(*support_persons)
+
+        for notification_type in DURATION_COMPLETION_NOTIFICATION_TYPE:
+            obj.notification_type[notification_type["du_check"]] = False
+        obj.save()
+        return "assigned"
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def update_project_associate(associate_obj, request, **kwargs):
+    try:
+        if kwargs.get('update_type', '') == 'support':
+            support_person = kwargs.get("obj", '')
+            if support_person not in associate_obj.support_persons.all():
+                associate_obj.support_persons.add(support_person)
+                associate_obj.save()
+
+        if kwargs.get('update_type', '') == 'total_hours':
+            associate_obj.total_hours += kwargs.get('total_hours')
+            associate_obj.save()
+    except Exception as error:
+        write_exception(error, request)
+        return None
