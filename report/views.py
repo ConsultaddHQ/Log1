@@ -1465,7 +1465,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='timesheet/project')
     def timesheet_project(self, request, *args, **kwargs):
         try:
-            # self.verify_api_key(request.GET.get('api_key'))
+            self.verify_api_key(request.GET.get('api_key'))
             month = int(request.GET.get('month', '0'))
             project_type = request.GET.get('project_type')
             project_id = request.GET.get('project_id', None)
