@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from employee.models import User
-from project.models import Project
+from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from marketing.models import Submission, Interview, Test
 
@@ -198,13 +198,14 @@ class ProjectInfoSerializer(serializers.ModelSerializer):
 
 
 class TimesheetProjectSerializer(serializers.ModelSerializer):
-    display_name = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
     companies = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
     project_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'companies', 'display_name', 'project_type')
+        fields = ('id', 'companies', 'display_name', 'project_type', 'support')
 
     @staticmethod
     def get_companies(obj):
@@ -219,6 +220,13 @@ class TimesheetProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_display_name(obj):
         return f'{obj.id}:{obj.submission.client}'
+
+    def get_support(self, obj):
+        if self.context.get('employee_id'):
+            return ProjectSupport.objects.filter(
+                project=obj, support__employee_id=self.context.get('employee_id')
+            ).values('start', 'end')
+        return {}
 
     def get_project_type(self, obj):
         return self.context.get('project_type')
