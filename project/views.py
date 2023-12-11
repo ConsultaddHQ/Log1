@@ -1940,7 +1940,7 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             leave.save()
 
             consultant_leave = leave.leave_type
-            if not leave_status or leave_status == leave.status:
+            if not leave_status or leave_status in leave.status:
                 return Response({"message": "Status Not Updated"}, status=200)
 
             if leave_status.upper() == "REJECTED":
@@ -1961,6 +1961,20 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
             leave.status = leave_status
             leave.save()
+
+            if leave.status in ["applied", "rejected_1st_level"]:
+                leave_verdict = 'granted' if leave_status == 'applied' else 'rejected'
+                mail_data = {
+                    "template": "../templates/leave_update.html",
+                    "to": [consultant.email], "cc": [], "bcc": [],
+                    "subject": f"Leave initial level approval {leave_verdict}",
+                    "context": {
+                        "start_date": leave.from_date, "consultant_name": consultant.name, "status": leave_verdict,
+                        "end_date": leave.to_date, "hours": leave.total_hours, "sender_name": request.user.employee_name
+                    }
+                }
+                cal_id, res, _ = send_email_(mail_data, "sid@consultadd.com", request)
+
             sender_content_type = ContentType.objects.get(model='user')
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')

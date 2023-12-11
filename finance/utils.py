@@ -3,10 +3,12 @@ from rest_framework.response import Response
 
 from project.models import Leave
 
+
 def check_access(request):
     if not ('superadmin' in request.user.roles or 'finance' in request.user.roles):
         return Response({"message": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
     return None
+
 
 def make_unique_preserve_order(ids):
     return list(dict.fromkeys(ids))
