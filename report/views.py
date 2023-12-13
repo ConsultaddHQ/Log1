@@ -1483,7 +1483,6 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     ).filter(
                         Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
                     ).exclude(start__gte=first_date_next_month)
-                    breakpoint()
                 else:
                     project_support = ProjectSupport.objects.filter(
                         statuses__frequency__in=['active', 'less_active'],
