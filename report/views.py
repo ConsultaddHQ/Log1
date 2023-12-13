@@ -1476,12 +1476,14 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 elif month and employee_id:
                     current_date = datetime.now()
                     first_date_next_month = datetime(current_date.year, month % 12 + 1, 1)
-                    last_date_prev_month = datetime(current_date.year, month % 12, 1) - timedelta(days=1)
+                    last_date_prev_month = datetime(
+                        current_date.year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
                     project_support = ProjectSupport.objects.filter(
                         support__employee_id=employee_id, statuses__frequency__in=['active', 'less_active']
                     ).filter(
                         Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
                     ).exclude(start__gte=first_date_next_month)
+                    breakpoint()
                 else:
                     project_support = ProjectSupport.objects.filter(
                         statuses__frequency__in=['active', 'less_active'],
