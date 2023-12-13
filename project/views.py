@@ -2341,8 +2341,11 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__gte=created_in_range.get("gte"))
             if "duration" in filter_json:
-                queryset = queryset.filter(total_hours__gte=float(filter_json.get("duration")))
-
+                duration_range = filter_json.get("duration")
+                if "lte" in duration_range:
+                    queryset = queryset.filter(total_hours__lte=duration_range.get("lte"))
+                if "gte" in duration_range:
+                    queryset = queryset.filter(total_hours__gte=duration_range.get("gte"))
             return queryset
         except Exception as error:
             write_exception(error, request)
@@ -2369,7 +2372,6 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
     @action(methods=["get"], detail=False, url_name="export")
     def export(self, request, *args, **kwargs):
         try:
-
             query = request.GET.get('query', None)
             filter_json = json.loads(request.GET.get('filter', '{}'))
             queryset = ProjectAssociates.objects.all()
