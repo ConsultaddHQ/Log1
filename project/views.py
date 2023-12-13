@@ -1964,13 +1964,13 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             leave.save()
 
             if leave.status in ["applied", "rejected_1st_level"]:
-                leave_status = 'granted' if leave_status == 'applied' else 'rejected'
+                leave_verdict = 'granted' if leave_status == 'applied' else 'rejected'
                 mail_data = {
                     "template": "../templates/leave_update.html",
                     "to": [consultant.email], "cc": [], "bcc": [],
-                    "subject": f"Leave initial level approval {leave_status}",
+                    "subject": f"Leave initial level approval {leave_verdict}",
                     "context": {
-                        "start_date": leave.from_date, "consultant_name": consultant.name, "status": leave_status,
+                        "start_date": leave.from_date, "consultant_name": consultant.name, "status": leave_verdict,
                         "end_date": leave.to_date, "hours": leave.total_hours, "sender_name": request.user.employee_name
                     }
                 }
