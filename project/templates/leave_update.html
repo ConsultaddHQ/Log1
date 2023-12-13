@@ -107,7 +107,7 @@ border: 8px solid rgba(215, 221, 250, 0.20);
                                     color: #1b1c20;
                                     "
                                     >
-                                    Leave approval
+                                    Leave Update
                                  </p><br>
                               </td>
                            </tr>
@@ -121,7 +121,10 @@ border: 8px solid rgba(215, 221, 250, 0.20);
                                     line-height: 24px;
                                     color: #384860;
                                     ">
-                                    Greetings Siddharth,<br><br> We would like to inform you that Consultant <span class="boldSpan">{{consultant_name}}</span> has submitted a leave request for a duration of <span class="boldSpan">{{hours}} hours</span> from <span class="boldSpan">{{start_date}} to {{end_date}}</span>. To review it, please click the button below to be redirected to the LOG1 App. <br><br> Best Regards,<br>{{consultant_name}}
+                                    Greetings {{consultant_name}},<br><br> We would like to inform you that your leave
+                                     request for a duration of {{hours}} hours from {{start_date}} to {{end_date}} has
+                                     been {{status}}. To review the leave details please sign in to TimeTrack Application.
+                                     <br><br> Best Regards, <br>{{sender_name}}
                                  </p>
                               </td>
                            </tr>
@@ -132,75 +135,6 @@ border: 8px solid rgba(215, 221, 250, 0.20);
 flex-direction: column;
 align-items: flex-start;
 gap: 64px;"><td></td></tr>
-                                    <tr>
-                                       <td>
-                                          <button style="display: flex;
-                                             padding: 12px 24px;
-                                             justify-content: center;
-                                             align-items: center;
-                                             gap: 8px;
-                                             border-radius: 8px;
-                                             background: #26305C;
-                                             border: none"><a style="cursor:default; color:#FFF;
-                                             /* Paragraph/Medium/Medium */
-                                             font-family: sans-serif;
-                                             font-size: 16px;
-                                             font-style: normal;
-                                             font-weight: 500;
-                                             line-height: 24px; /* 150% */ text-decoration: none" href={{url}} target="_blank">Go to Log1</a></button>
-                                       </td>
-                                    </tr>
-                                  <!--  <tr>
-                                       <td style="display: flex;
-                                          flex-direction: column;
-                                          align-items: flex-start;
-                                          gap: 32px;"></td>
-                                    </tr>
-                                    <tr style="display: flex;
-                                       flex-direction: column;
-                                       align-items: flex-start;
-                                       gap: 32px;"></tr>
-                                    <tr style="display: flex;
-                                       align-items: flex-start;
-                                       gap: 18px;">
-                                       <td>
-                                          <button id="approve" style="display: flex;
-                                             padding: 12px 24px;
-                                             justify-content: center;
-                                             align-items: center;
-                                             gap: 8px;
-                                             border-radius: 8px;
-                                             background: #14882F;
-                                             border: none"><a style="
-                                             cursor:default;
-                                             color: #FFF;
-                                             /* Paragraph/Medium/Medium */
-                                             font-family: sans-serif;
-                                             font-size: 16px;
-                                             font-style: normal;
-                                             font-weight: 500;
-                                             line-height: 24px; /* 150% */ text-decoration: none" href={{url}} target="_blank">Approve</a></button>
-                                       </td>
-                                       <td style="padding-left: 10px;">
-                                          <button style="display: flex;
-                                             padding: 12px 24px;
-                                             justify-content: center;
-                                             align-items: center;
-                                             gap: 8px;
-                                             border-radius: 8px;
-                                             border: 1px solid #EF4444;
-                                             background: #FFF;"><a style="
-                                             cursor:default;
-                                             color: #EF4444;
-                                             /* Paragraph/Medium/Medium */
-                                             font-family: sans-serif;
-                                             font-size: 16px;
-                                             font-style: normal;
-                                             font-weight: 500;
-                                             line-height: 24px; /* 150% */text-decoration: none" href={{url}} target="_blank">Reject</a></button>
-                                       </td>
-                                    </tr>
-                                    -->
                                  </table>
                               </td>
                            </tr>

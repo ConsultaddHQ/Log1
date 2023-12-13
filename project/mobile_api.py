@@ -17,10 +17,10 @@ from constance import config
 from employee.models import User
 from attachment.models import Attachment
 from consultant.models import Consultant
-from utils_app.thred_mail import send_email, send_email_attachment_multiple
-from utils_app.aws_utils import get_s3_object, download_s3_object
+from utils_app.thred_mail import send_email
 from log1.utils import write_exception, ERROR_MSG
 from consultant.permissions import ConsultantIsAuthenticated
+from utils_app.aws_utils import get_s3_object, download_s3_object
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
 from project.utils import check_days, mark_in_active, timesheet_submission_mail
@@ -604,8 +604,9 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                         "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}/{project_obj.first().id}/"
                     }
                 }
-                send_email_attachment_multiple(mail_data, 'product@consultadd.com', request=request)
-
+                cal_id, res, _ = send_email(mail_data, consultant.email, request)
+                if not res:
+                    write_exception(cal_id, request)
             return Response({"message": "leave applied successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)

@@ -544,7 +544,7 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_lead_sm(obj):
-        return obj.lead_sm.employee_name
+        return obj.lead_sm.employee_name if obj.lead_sm else "Not Assigned"
 
     @staticmethod
     def get_remote(obj):
