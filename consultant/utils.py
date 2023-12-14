@@ -485,7 +485,6 @@ def add_other_details(request, consultant):
 
 def create_consultant(request, creator_id):
     try:
-        breakpoint()
         skills, links, phone_numbers = None, None, None
         req_links = request.data.get('links', [])
         req_skills = request.data.get('skills', [])
