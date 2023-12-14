@@ -218,8 +218,10 @@ class ConsultantViewSets(ModelViewSet):
                 status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer', 'start_date', 'end_date', 'job_title', 'is_remote', 'work_type')
+            ).values(
+                'id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
+                'status', 'employer', 'start_date', 'end_date', 'job_title', 'is_remote', 'work_type', 'submission_id'
+            )
             return data, data_counts
         except Exception as error:
             write_exception(message=error)

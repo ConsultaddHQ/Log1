@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, F
 from datetime import date, datetime
 from rest_framework import serializers
 
@@ -507,7 +507,7 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
             return {
                 'rate': project.rate,
                 'project_id': project.id,
-                'submission_id':project.submission.id,
+                'submission_id': project.submission.id,
                 'client_name': project.submission.client,
                 'remote_engineer': project.consultant.name,
                 'project_type':project.submission.work_type,
@@ -527,6 +527,7 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
     vp = serializers.SerializerMethodField()
     remote = serializers.SerializerMethodField()
     lead_sm = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
     marketer = serializers.SerializerMethodField()
     team_lead = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
@@ -540,44 +541,33 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_vp(obj):
-        return obj.vp.employee_name
+        return {"employee_name": obj.vp.employee_name, "employee_id": obj.vp.employee_id}
 
     @staticmethod
     def get_lead_sm(obj):
-        return obj.lead_sm.employee_name if obj.lead_sm else "Not Assigned"
+        return {"employee_name": obj.lead_sm.employee_name, "employee_id": obj.lead_sm.employee_id} \
+            if obj.lead_sm else {"employee_name": "Not Assigned", "employee_id": None}
 
     @staticmethod
     def get_remote(obj):
         return {
-            "is_remote": obj.project.is_remote, "remote_consultant": obj.project.consultant.name
+            "remote_consultant": obj.project.consultant.name,
+            "is_remote": obj.project.is_remote, "con_id": obj.project.consultant_id
         }
 
     @staticmethod
     def get_team_lead(obj):
-        return obj.team_lead.employee_name if obj.team_lead else None
+        return {"employee_name": obj.team_lead.employee_name, "employee_id": obj.team_lead.employee_id} \
+            if obj.team_lead else {"employee_name": "Not Assigned", "employee_id": None}
 
     @staticmethod
     def get_marketer(obj):
-        return obj.marketer.employee_name
+        return {"employee_name": obj.marketer.employee_name, "employee_id": obj.marketer.employee_id}
 
     @staticmethod
     def get_recruiter(obj):
-        return obj.recruiter.employee_name if obj.recruiter else "Not Assigned"
-
-    @staticmethod
-    def get_support_persons(obj):
-        support_info = []
-        for support in obj.support_persons.all():
-            frequency = support.statuses.filter(is_current=True).first()
-            support_info.append(
-                {
-                    "start": support.start, "end": support.end,
-                    "support_name": support.support.employee_name,
-                    "duration": ProjectAssociatesSerializer.get_duration(support),
-                    "status": " ".join(frequency.frequency.split("_")).capitalize() if frequency else None
-                }
-            )
-        return support_info
+        return {"employee_name": obj.recruiter.employee_name, "employee_id": obj.recruiter.employee_id}\
+            if obj.recruiter else {"employee_name": "Not Assigned", "employee_id": None}
 
     @staticmethod
     def get_duration(support):
@@ -600,16 +590,44 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
             return f"{days} days"
 
     @staticmethod
+    def get_support_persons(obj):
+        support_info = []
+        for support in obj.support_persons.all():
+            frequency = support.statuses.filter(is_current=True).first()
+            support_info.append(
+                {
+                    "start": support.start, "end": support.end,
+                    "duration": ProjectAssociatesSerializer.get_duration(support),
+                    "id": support.id, "support_name": support.support.employee_name,
+                    "status": " ".join(frequency.frequency.split("_")).capitalize() if frequency else None
+                }
+            )
+        return support_info
+
+    @staticmethod
     def get_interviews(obj):
         interview_info = [
             {
-                f'round': interview.round,
+                f'round': interview.round, "id": interview.id,
+                'supervisor': interview.supervisor.employee_name,
                 'coders': interview.guests.filter(type__in=['Assistant', 'Coder', 'Coder & Assistant']).values_list(
                     'user__employee_name', flat=True
-                ),
-                'supervisor': interview.supervisor.employee_name
+                )
                 if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}"
             } for interview in obj.interviews.all().order_by('id').distinct('id')
         ]
 
         return interview_info
+
+    @staticmethod
+    def get_project(obj):
+        data = {
+            "id": obj.project_id,
+            "client": obj.project.submission.client,
+            "submission_id": obj.project.submission_id,
+            "name": obj.project.submission.consultant.name,
+            "email": obj.project.submission.consultant.email,
+            "vendor": obj.project.submission.lead.vendor_company.name,
+            "job_title": obj.project.submission.lead.position.display_name if obj.project.submission.lead.position else None
+        }
+        return data
