@@ -3022,6 +3022,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 )
             test.status = request.data.get('status')
             test.submitted_by = request.user
+            test.feedback = feedback
             test.save()
             assigned_test_points(test, request)
 
