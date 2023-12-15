@@ -23,7 +23,7 @@ def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
             'subject': 'Scrum Report of {} from {} to {}'.format(team_name, this_week, yesterday),
             'context': {'end': yesterday, 'offers': offers, 'team': team_name, 'start': this_week}
         }
-        res, msg, _ = send_email_attachment_multiple(mail_data, 'Log1@consultadd.com', None, None, None, True)
+        res, msg, _ = send_email_attachment_multiple(mail_data, 'product@consultadd.com', None, None, None, True)
         if not msg:
             return res, "error"
         return res, "ok"

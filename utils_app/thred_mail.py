@@ -178,7 +178,8 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
 @shared_task
 def send_email(mail_data, from_email, request=None, cron_execution=None):
     try:
-        from_email = "product@consultadd.com"
+        if "@consultadd.com" not in from_email:
+            from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email, cron_execution)
         msg = create_message(from_mail_id, mail_data)
         message = (service.users().messages().send(userId="me", body=msg).execute())
@@ -195,7 +196,7 @@ def send_email(mail_data, from_email, request=None, cron_execution=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None, cron_execution=None):
     try:
-        if from_email:
+        if "@consultadd.com" not in from_email:
             from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email, cron_execution)
         if mail_id:
