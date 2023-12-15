@@ -247,7 +247,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
             notification_type = "rejected" if request.data.get('status') == 'rejected' else "Approved"
             create_notification_and_send_push(paystub, request, notification_type)
-            serializer = self.serializer_class(paystub)
+            serializer = FinanceDetailSerializer(paystub)
             return Response({"data": serializer.data, "message": "PayStubs is updated"},
                             status=status.HTTP_202_ACCEPTED)
         except Exception as error:
