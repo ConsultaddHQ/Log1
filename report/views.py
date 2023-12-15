@@ -1,25 +1,33 @@
 import csv
 import json
+import copy
 from datetime import datetime, date, timedelta
 
-from django.db.models import Q, Max
 from django.db import transaction
 from rest_framework import status
+from django.db.models import Q, Max
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from constance import config
+
 from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
+from activity.views import create_activity
 from utils_app.thred_mail import send_email
+from engineering.models import ProjectUpdate
+from engineering.utils import tag_and_notify
 from employee.serializers import UserSerializer
+from attachment.models import create_attachment
+from engineering.serializers import ProjectUpdateSerializer
 from report.serializers import ReportSerializer, ConsultantInfoSerializer, SubmissionInfoSerializer, \
     InterviewInfoSerializer, ProjectInfoSerializer, TimesheetProjectSerializer, TimesheetTestSerializer, \
     TimesheetUserSerializer
@@ -1458,17 +1466,28 @@ class EngineerReportXposedViewSets(GenericViewSet):
     def timesheet_project(self, request, *args, **kwargs):
         try:
             self.verify_api_key(request.GET.get('api_key'))
+            month = int(request.GET.get('month', '0'))
             project_type = request.GET.get('project_type')
-            employee_id = request.GET.get('employee_id', None)
             project_id = request.GET.get('project_id', None)
+            employee_id = request.GET.get('employee_id', None)
             if project_type == 'support':
                 if project_id:
                     project_support = ProjectSupport.objects.filter(project__id=project_id)
+                elif month and employee_id:
+                    current_date = datetime.now()
+                    first_date_next_month = datetime(current_date.year, month % 12 + 1, 1)
+                    last_date_prev_month = datetime(
+                        current_date.year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
+                    project_support = ProjectSupport.objects.filter(
+                        support__employee_id=employee_id, statuses__frequency__in=['active', 'less_active']
+                    ).filter(
+                        Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
+                    ).exclude(start__gte=first_date_next_month)
                 else:
-                    project_support = ProjectSupport.objects.filter(statuses__frequency__in=['active', 'less_active'],
-                                                                    statuses__is_current=True,
-                                                                    support__employee_id=employee_id,
-                                                                    )
+                    project_support = ProjectSupport.objects.filter(
+                        statuses__frequency__in=['active', 'less_active'],
+                        statuses__is_current=True, support__employee_id=employee_id
+                    )
                 project_ids = set(project_support.values_list('project__id', flat=True))
                 project = Project.objects.filter(id__in=project_ids)
             elif project_type == 'remote':
@@ -1478,7 +1497,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     try:
                         user = get_object_or_404(User, employee_id=employee_id)
                         consultant = get_object_or_404(Consultant, email=user.email)
-                    except Exception as error:
+                    except ObjectDoesNotExist:
                         return Response({"message": 'No Consultant found'}, status=status.HTTP_400_BAD_REQUEST)
                     project = Project.objects.filter(consultant=consultant, statuses__status__in=['joined', 'extended'],
                                                      statuses__is_current=True).order_by('id').distinct('id')
@@ -1523,5 +1542,39 @@ class EngineerReportXposedViewSets(GenericViewSet):
             users = User.objects.filter(team__dept='Engineering')
             serializer = TimesheetUserSerializer(users, many=True)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+
+    @action(methods=['put'], detail=True, url_path='remote_project/update')
+    def project_update(self, request, pk):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            data = copy.copy(request.data)
+            user = User.objects.get(employee_id=9998)
+            data['update_by'] = user.id
+            data['project'] = pk
+            serializer = ProjectUpdateSerializer(data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            update = ProjectUpdate.objects.get(id=serializer.data['id'])
+            for file in request.FILES.getlist('files'):
+                file_data = {
+                    "file": file,
+                    "object_id": update.id,
+                    "creator": user,
+                    "model": "projectupdate",
+                    "type": 'project_update',
+                }
+                create_attachment(file_data)
+
+            tags = request.data.get('tagged_user', None)
+            if tags:
+                tag_and_notify(update, tags, user, 'create')
+
+            # Activity
+            desc = f"{user.employee_name} added project Update-{update.id}"
+            create_activity(data['project'], 'projectupdate', user, desc, 'created')
+            return Response({"message": "Project Update is added successfully"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)

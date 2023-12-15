@@ -1238,6 +1238,9 @@ class InterviewViewSets(ModelViewSet):
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
+
                 if 'position' in filters and len(filters["position"]) > 0:
                     queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
 
@@ -1343,8 +1346,7 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
-        coder_names = obj.guests.filter(
-            type__in=['Coder', 'Assistant', 'Coder & Assistant']).values_list('user__employee_name', flat=True)
+        coder_names = obj.guests.all().values_list('user__employee_name', flat=True)
         coders = ', '.join(coder_names)
         supervisor_feedback, guest_feedback = '', ''
         for answer_obj in interview_answer_qs:
@@ -3013,9 +3015,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             users = get_authenticated_users(request)
             test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
-            test.feedback = request.data.get('feedback')
+            feedback = request.data.get('feedback', '')
+            if feedback and len(feedback.strip()) < 10:
+                return Response(
+                    {"message": "Feedback must be of more than 10 character"}, status=status.HTTP_400_BAD_REQUEST
+                )
             test.status = request.data.get('status')
             test.submitted_by = request.user
+            test.feedback = feedback
             test.save()
             assigned_test_points(test, request)
 
