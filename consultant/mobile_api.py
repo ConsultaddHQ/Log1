@@ -248,7 +248,6 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                     },
                 }
                 msg, resp, _ = send_email(mail_data, "product@consultadd.com", request)
-
                 if not resp:
                     write_exception(msg, request)
                     return Response({'error': msg}, status=400)

@@ -71,10 +71,11 @@ class ProjectViewSets(ModelViewSet):
                     'client': project.submission.client.title(), 'consultant_email': project.consultant.email,
                 },
             }
-            res, msg = send_email_(mail_data, config.RELATIONS, request=request)
-            if not msg:
-                return res, "error"
-            return res, "ok"
+            msg, resp, _ = send_email_(mail_data, config.RELATIONS)
+            if not resp:
+                write_exception(msg, request)
+                return  resp, "error"
+            return resp, "ok"
         except Exception as error:
             write_exception(message=error)
             return error, "error"
