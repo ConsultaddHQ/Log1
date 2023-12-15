@@ -678,8 +678,8 @@ class ProjectViewSets(ModelViewSet):
             if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "Joined":
                 # Setting password for User (consultant)
                 password, new_user = set_consultant_password(project.consultant)
-                resp, mesg = self.consultant_mail_on_joining(project, password, new_user, request)
-                if mesg == "ok":
+                resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
+                if resp_message == "ok":
                     is_mail_sent = True;
                 util.assign_leave()
 
