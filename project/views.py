@@ -680,7 +680,7 @@ class ProjectViewSets(ModelViewSet):
                 password, new_user = set_consultant_password(project.consultant)
                 resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                 if err == "ok":
-                    is_msg_sent = True;
+                    is_mail_sent = True;
                 util.assign_leave()
 
             activity_created = False
