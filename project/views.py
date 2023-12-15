@@ -639,7 +639,7 @@ class ProjectViewSets(ModelViewSet):
         project_id = kwargs.get('pk')
         try:
             err = None
-            is_mail_sent = False;
+            is_mail_sent = False
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             util = ProjectUtil(project, request)
