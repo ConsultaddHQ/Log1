@@ -54,11 +54,6 @@ class Project(TimeStampedModel):
     timesheet_frequency = models.CharField(
         _("Frequency"), max_length=30,
         choices=TIMESHEET_FREQUENCIES, null=True, blank=True)
-    is_msg_sent = models.BooleanField(
-        _('Is Message Sent'),
-        help_text='Message sent on Offer-announcement channel ?',
-        default=False
-    )
     is_mail_sent = models.BooleanField(
         _('Is Mail Sent'),
         help_text='Timesheet application credensial mail sent ?',

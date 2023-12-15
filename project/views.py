@@ -639,6 +639,7 @@ class ProjectViewSets(ModelViewSet):
         project_id = kwargs.get('pk')
         try:
             err = None
+            is_mail_sent = False;
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             util = ProjectUtil(project, request)
@@ -679,7 +680,7 @@ class ProjectViewSets(ModelViewSet):
                 password, new_user = set_consultant_password(project.consultant)
                 resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                 if err == "ok":
-                    project.is_msg_sent = True;
+                    is_msg_sent = True;
                 util.assign_leave()
 
             activity_created = False
@@ -729,7 +730,7 @@ class ProjectViewSets(ModelViewSet):
                     if project.submission.work_type == 'c2c':
                         util.create_timesheet()
 
-                    if not project.is_mail_sent:
+                    if not is_mail_sent:
                         password, new_user = set_consultant_password(project.consultant)
                         resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                         util.assign_leave()
