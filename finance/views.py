@@ -237,16 +237,16 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             paystub.save()
 
             if paystub.status == 'approved':
-                project = Project.objects.get(id=paystub.project)
+                project = Project.objects.get(id=paystub.project_id)
                 project_associates = ProjectAssociates.objects.filter(project=project)
                 if not project_associates:
                     assign_project_associates(project,request)
-                data = {"total_hours": paystub.hour+paystub.additional_hours, "update_type": "total_hours"}
+                data = {"total_hours": paystub.hours + paystub.additional_hours, "update_type": "total_hours"}
                 update_project_associate(project.associate, request, **data)
 
             notification_type = "rejected" if request.data.get('status') == 'rejected' else "Approved"
             create_notification_and_send_push(paystub, request, notification_type)
-            serializer = self.serializer_class(paystub)
+            serializer = FinanceDetailSerializer(paystub)
             return Response({"data": serializer.data, "message": "PayStubs is updated"},
                             status=status.HTTP_202_ACCEPTED)
         except Exception as error:

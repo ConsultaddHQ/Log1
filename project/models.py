@@ -57,7 +57,13 @@ class Project(TimeStampedModel):
     is_msg_sent = models.BooleanField(
         _('Is Message Sent'),
         help_text='Message sent on Offer-announcement channel ?',
-        default=False)
+        default=False
+    )
+    is_mail_sent = models.BooleanField(
+        _('Is Mail Sent'),
+        help_text='Timesheet application credensial mail sent ?',
+        default=False
+    )
     submission = models.OneToOneField(
         Submission, on_delete=models.PROTECT,
         related_name='project',

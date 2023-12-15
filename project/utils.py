@@ -31,7 +31,7 @@ def set_consultant_password(consultant):
             consultant.is_active = True
             consultant.save()
             return password, True
-        return "Use your old password", False
+        return "Use your old password, or reset it using your registered email address in the TimeTrack app", False
     except Exception as error:
         write_exception(message=error)
 

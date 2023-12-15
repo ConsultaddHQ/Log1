@@ -676,7 +676,8 @@ class ProjectViewSets(ModelViewSet):
                 # Setting password for User (consultant)
                 password, new_user = set_consultant_password(project.consultant)
                 resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
-                util.send_join_notification()
+                if err == "ok":
+                    project.is_msg_sent = True;
                 util.assign_leave()
 
             activity_created = False
@@ -726,12 +727,11 @@ class ProjectViewSets(ModelViewSet):
                     if project.submission.work_type == 'c2c':
                         util.create_timesheet()
 
-                    # Creating first week Timesheet on project status change to joined
-                    util.assign_leave()
+                    if not project.is_mail_sent:
+                        password, new_user = set_consultant_password(project.consultant)
+                        resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
+                        util.assign_leave()
 
-                    # Setting password for User (consultant)
-                    password, new_user = set_consultant_password(project.consultant)
-                    resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
                     assign_project_associates(project, request)
                     project.save()
