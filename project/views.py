@@ -191,7 +191,7 @@ class ProjectViewSets(ModelViewSet):
                 return res, "error"
             return res, "ok"
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=request)
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):

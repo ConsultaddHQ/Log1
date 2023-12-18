@@ -150,9 +150,14 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
 @shared_task
 def send_mail_in_thread(mail_data, from_email, request, mail_id):
     try:
+        _e = from_email
         from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
-        email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+        try:
+            email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+        except Exception:
+            service, from_mail_id = cred(_e)
+            email_data = service.users().messages().get(userId='me', id=mail_id).execute()
 
         body = render_to_string(mail_data["template"], mail_data["context"])
         body = body.replace("\\r\\n", "<br>").replace(";newline;", "<br>").replace(
@@ -182,9 +187,13 @@ def send_email(mail_data, from_email, request=None, cron_execution=None):
             from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email, cron_execution)
         msg = create_message(from_mail_id, mail_data)
-        message = (service.users().messages().send(userId="me", body=msg).execute())
+        try:
+            message = (service.users().messages().send(userId="me", body=msg).execute())
+        except Exception:
+            service, from_mail_id = cred("product@consultadd.com", cron_execution)
+            msg = create_message(from_mail_id, mail_data)
+            message = (service.users().messages().send(userId="me", body=msg).execute())
         return message['id'], True, from_mail_id
-    
     except Exception as error:
         write_exception(message=error, request=request)
         invalid_keys = ['template', 'context']
@@ -237,15 +246,55 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
         return str(error), False, None
 
 
+def send_mail_without_thread(mail_data, service, request=None):
+    try:
+        message = multipart.MIMEMultipart()
+        from_mail_id = "product@consultadd.com"
+        subject = mail_data["subject"]
+        message = set_mail_config(mail_data["to"], from_mail_id, mail_data["cc"], mail_data["bcc"], subject, message)
+
+        body = render_to_string(mail_data["template"], mail_data["context"])
+        body = body.replace("\\n", "<br>").replace(";newline;", "<br>").replace(
+            "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+        message.attach(MIMEText(body, 'html'))
+
+        file_size = False
+        if len(mail_data["attachments"]) > 0:
+            file_size = add_attachments(message, mail_data["attachments"])
+
+        if file_size:
+            return str("Email size is more then 25 MB"), False, None
+
+        # for i in mail_data["attachments"]:
+        #     filename = i.split('/')[2]
+        #     message = add_file(i, filename, message)
+        media = MediaIoBaseUpload(BytesIO(message.as_bytes()), mimetype='message/rfc822', resumable=True)
+        # b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
+        # b64_string = b64_bytes.decode()
+        message = (service.users().messages().send(userId="me", media_body=media).execute())
+        return message['id'], True, from_mail_id
+    except Exception as error:
+        write_exception(message=error, request=request)
+        return str(error), False, ""
+
+
 @shared_task
 def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None, cron_execution=None):
     try:
+        _e = from_email
         from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email, cron_execution)
         if mail_id is not None:
-            email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+            try:
+                email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+            except Exception as e:
+                service, from_mail_id = cred(_e, cron_execution)
+                try:
+                    service, from_mail_id = cred("product@consultadd.com", cron_execution)
+                    email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+                except Exception as e:
+                    return send_mail_without_thread(mail_data, service, request)
             message = multipart.MIMEMultipart()
-
             subject = get_field(email_data, 'subject')
             message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)
             if from_email == "suman.m@consultadd.com": 
@@ -264,6 +313,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                     file_size = add_attachments(message, mail_data["attachments"])
                     
                 if file_size:
+                    write_exception(message=f"File size issue", request=request)
                     return str("Email size is more then 25 MB"), False, None
                 
                 # for i in mail_data["attachments"]:
@@ -295,8 +345,9 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                     file_size = add_attachments(message,mail_data["attachments"])
                     
                 if file_size:
+                    write_exception(message=f"File size issue", request=request)
                     return str("Email size is more then 25 MB"), False, None
-                                    
+
                 # for i in mail_data["attachments"]:
                 #     filename = i.split('/')[2]
                 #     message = add_file(i, filename, message)
