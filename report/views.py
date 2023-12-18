@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
@@ -1465,17 +1466,28 @@ class EngineerReportXposedViewSets(GenericViewSet):
     def timesheet_project(self, request, *args, **kwargs):
         try:
             self.verify_api_key(request.GET.get('api_key'))
+            month = int(request.GET.get('month', '0'))
             project_type = request.GET.get('project_type')
-            employee_id = request.GET.get('employee_id', None)
             project_id = request.GET.get('project_id', None)
+            employee_id = request.GET.get('employee_id', None)
             if project_type == 'support':
                 if project_id:
                     project_support = ProjectSupport.objects.filter(project__id=project_id)
+                elif month and employee_id:
+                    current_date = datetime.now()
+                    first_date_next_month = datetime(current_date.year, month % 12 + 1, 1)
+                    last_date_prev_month = datetime(
+                        current_date.year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
+                    project_support = ProjectSupport.objects.filter(
+                        support__employee_id=employee_id, statuses__frequency__in=['active', 'less_active']
+                    ).filter(
+                        Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
+                    ).exclude(start__gte=first_date_next_month)
                 else:
-                    project_support = ProjectSupport.objects.filter(statuses__frequency__in=['active', 'less_active'],
-                                                                    statuses__is_current=True,
-                                                                    support__employee_id=employee_id,
-                                                                    )
+                    project_support = ProjectSupport.objects.filter(
+                        statuses__frequency__in=['active', 'less_active'],
+                        statuses__is_current=True, support__employee_id=employee_id
+                    )
                 project_ids = set(project_support.values_list('project__id', flat=True))
                 project = Project.objects.filter(id__in=project_ids)
             elif project_type == 'remote':
@@ -1485,7 +1497,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     try:
                         user = get_object_or_404(User, employee_id=employee_id)
                         consultant = get_object_or_404(Consultant, email=user.email)
-                    except Exception as error:
+                    except ObjectDoesNotExist:
                         return Response({"message": 'No Consultant found'}, status=status.HTTP_400_BAD_REQUEST)
                     project = Project.objects.filter(consultant=consultant, statuses__status__in=['joined', 'extended'],
                                                      statuses__is_current=True).order_by('id').distinct('id')

@@ -65,17 +65,18 @@ class ProjectViewSets(ModelViewSet):
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'to': [project.consultant.email], 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
-                'bcc': ['shreyas.k@consultadd.com'],
+                'bcc': ['piyush.y@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
                     'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
                     'client': project.submission.client.title(), 'consultant_email': project.consultant.email,
                 },
             }
-            res, msg = send_email(mail_data, config.RELATIONS, request=request)
-            if not msg:
-                return res, "error"
-            return res, "ok"
+            msg, resp, _ = send_email_(mail_data, config.RELATIONS, request)
+            if not resp:
+                write_exception(msg, request)
+                return  resp, "error"
+            return resp, "ok"
         except Exception as error:
             write_exception(message=error)
             return error, "error"
@@ -638,9 +639,12 @@ class ProjectViewSets(ModelViewSet):
         project_id = kwargs.get('pk')
         try:
             err = None
+            is_mail_sent = False
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
+            util = ProjectUtil(project, request)
             prev_employer = project.employer
+            prev_consultant_id = project.consultant.id
             prev_status_obj = project.statuses.get(is_current=True)
             prev_rate, prev_start_date = project.rate, project.start_date
             all_status, cancellation_status, termination_status = fetch_project_status()
@@ -663,11 +667,21 @@ class ProjectViewSets(ModelViewSet):
             project.invoicing_period = request.data.get('invoicing_period', project.invoicing_period)
             project.reporting_details = request.data.get('reporting_details', project.reporting_details)
 
+            remote_consultant_id = request.data.get('remote_consultant_id', None)
+
             consultant = create_remote_consultant(request)
             if consultant:
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
+
+            if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "Joined":
+                # Setting password for User (consultant)
+                password, new_user = set_consultant_password(project.consultant)
+                resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
+                if resp_message == "ok":
+                    is_mail_sent = True;
+                util.assign_leave()
 
             activity_created = False
 
@@ -676,7 +690,6 @@ class ProjectViewSets(ModelViewSet):
                 activity_created = True
                 send_employer_change_notification(project, data, request)
 
-            util = ProjectUtil(project, request)
             desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -717,14 +730,14 @@ class ProjectViewSets(ModelViewSet):
                     if project.submission.work_type == 'c2c':
                         util.create_timesheet()
 
-                    # Creating first week Timesheet on project status change to joined
-                    util.assign_leave()
+                    if not is_mail_sent:
+                        password, new_user = set_consultant_password(project.consultant)
+                        resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
+                        util.assign_leave()
 
-                    # Setting password for User (consultant)
-                    password, new_user = set_consultant_password(project.consultant)
-                    resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
                     assign_project_associates(project, request)
+                    project.save()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -1964,13 +1977,13 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             leave.save()
 
             if leave.status in ["applied", "rejected_1st_level"]:
-                leave_status = 'granted' if leave_status == 'applied' else 'rejected'
+                leave_verdict = 'granted' if leave_status == 'applied' else 'rejected'
                 mail_data = {
                     "template": "../templates/leave_update.html",
                     "to": [consultant.email], "cc": [], "bcc": [],
-                    "subject": f"Leave initial level approval {leave_status}",
+                    "subject": f"Leave initial level approval {leave_verdict}",
                     "context": {
-                        "start_date": leave.from_date, "consultant_name": consultant.name, "status": leave_status,
+                        "start_date": leave.from_date, "consultant_name": consultant.name, "status": leave_verdict,
                         "end_date": leave.to_date, "hours": leave.total_hours, "sender_name": request.user.employee_name
                     }
                 }
@@ -2341,8 +2354,11 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__gte=created_in_range.get("gte"))
             if "duration" in filter_json:
-                queryset = queryset.filter(total_hours__gte=float(filter_json.get("duration")))
-
+                duration_range = filter_json.get("duration")
+                if "lte" in duration_range:
+                    queryset = queryset.filter(total_hours__lte=duration_range.get("lte"))
+                if "gte" in duration_range:
+                    queryset = queryset.filter(total_hours__gte=duration_range.get("gte"))
             return queryset
         except Exception as error:
             write_exception(error, request)
@@ -2369,7 +2385,6 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
     @action(methods=["get"], detail=False, url_name="export")
     def export(self, request, *args, **kwargs):
         try:
-
             query = request.GET.get('query', None)
             filter_json = json.loads(request.GET.get('filter', '{}'))
             queryset = ProjectAssociates.objects.all()

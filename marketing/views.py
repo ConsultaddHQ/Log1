@@ -3015,9 +3015,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             users = get_authenticated_users(request)
             test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
-            test.feedback = request.data.get('feedback')
+            feedback = request.data.get('feedback', '')
+            if feedback and len(feedback.strip()) < 10:
+                return Response(
+                    {"message": "Feedback must be of more than 10 character"}, status=status.HTTP_400_BAD_REQUEST
+                )
             test.status = request.data.get('status')
             test.submitted_by = request.user
+            test.feedback = feedback
             test.save()
             assigned_test_points(test, request)
 
