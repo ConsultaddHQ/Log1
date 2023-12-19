@@ -1163,6 +1163,10 @@ class InterviewViewSets(ModelViewSet):
             else:
                 order_by = "-modified"
 
+            data_counts['otter_AI'] = queryset.filter(call_type__display_name='Otter AI').count()
+            data_counts['supervisor'] = queryset.filter(call_type__name='supervisor').count()
+            data_counts['consultant'] = queryset.filter(call_type__name='consultant').count()
+
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             serializer = InterviewListSerializer(queryset[first:last], many=True)
             return serializer.data, data_counts
