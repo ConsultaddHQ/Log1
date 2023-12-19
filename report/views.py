@@ -1466,29 +1466,36 @@ class EngineerReportXposedViewSets(GenericViewSet):
     def timesheet_project(self, request, *args, **kwargs):
         try:
             self.verify_api_key(request.GET.get('api_key'))
-            month = int(request.GET.get('month', '0'))
+            months = request.GET.get('month', None)
             project_type = request.GET.get('project_type')
             project_id = request.GET.get('project_id', None)
             employee_id = request.GET.get('employee_id', None)
             if project_type == 'support':
                 if project_id:
                     project_support = ProjectSupport.objects.filter(project__id=project_id)
-                elif month and employee_id:
-                    current_date = datetime.now()
-                    first_date_next_month = datetime(current_date.year, month % 12 + 1, 1)
-                    last_date_prev_month = datetime(
-                        current_date.year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
-                    project_support = ProjectSupport.objects.filter(
-                        support__employee_id=employee_id, statuses__frequency__in=['active', 'less_active']
-                    ).filter(
-                        Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
-                    ).exclude(start__gte=first_date_next_month)
+                    project_ids = set(project_support.values_list('project__id', flat=True))
+                elif months and employee_id:
+                    project_ids = set()
+                    months = months.split(",")
+                    for month in months:
+                        month = int(month)
+                        current_date = datetime.now()
+                        first_date_next_month = datetime(
+                            current_date.year + 1 if month == 12 else current_date.year, month % 12 + 1, 1)
+                        last_date_prev_month = datetime(
+                            current_date.year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
+                        queryset = ProjectSupport.objects.filter(
+                            support__employee_id=employee_id, statuses__frequency__in=['active', 'less_active']
+                        ).filter(
+                            Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
+                        ).exclude(start__gte=first_date_next_month)
+                        project_ids.add(queryset.values_list('project__id', flat=True))
                 else:
                     project_support = ProjectSupport.objects.filter(
                         statuses__frequency__in=['active', 'less_active'],
                         statuses__is_current=True, support__employee_id=employee_id
                     )
-                project_ids = set(project_support.values_list('project__id', flat=True))
+                    project_ids = set(project_support.values_list('project__id', flat=True))
                 project = Project.objects.filter(id__in=project_ids)
             elif project_type == 'remote':
                 if project_id:

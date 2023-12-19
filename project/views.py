@@ -35,7 +35,8 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates, \
+    STAKEHOLDER
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
@@ -2336,6 +2337,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /project_associates/
 class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     queryset = ProjectAssociates.objects.all()
@@ -2353,13 +2355,21 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
                 if "gte" in created_in_range:
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__gte=created_in_range.get("gte"))
+
             if "duration" in filter_json:
                 duration_range = filter_json.get("duration")
                 if "lte" in duration_range:
                     queryset = queryset.filter(total_hours__lte=duration_range.get("lte"))
                 if "gte" in duration_range:
                     queryset = queryset.filter(total_hours__gte=duration_range.get("gte"))
-            return queryset
+
+            if "stakeholder" in filter_json:
+                stakeholder = filter_json.get("stakeholder")
+                if "type" and "emp_ids" in list(filter_json.get("stakeholder").keys()):
+                    query = {f'{STAKEHOLDER[stakeholder.get("type")].get("query")}__id__in': stakeholder.get("emp_ids")}
+                    queryset = queryset.filter(**query)
+
+            return queryset.order_by('id').distinct('id')
         except Exception as error:
             write_exception(error, request)
             return Response({"msg": error}, status=status.HTTP_400_BAD_REQUEST)
@@ -2370,7 +2380,6 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             query = request.GET.get('query', None)
             filter_json = json.loads(request.GET.get('filter', '{}'))
             queryset = ProjectAssociates.objects.all()
-
             if query:
                 queryset = queryset.filter(
                     project__submission__consultant_marketing__consultant__name__istartswith=query)
@@ -2438,4 +2447,23 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
 
         except Exception as error:
             write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="stakeholder_types")
+    def stakeholder_types(self, request, *args, **kwargs):
+        try:
+            return Response({"data": list(STAKEHOLDER.keys())}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="employees")
+    def employees(self, request, *args, **kwargs):
+        try:
+            stakeholder_type = request.GET.get('type')
+            role = STAKEHOLDER.get(stakeholder_type).get("role")
+            user_data = User.objects.filter(role__name=role, is_active=True, account_login=True).values(
+                'id', 'employee_id', "employee_name"
+            )
+            return Response({"data": user_data}, status=status.HTTP_200_OK)
+        except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
