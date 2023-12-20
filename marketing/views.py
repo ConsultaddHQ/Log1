@@ -1314,14 +1314,11 @@ class InterviewViewSets(ModelViewSet):
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
+            filter_call_type = None
             if filter_json:
                 filters = json.loads(filter_json)
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
                     filter_call_type = filters["call_type"]
-                else:
-                    filter_call_type = None
-            else:
-                filter_call_type = None
 
             data, screen_data = self.get_count_and_queryset(
                 queryset, filter_by_status, sort_by, first, last, filter_call_type
