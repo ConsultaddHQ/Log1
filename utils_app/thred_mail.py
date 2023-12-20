@@ -183,7 +183,7 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
 @shared_task
 def send_email(mail_data, from_email, request=None, cron_execution=None):
     try:
-        if "@consultadd.com" not in from_email:
+        if from_email and "@consultadd.com" not in from_email:
             from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email, cron_execution)
         msg = create_message(from_mail_id, mail_data)
@@ -288,11 +288,12 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             try:
                 email_data = service.users().messages().get(userId='me', id=mail_id).execute()
             except Exception as e:
-                service, from_mail_id = cred(_e, cron_execution)
                 try:
-                    service, from_mail_id = cred("product@consultadd.com", cron_execution)
+                    service, from_mail_id = cred(_e, cron_execution)
                     email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+                    from_email = _e
                 except Exception as e:
+                    service, from_mail_id = cred(from_email, cron_execution)
                     return send_mail_without_thread(mail_data, service, request)
             message = multipart.MIMEMultipart()
             subject = get_field(email_data, 'subject')

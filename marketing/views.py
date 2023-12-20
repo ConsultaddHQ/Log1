@@ -1140,32 +1140,41 @@ class InterviewViewSets(ModelViewSet):
             return error
 
     @staticmethod
-    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last):
+    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last, filter_by_call_type=None):
         try:
             # Interview counts by status
             queryset = queryset.order_by('id').distinct('id')
+
+            if filter_by_call_type:
+                status_count_qs = queryset.filter(call_type__display_name__in=filter_by_call_type)
+            else:
+                status_count_qs = queryset
+
             data_counts = {
-                'total': queryset.count(),
-                'offer': queryset.filter(status='offer').count(),
-                'failed': queryset.filter(status='failed').count(),
-                'scheduled': queryset.filter(status='scheduled').count(),
-                'cancelled': queryset.filter(status='cancelled').count(),
-                'next_round': queryset.filter(status='next_round').count(),
-                'rescheduled': queryset.filter(status='rescheduled').count(),
-                'feedback_due': queryset.filter(status='feedback_due').count(),
+                'total': status_count_qs.count(),
+                'offer': status_count_qs.filter(status='offer').count(),
+                'failed': status_count_qs.filter(status='failed').count(),
+                'scheduled': status_count_qs.filter(status='scheduled').count(),
+                'cancelled': status_count_qs.filter(status='cancelled').count(),
+                'next_round': status_count_qs.filter(status='next_round').count(),
+                'rescheduled': status_count_qs.filter(status='rescheduled').count(),
+                'feedback_due': status_count_qs.filter(status='feedback_due').count(),
             }
 
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
 
+            data_counts['otter_AI'] = queryset.filter(call_type__display_name='Otter AI').count()
+            data_counts['supervisor'] = queryset.filter(call_type__name='supervisor').count()
+            data_counts['consultant'] = queryset.filter(call_type__name='consultant').count()
+
+            if filter_by_call_type and len(filter_by_call_type) > 0:
+                queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+
             if sort_by in ['created', 'modified', 'start_time']:
                 order_by = f"-{sort_by}"
             else:
                 order_by = "-modified"
-
-            data_counts['otter_AI'] = queryset.filter(call_type__display_name='Otter AI').count()
-            data_counts['supervisor'] = queryset.filter(call_type__name='supervisor').count()
-            data_counts['consultant'] = queryset.filter(call_type__name='consultant').count()
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             serializer = InterviewListSerializer(queryset[first:last], many=True)
@@ -1242,9 +1251,6 @@ class InterviewViewSets(ModelViewSet):
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
-                if 'call_type' in filters and len(filters["call_type"]) > 0:
-                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
-
                 if 'position' in filters and len(filters["position"]) > 0:
                     queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
 
@@ -1308,7 +1314,18 @@ class InterviewViewSets(ModelViewSet):
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
-            data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    filter_call_type = filters["call_type"]
+                else:
+                    filter_call_type = None
+            else:
+                filter_call_type = None
+
+            data, screen_data = self.get_count_and_queryset(
+                queryset, filter_by_status, sort_by, first, last, filter_call_type
+            )
             if screen_data == 'error':
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 
