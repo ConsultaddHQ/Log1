@@ -1653,7 +1653,7 @@ class InterviewViewSets(ModelViewSet):
                     else:
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id = "suman.m@consultadd.com"
+                            calendar_mail_id = "shreyas.k@consultadd.com"
 
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         if msg == 'booked':
@@ -1738,7 +1738,7 @@ class InterviewViewSets(ModelViewSet):
                     if interview.calendar_id:
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id = "suman.m@consultadd.com"
+                            calendar_mail_id = "shreyas.k@consultadd.com"
                         calendar = GoogleCalendar()
                         calendar.delete_calendar_booking(interview.calendar_id, calendar_mail_id, request)
                 except Exception as error:
@@ -1933,7 +1933,7 @@ class InterviewViewSets(ModelViewSet):
                     try:
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id = "suman.m@consultadd.com"
+                            calendar_mail_id = "shreyas.k@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         booking_res = 'updated'
                         if msg == 'booked':
@@ -2026,7 +2026,7 @@ class InterviewViewSets(ModelViewSet):
                 if interview.calendar_id:
                     calendar_mail_id = interview.submission.created_by.email
                     if interview.if_previous_calendar:
-                        calendar_mail_id = "suman.m@consultadd.com"
+                        calendar_mail_id = "shreyas.k@consultadd.com"
                     calendar = GoogleCalendar()
                     calendar.delete_calendar_booking(interview.calendar_id, calendar_mail_id, request)
             except Exception as error:
@@ -2296,7 +2296,7 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'updated'
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id = "suman.m@consultadd.com"
+                            calendar_mail_id = "shreyas.k@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         if msg == 'booked':
                             booking_res = 'booked'

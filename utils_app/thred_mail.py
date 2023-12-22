@@ -22,10 +22,10 @@ SCOPES = ['https://mail.google.com/']
 
 def cred(mail_id, file_dst=None):
     if os.environ.get('ENV', 'local') != 'prod':
-        mail_id = "suman.m@consultadd.com"
+        mail_id = "shreyas.k@consultadd.com"
         
     if not mail_id or mail_id == "product@consultadd.com":
-        mail_id = "suman.m@consultadd.com"
+        mail_id = "shreyas.k@consultadd.com"
 
     credentials = Credentials.from_service_account_file(
         filename=SERVICE_ACCOUNT_FILE if file_dst else 'service.json',
@@ -111,9 +111,9 @@ def create_message(from_email, mail_data):
     message['subject'] = mail_data["subject"]
     
     if os.environ.get('ENV', 'local') != 'prod':
-        from_email = "suman.m@consultadd.com"
+        from_email = "shreyas.k@consultadd.com"
         
-    if from_email == "suman.m@consultadd.com":
+    if from_email in ["suman.m@consultadd.com", "shreyas.k@consultadd.com"]:
         from_email="product@consultadd.com"
         
     message['from'] = from_email
@@ -301,7 +301,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             message = multipart.MIMEMultipart()
             subject = get_field(email_data, 'subject')
             message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)
-            if from_email == "suman.m@consultadd.com": 
+            if from_email in ["suman.m@consultadd.com", "shreyas.k@consultadd.com"]:
                 message['from'] = 'product@consultadd.com'
             message['In-Reply-To'] = get_field(email_data, 'Message-Id')
             message['References'] = get_field(email_data, 'Message-Id')

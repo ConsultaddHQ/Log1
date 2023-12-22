@@ -2345,6 +2345,13 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def get_attr(sequence, key):
+        lst = list()
+        for elem in sequence:
+            lst.extend(elem.get(key, [])) if type(elem.get(key, [])) == list else lst.append(elem.get(key, []))
+        return ", ".join(set(lst)) if lst else "Not Assigned"
+
+    @staticmethod
     def filter_project_associate_queryset(queryset, filter_json, request):
         try:
             if "created" in filter_json and filter_json.get("created", {}):
@@ -2408,22 +2415,24 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             response = HttpResponse(content_type='text/csv')
             writer = csv.writer(response)
             writer.writerow([
-                'Project ID', 'Consultant Name', 'Consultant Email', 'Client', 'Vendor', 'Marketer', 'Job Title',
-                'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM', 'VP', 'Support Persons', 'Total Hours',
-                'PO Detail Page Link'
+                'Project ID', 'Consultant Name', 'Consultant Email', 'Client', 'Vendor', 'Job Title', 'Start Date',
+                'Total Hours', 'Marketer', 'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM', 'VP',
+                'Support Persons', 'PO Detail Page Link'
             ])
+
             response['Content-Disposition'] = "attachment; filename=Consultants.csv"
             for data in serialized.data:
                 project = data.get('project', {})
-                coders = ", ".join([code.get("coders") for code in data.get("interview_info", [])])
-                supervisors = ", ".join([sup.get("supervisor") for sup in data.get("interview_info", [])])
-                support_persons = ", ".join([sup.get("support_name") for sup in data.get("support_persons", [])])
+                coders = self.get_attr(data.get("interviews", []), "coders")
+                supervisors = self.get_attr(data.get("interviews", []), "supervisor")
+                support_persons = self.get_attr(data.get("support_persons", []), "support_name")
                 writer.writerow([
                     project.get("id"), project.get("name"), project.get("email"), project.get("client"),
-                    data.get("marketer").get("employee_name"), project.get("job_title"),
-                    data.get("recruiter").get("employee_name"), supervisors, set(coders),
-                    data.get("team_lead", {}).get("employee_name"), data.get("lead_sm", {}).get("employee_name"),
-                    data.get("vp", {}).get("employee_name"), support_persons, data.get('total_hours'),
+                    project.get("vendor"), project.get("job_title"), project.get("start_date"), data.get('total_hours'),
+                    data.get("marketer").get("employee_name"), data.get("recruiter").get("employee_name"),
+                    supervisors, coders, data.get("team_lead", {}).get("employee_name"),
+                    data.get("lead_sm", {}).get("employee_name"), data.get("vp", {}).get("employee_name"),
+                    support_persons,
                     f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('id')}"
                 ])
             add_export_log("Project Associates List", request)
