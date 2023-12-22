@@ -1512,7 +1512,6 @@ class EngineerReportXposedViewSets(GenericViewSet):
                                                      statuses__is_current=True).order_by('id').distinct('id')
             else:
                 return Response({'message': 'Project Type is required'}, status=status.HTTP_400_BAD_REQUEST)
-            breakpoint()
             serializer = TimesheetProjectSerializer(project, many=True, context={'project_type': project_type})
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
