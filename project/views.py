@@ -35,7 +35,8 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates, \
+    STAKEHOLDER
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
@@ -191,7 +192,7 @@ class ProjectViewSets(ModelViewSet):
                 return res, "error"
             return res, "ok"
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=request)
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
@@ -2336,6 +2337,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /project_associates/
 class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     queryset = ProjectAssociates.objects.all()
@@ -2343,23 +2345,38 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def get_attr(sequence, key):
+        lst = list()
+        for elem in sequence:
+            lst.extend(elem.get(key, [])) if type(elem.get(key, [])) == list else lst.append(elem.get(key, []))
+        return ", ".join(set(lst)) if lst else "Not Assigned"
+
+    @staticmethod
     def filter_project_associate_queryset(queryset, filter_json, request):
         try:
             if "created" in filter_json and filter_json.get("created", {}):
                 created_in_range = filter_json.get("created")
-                if "lte" in created_in_range:
+                if created_in_range.get("lte"):
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__lte=created_in_range.get("lte"))
-                if "gte" in created_in_range:
+                if created_in_range.get("gte"):
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__gte=created_in_range.get("gte"))
+
             if "duration" in filter_json:
                 duration_range = filter_json.get("duration")
-                if "lte" in duration_range:
+                if duration_range.get("lte"):
                     queryset = queryset.filter(total_hours__lte=duration_range.get("lte"))
-                if "gte" in duration_range:
+                if duration_range.get("gte"):
                     queryset = queryset.filter(total_hours__gte=duration_range.get("gte"))
-            return queryset
+
+            if "stakeholder" in filter_json:
+                stakeholder = filter_json.get("stakeholder")
+                if stakeholder.get("type") and stakeholder.get("emp_ids"):
+                    query = {f'{STAKEHOLDER[stakeholder.get("type")].get("query")}__id__in': stakeholder.get("emp_ids")}
+                    queryset = queryset.filter(**query)
+
+            return queryset.order_by('id').distinct('id')
         except Exception as error:
             write_exception(error, request)
             return Response({"msg": error}, status=status.HTTP_400_BAD_REQUEST)
@@ -2370,7 +2387,6 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             query = request.GET.get('query', None)
             filter_json = json.loads(request.GET.get('filter', '{}'))
             queryset = ProjectAssociates.objects.all()
-
             if query:
                 queryset = queryset.filter(
                     project__submission__consultant_marketing__consultant__name__istartswith=query)
@@ -2399,22 +2415,24 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             response = HttpResponse(content_type='text/csv')
             writer = csv.writer(response)
             writer.writerow([
-                'Project ID', 'Consultant Name', 'Consultant Email', 'Client', 'Vendor', 'Marketer', 'Job Title',
-                'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM', 'VP', 'Support Persons', 'Total Hours',
-                'PO Detail Page Link'
+                'Project ID', 'Consultant Name', 'Consultant Email', 'Client', 'Vendor', 'Job Title', 'Start Date',
+                'Total Hours', 'Marketer', 'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM', 'VP',
+                'Support Persons', 'PO Detail Page Link'
             ])
+
             response['Content-Disposition'] = "attachment; filename=Consultants.csv"
             for data in serialized.data:
                 project = data.get('project', {})
-                coders = ", ".join([code.get("coders") for code in data.get("interview_info", [])])
-                supervisors = ", ".join([sup.get("supervisor") for sup in data.get("interview_info", [])])
-                support_persons = ", ".join([sup.get("support_name") for sup in data.get("support_persons", [])])
+                coders = self.get_attr(data.get("interviews", []), "coders")
+                supervisors = self.get_attr(data.get("interviews", []), "supervisor")
+                support_persons = self.get_attr(data.get("support_persons", []), "support_name")
                 writer.writerow([
                     project.get("id"), project.get("name"), project.get("email"), project.get("client"),
-                    data.get("marketer").get("employee_name"), project.get("job_title"),
-                    data.get("recruiter").get("employee_name"), supervisors, set(coders),
-                    data.get("team_lead", {}).get("employee_name"), data.get("lead_sm", {}).get("employee_name"),
-                    data.get("vp", {}).get("employee_name"), support_persons, data.get('total_hours'),
+                    project.get("vendor"), project.get("job_title"), project.get("start_date"), data.get('total_hours'),
+                    data.get("marketer").get("employee_name"), data.get("recruiter").get("employee_name"),
+                    supervisors, coders, data.get("team_lead", {}).get("employee_name"),
+                    data.get("lead_sm", {}).get("employee_name"), data.get("vp", {}).get("employee_name"),
+                    support_persons,
                     f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('id')}"
                 ])
             add_export_log("Project Associates List", request)
@@ -2438,4 +2456,23 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
 
         except Exception as error:
             write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="stakeholder_types")
+    def stakeholder_types(self, request, *args, **kwargs):
+        try:
+            return Response({"data": list(STAKEHOLDER.keys())}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="employees")
+    def employees(self, request, *args, **kwargs):
+        try:
+            stakeholder_type = request.GET.get('type')
+            role = STAKEHOLDER.get(stakeholder_type).get("role")
+            user_data = User.objects.filter(role__name=role, is_active=True, account_login=True).values(
+                'id', 'employee_id', "employee_name"
+            )
+            return Response({"data": user_data}, status=status.HTTP_200_OK)
+        except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

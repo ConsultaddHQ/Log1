@@ -609,11 +609,12 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
         interview_info = [
             {
                 f'round': interview.round, "id": interview.id,
-                'supervisor': interview.supervisor.employee_name,
-                'coders': interview.guests.filter(type__in=['Assistant', 'Coder', 'Coder & Assistant']).values_list(
-                    'user__employee_name', flat=True
+                'supervisor': interview.supervisor.employee_name
+                if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}",
+                'coders': list(
+                    interview.guests.filter(type__in=['Assistant', 'Coder', 'Coder & Assistant']).values_list(
+                        'user__employee_name', flat=True)
                 )
-                if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}"
             } for interview in obj.interviews.all().order_by('id').distinct('id')
         ]
 
@@ -623,11 +624,13 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
     def get_project(obj):
         data = {
             "id": obj.project_id,
+            "start_date": obj.project.start_date,
             "client": obj.project.submission.client,
             "submission_id": obj.project.submission_id,
             "name": obj.project.submission.consultant.name,
             "email": obj.project.submission.consultant.email,
             "vendor": obj.project.submission.lead.vendor_company.name,
-            "job_title": obj.project.submission.lead.position.display_name if obj.project.submission.lead.position else None
+            "job_title": obj.project.submission.lead.position.display_name
+            if obj.project.submission.lead.position else None
         }
         return data
