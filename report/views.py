@@ -38,7 +38,6 @@ from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
 
-
 ERR_DURATION = "Please duration for the report"
 
 
@@ -674,7 +673,8 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             serializer = ProjectSupportDetailSerializer(
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
-            return Response({"data": serializer.data, "counts": data_count, "page_count": page_count}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data, "counts": data_count, "page_count": page_count},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status.HTTP_400_BAD_REQUEST)
@@ -1421,7 +1421,8 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id
                 }
                 count += 1
-            return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=status.HTTP_200_OK)
+            return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
@@ -1477,19 +1478,19 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 elif months and employee_id:
                     support_ids = []
                     months = months.split(",")
-                    for month in months:
-                        month = int(month)
-                        current_date = datetime.now()
+                    for month_set in months:
+                        year, month = month_set.split('-')
+                        year, month = int(year), int(month)
                         first_date_next_month = datetime(
-                            current_date.year + 1 if month == 12 else current_date.year, month % 12 + 1, 1)
+                            year + 1 if month == 12 else year, month % 12 + 1, 1)
                         last_date_prev_month = datetime(
-                            current_date.year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
+                            year, 12 if month % 12 == 0 else month % 12, 1) - timedelta(days=1)
                         queryset = ProjectSupport.objects.filter(
                             support__employee_id=employee_id, statuses__frequency__in=['active', 'less_active']
                         ).filter(
                             Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
                         ).exclude(start__gte=first_date_next_month)
-                        support_ids.append(queryset.values_list('project__id', flat=True))
+                        support_ids.extend(list(queryset.values_list('project__id', flat=True)))
                     project_ids = set(support_ids)
                 else:
                     project_support = ProjectSupport.objects.filter(
@@ -1511,6 +1512,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                                                      statuses__is_current=True).order_by('id').distinct('id')
             else:
                 return Response({'message': 'Project Type is required'}, status=status.HTTP_400_BAD_REQUEST)
+            breakpoint()
             serializer = TimesheetProjectSerializer(project, many=True, context={'project_type': project_type})
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -1535,8 +1537,14 @@ class EngineerReportXposedViewSets(GenericViewSet):
             if submit_date:
                 test = test.filter(submit_date__date=submit_date)
             if submit_month:
-                year, month = submit_month.split('-')
-                test = test.filter(submit_date__year=year, submit_date__month=month)
+                test_ids = []
+                months = submit_month.split(",")
+                for month_set in months:
+                    year, month = month_set.split('-')
+                    ids = test.filter(submit_date__year=year, submit_date__month=month).values_list('id', flat=True)
+                    if test:
+                        test_ids.extend(ids)
+                test = test.filter(id__in=test_ids)
             serializer = TimesheetTestSerializer(test, many=True)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
