@@ -193,9 +193,10 @@ def terminate_consultant(terminate, request):
         # App Notification
         recruiter = consultant.recruiter
         user_list = [recruiter]
-        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
-        for user in scrum_masters:
-            user_list.append(user)
+        if recruiter.team:
+            scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
+            for user in scrum_masters:
+                user_list.append(user)
 
         if isinstance(terminate.last_date, str):
             last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b %d, %Y")

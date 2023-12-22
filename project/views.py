@@ -2349,23 +2349,23 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
         try:
             if "created" in filter_json and filter_json.get("created", {}):
                 created_in_range = filter_json.get("created")
-                if "lte" in created_in_range:
+                if created_in_range.get("lte"):
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__lte=created_in_range.get("lte"))
-                if "gte" in created_in_range:
+                if created_in_range.get("gte"):
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__gte=created_in_range.get("gte"))
 
             if "duration" in filter_json:
                 duration_range = filter_json.get("duration")
-                if "lte" in duration_range:
+                if duration_range.get("lte"):
                     queryset = queryset.filter(total_hours__lte=duration_range.get("lte"))
-                if "gte" in duration_range:
+                if duration_range.get("gte"):
                     queryset = queryset.filter(total_hours__gte=duration_range.get("gte"))
 
             if "stakeholder" in filter_json:
                 stakeholder = filter_json.get("stakeholder")
-                if "type" and "emp_ids" in list(filter_json.get("stakeholder").keys()):
+                if stakeholder.get("type") and stakeholder.get("emp_ids"):
                     query = {f'{STAKEHOLDER[stakeholder.get("type")].get("query")}__id__in': stakeholder.get("emp_ids")}
                     queryset = queryset.filter(**query)
 

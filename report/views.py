@@ -1475,7 +1475,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     project_support = ProjectSupport.objects.filter(project__id=project_id)
                     project_ids = set(project_support.values_list('project__id', flat=True))
                 elif months and employee_id:
-                    project_ids = set()
+                    support_ids = []
                     months = months.split(",")
                     for month in months:
                         month = int(month)
@@ -1489,7 +1489,8 @@ class EngineerReportXposedViewSets(GenericViewSet):
                         ).filter(
                             Q(start__lt=last_date_prev_month, end__gt=last_date_prev_month) | Q(end=None)
                         ).exclude(start__gte=first_date_next_month)
-                        project_ids.add(queryset.values_list('project__id', flat=True))
+                        support_ids.append(queryset.values_list('project__id', flat=True))
+                    project_ids = set(support_ids)
                 else:
                     project_support = ProjectSupport.objects.filter(
                         statuses__frequency__in=['active', 'less_active'],

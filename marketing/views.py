@@ -1145,10 +1145,9 @@ class InterviewViewSets(ModelViewSet):
             # Interview counts by status
             queryset = queryset.order_by('id').distinct('id')
 
+            status_count_qs = queryset
             if filter_by_call_type:
                 status_count_qs = queryset.filter(call_type__display_name__in=filter_by_call_type)
-            else:
-                status_count_qs = queryset
 
             data_counts = {
                 'total': status_count_qs.count(),

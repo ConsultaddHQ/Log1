@@ -24,7 +24,7 @@ def cred(mail_id, file_dst=None):
     if os.environ.get('ENV', 'local') != 'prod':
         mail_id = "suman.m@consultadd.com"
         
-    if mail_id == "product@consultadd.com":
+    if not mail_id or mail_id == "product@consultadd.com":
         mail_id = "suman.m@consultadd.com"
 
     credentials = Credentials.from_service_account_file(
@@ -156,9 +156,13 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
         try:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()
         except Exception:
-            service, from_mail_id = cred(_e)
-            email_data = service.users().messages().get(userId='me', id=mail_id).execute()
-
+            if _e:
+                from_email = _e
+                service, from_mail_id = cred(_e)
+                email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+            else:
+                service, from_mail_id = cred("product@consultadd.com")
+                return send_mail_without_thread(mail_data, service, request)
         body = render_to_string(mail_data["template"], mail_data["context"])
         body = body.replace("\\r\\n", "<br>").replace(";newline;", "<br>").replace(
                 "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")    
@@ -170,8 +174,7 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
         email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_bytes()).decode()}}
         draft = service.users().drafts().create(userId='me', body=email_body).execute()
         message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
-        return message['id'], True, from_mail_id   
-     
+        return message['id'], True, from_mail_id
     except Exception as error:
         write_exception(message=error, request=request)
         invalid_keys = ['template', 'context']
