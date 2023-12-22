@@ -193,7 +193,7 @@ def terminate_consultant(terminate, request):
         # App Notification
         recruiter = consultant.recruiter
         user_list = [recruiter]
-        if recruiter.team:
+        if recruiter and recruiter.team:
             scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
             for user in scrum_masters:
                 user_list.append(user)
