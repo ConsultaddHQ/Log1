@@ -657,7 +657,7 @@ def get_country(city):
 
 def assign_project_associates(project, request=None, **kwargs):
     try:
-        city = project.submission.lead.city.split(",")
+        city = project.submission.lead.city.split(",") if project.submission.lead.city else None
         if city and city[1] != 'CA':
             vp = get_object_or_404(User, employee_id=2572)
             lead_sm = get_object_or_404(User, employee_id=2491)
