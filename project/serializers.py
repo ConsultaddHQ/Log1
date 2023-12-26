@@ -632,7 +632,7 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
             "email": obj.project.submission.consultant.email,
             "type": obj.project.submission.get_work_type_display(),
             "vendor": obj.project.submission.lead.vendor_company.name,
-            "joining_date": joining_date if joining_date else "Not Joined",
+            "joining_date": joining_date.created.strftime("%Y-%m-%d") if joining_date else "Not Joined",
             "job_title": obj.project.submission.lead.position.display_name
             if obj.project.submission.lead.position else None
         }

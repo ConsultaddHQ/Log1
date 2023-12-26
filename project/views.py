@@ -2357,8 +2357,8 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             if "created" in filter_json and filter_json.get("created", {}):
                 created_in_range = filter_json.get("created")
                 if created_in_range.get("lte"):
-                    queryset = queryset.filter(project__statuses__status='joined',
-                                               project__statuses__created__lte=created_in_range.get("lte"))
+                    lte = datetime.strptime(created_in_range.get("lte"), "%Y-%m-%d") + timedelta(days=1)
+                    queryset = queryset.filter(project__statuses__status='joined', project__statuses__created__lte=lte)
                 if created_in_range.get("gte"):
                     queryset = queryset.filter(project__statuses__status='joined',
                                                project__statuses__created__gte=created_in_range.get("gte"))
@@ -2415,9 +2415,9 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             response = HttpResponse(content_type='text/csv')
             writer = csv.writer(response)
             writer.writerow([
-                'Project ID', 'Consultant Name', 'Consultant Email', 'Client', 'Vendor', 'Job Title', 'Start Date',
-                'Total Hours', 'Marketer', 'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM', 'VP',
-                'Support Persons', 'PO Detail Page Link'
+                'Project ID', 'Consultant Name', 'Client', 'Vendor', 'Job Title', 'Project Type', 'Start Date',
+                'Joining Date', 'Total Hours', 'Marketer', 'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM',
+                'VP', 'Support Persons', 'PO Detail Page Link'
             ])
 
             response['Content-Disposition'] = "attachment; filename=Consultants.csv"
@@ -2427,10 +2427,11 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
                 supervisors = self.get_attr(data.get("interviews", []), "supervisor")
                 support_persons = self.get_attr(data.get("support_persons", []), "support_name")
                 writer.writerow([
-                    project.get("id"), project.get("name"), project.get("email"), project.get("client"),
-                    project.get("vendor"), project.get("job_title"), project.get("start_date"), data.get('total_hours'),
-                    data.get("marketer").get("employee_name"), data.get("recruiter").get("employee_name"),
-                    supervisors, coders, data.get("team_lead", {}).get("employee_name"),
+                    project.get("id"), project.get("name"), project.get("client"),
+                    project.get("vendor"), project.get("job_title"), project.get("type"), project.get("start_date"),
+                    project.get("joining_date"), data.get('total_hours'), data.get("marketer").get("employee_name"),
+                    data.get("recruiter").get("employee_name"), supervisors, coders,
+                    data.get("team_lead", {}).get("employee_name"),
                     data.get("lead_sm", {}).get("employee_name"), data.get("vp", {}).get("employee_name"),
                     support_persons,
                     f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('id')}"
