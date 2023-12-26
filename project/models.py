@@ -25,7 +25,7 @@ FEEDBACK_CHOICES = (
 
 STAKEHOLDER = {
     "VP": {"query": "vp", "role": "vp"},
-    "Lead SM": {"query": "lead_sm", "role": "admin"},
+    "Lead SM": {"query": "lead_sm", "role": "lead_sm"},
     "Team Lead": {"query": "team_lead", "role": "admin"},
     "Marketer": {"query": "marketer", "role": "marketer"},
     "Recruiter": {"query": "recruiter", "role": "recruiter"},
