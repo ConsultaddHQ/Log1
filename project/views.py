@@ -189,6 +189,7 @@ class ProjectViewSets(ModelViewSet):
             res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             delete_temp_file(path)
             if not msg:
+                write_exception(res, request=request)
                 return res, "error"
             return res, "ok"
         except Exception as error:
