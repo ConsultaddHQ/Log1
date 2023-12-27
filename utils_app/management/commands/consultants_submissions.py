@@ -68,7 +68,7 @@ class Command(BaseCommand):
 
                 reply_to = [config.RELATIONS]
                 try:
-                    resp, status, from_mail_id = send_email(mail_data, "marketing@consultadd.com", None, True)
+                    resp, status, from_mail_id = send_email(mail_data, "product@consultadd.com", None, True)
                     if not status:
                         mail_res = False
                         create_cron_error(job, f"{resp} while sending mail to {consultant.name} {consultant.email}")
@@ -102,7 +102,7 @@ class Command(BaseCommand):
                 },
             }
             if submission_data:
-                send_email(mail_data, "marketing@consultadd.com", None, True)
+                send_email(mail_data, "product@consultadd.com", None, True)
         except Exception as error:
             _, _, tb = sys.exc_info()
             lineno = tb.tb_lineno

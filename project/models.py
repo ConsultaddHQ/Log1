@@ -23,6 +23,17 @@ FEEDBACK_CHOICES = (
     ('engineering_issue', 'Engineering Issue'),
 )
 
+STAKEHOLDER = {
+    "VP": {"query": "vp", "role": "vp"},
+    "Lead SM": {"query": "lead_sm", "role": "lead_sm"},
+    "Team Lead": {"query": "team_lead", "role": "admin"},
+    "Marketer": {"query": "marketer", "role": "marketer"},
+    "Recruiter": {"query": "recruiter", "role": "recruiter"},
+    "Coder": {"query": "interviews__guests__user", "role": "engineer"},
+    "Supervisor": {"query": "interviews__supervisor", "role": "interviewee"},
+    "Support Person": {"query": "support_persons__support", "role": "engineer"},
+}
+
 
 DURATION_COMPLETION_NOTIFICATION_TYPE = [
     {"hour": 160, "du_check": "160_HOUR"}, {"hour": 320, "du_check": "320_HOUR"},
