@@ -3,6 +3,7 @@ import json
 from datetime import datetime, date, timedelta
 
 from django.db import transaction
+from django.http import HttpResponse
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
@@ -25,7 +26,7 @@ from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from notification.models import Notification, FCMDevice
-from utils_app.utils import delete_temp_file, export_to_csv
+from utils_app.utils import delete_temp_file, export_to_csv, add_export_log
 from marketing.utils import date_filter, get_authenticated_users
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
@@ -34,7 +35,8 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm, ProjectAssociates, \
+    STAKEHOLDER
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
@@ -64,17 +66,18 @@ class ProjectViewSets(ModelViewSet):
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'to': [project.consultant.email], 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
-                'bcc': ['shreyas.k@consultadd.com'],
+                'bcc': ['piyush.y@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
                     'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
                     'client': project.submission.client.title(), 'consultant_email': project.consultant.email,
                 },
             }
-            res, msg = send_email(mail_data, config.RELATIONS, request=request)
-            if not msg:
-                return res, "error"
-            return res, "ok"
+            msg, resp, _ = send_email_(mail_data, config.RELATIONS, request)
+            if not resp:
+                write_exception(msg, request)
+                return  resp, "error"
+            return resp, "ok"
         except Exception as error:
             write_exception(message=error)
             return error, "error"
@@ -186,10 +189,11 @@ class ProjectViewSets(ModelViewSet):
             res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             delete_temp_file(path)
             if not msg:
+                write_exception(res, request=request)
                 return res, "error"
             return res, "ok"
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=request)
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
@@ -637,9 +641,12 @@ class ProjectViewSets(ModelViewSet):
         project_id = kwargs.get('pk')
         try:
             err = None
+            is_mail_sent = False
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
+            util = ProjectUtil(project, request)
             prev_employer = project.employer
+            prev_consultant_id = project.consultant.id
             prev_status_obj = project.statuses.get(is_current=True)
             prev_rate, prev_start_date = project.rate, project.start_date
             all_status, cancellation_status, termination_status = fetch_project_status()
@@ -662,11 +669,21 @@ class ProjectViewSets(ModelViewSet):
             project.invoicing_period = request.data.get('invoicing_period', project.invoicing_period)
             project.reporting_details = request.data.get('reporting_details', project.reporting_details)
 
+            remote_consultant_id = request.data.get('remote_consultant_id', None)
+
             consultant = create_remote_consultant(request)
             if consultant:
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
+
+            if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "Joined":
+                # Setting password for User (consultant)
+                password, new_user = set_consultant_password(project.consultant)
+                resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
+                if resp_message == "ok":
+                    is_mail_sent = True;
+                util.assign_leave()
 
             activity_created = False
 
@@ -675,7 +692,6 @@ class ProjectViewSets(ModelViewSet):
                 activity_created = True
                 send_employer_change_notification(project, data, request)
 
-            util = ProjectUtil(project, request)
             desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -716,14 +732,14 @@ class ProjectViewSets(ModelViewSet):
                     if project.submission.work_type == 'c2c':
                         util.create_timesheet()
 
-                    # Creating first week Timesheet on project status change to joined
-                    util.assign_leave()
+                    if not is_mail_sent:
+                        password, new_user = set_consultant_password(project.consultant)
+                        resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
+                        util.assign_leave()
 
-                    # Setting password for User (consultant)
-                    password, new_user = set_consultant_password(project.consultant)
-                    resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
                     util.send_join_notification()
                     assign_project_associates(project, request)
+                    project.save()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -2322,20 +2338,119 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin):
-    queryset = ProjectAssociates.objects.all()
+# Route - /project_associates/
+class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin):
     permission_classes = (IsAuthenticated,)
+    queryset = ProjectAssociates.objects.all()
     serializer_class = ProjectAssociatesSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @staticmethod
+    def get_attr(sequence, key):
+        lst = list()
+        for elem in sequence:
+            lst.extend(elem.get(key, [])) if type(elem.get(key, [])) == list else lst.append(elem.get(key, []))
+        return ", ".join(set(lst)) if lst else "Not Assigned"
+
+    @staticmethod
+    def filter_project_associate_queryset(queryset, filter_json, request):
+        try:
+            if "created" in filter_json and filter_json.get("created", {}):
+                created_in_range = filter_json.get("created")
+                if created_in_range.get("lte"):
+                    lte = datetime.strptime(created_in_range.get("lte"), "%Y-%m-%d") + timedelta(days=1)
+                    queryset = queryset.filter(project__statuses__status='joined', project__statuses__created__lte=lte)
+                if created_in_range.get("gte"):
+                    queryset = queryset.filter(project__statuses__status='joined',
+                                               project__statuses__created__gte=created_in_range.get("gte"))
+
+            if "duration" in filter_json:
+                duration_range = filter_json.get("duration")
+                if duration_range.get("lte"):
+                    queryset = queryset.filter(total_hours__lte=duration_range.get("lte"))
+                if duration_range.get("gte"):
+                    queryset = queryset.filter(total_hours__gte=duration_range.get("gte"))
+
+            if "stakeholder" in filter_json:
+                stakeholder = filter_json.get("stakeholder")
+                if stakeholder.get("type") and stakeholder.get("emp_ids"):
+                    query = {f'{STAKEHOLDER[stakeholder.get("type")].get("query")}__id__in': stakeholder.get("emp_ids")}
+                    queryset = queryset.filter(**query)
+
+            return queryset.order_by('id').distinct('id')
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"msg": error}, status=status.HTTP_400_BAD_REQUEST)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            query = request.GET.get('query', None)
+            filter_json = json.loads(request.GET.get('filter', '{}'))
+            queryset = ProjectAssociates.objects.all()
+            if query:
+                queryset = queryset.filter(
+                    project__submission__consultant_marketing__consultant__name__istartswith=query)
+            if filter_json:
+                queryset = self.filter_project_associate_queryset(queryset, filter_json, request)
+            serialized = ProjectAssociatesSerializer(queryset[first: last], many=True)
+            return Response({"data": serialized.data, "total": queryset.count()}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"msg": error}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="export")
+    def export(self, request, *args, **kwargs):
+        try:
+            query = request.GET.get('query', None)
+            filter_json = json.loads(request.GET.get('filter', '{}'))
+            queryset = ProjectAssociates.objects.all()
+
+            if query:
+                queryset = queryset.filter(
+                    project__submission__consultant_marketing__consultant__name__istartswith=query)
+            if filter_json:
+                queryset = self.filter_project_associate_queryset(queryset, filter_json, request)
+            serialized = ProjectAssociatesSerializer(queryset, many=True)
+
+            response = HttpResponse(content_type='text/csv')
+            writer = csv.writer(response)
+            writer.writerow([
+                'Project ID', 'Consultant Name', 'Client', 'Vendor', 'Job Title', 'Project Type', 'Start Date',
+                'Joining Date', 'Total Hours', 'Marketer', 'Recruiter', 'Supervisor', 'Coder', 'Team Lead', 'Lead SM',
+                'VP', 'Support Persons', 'PO Detail Page Link'
+            ])
+
+            response['Content-Disposition'] = "attachment; filename=Consultants.csv"
+            for data in serialized.data:
+                project = data.get('project', {})
+                coders = self.get_attr(data.get("interviews", []), "coders")
+                supervisors = self.get_attr(data.get("interviews", []), "supervisor")
+                support_persons = self.get_attr(data.get("support_persons", []), "support_name")
+                writer.writerow([
+                    project.get("id"), project.get("name"), project.get("client"),
+                    project.get("vendor"), project.get("job_title"), project.get("type"), project.get("start_date"),
+                    project.get("joining_date"), data.get('total_hours'), data.get("marketer").get("employee_name"),
+                    data.get("recruiter").get("employee_name"), supervisors, coders,
+                    data.get("team_lead", {}).get("employee_name"),
+                    data.get("lead_sm", {}).get("employee_name"), data.get("vp", {}).get("employee_name"),
+                    support_persons,
+                    f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('id')}"
+                ])
+            add_export_log("Project Associates List", request)
+            return response
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"msg": error}, status=status.HTTP_400_BAD_REQUEST)
+
     def retrieve(self, request, *args, **kwargs):
-        project_id = kwargs.get('pk',None)
+        project_id = kwargs.get('pk', None)
         try:
             if not project_id:
-                return Response({"message":"Project not found"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Project not found"}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                project_associates = ProjectAssociates.objects.get(project=project_id)
-            except:
+                project_associates = get_object_or_404(ProjectAssociates, project=project_id)
+            except ProjectAssociates.DoesNotExist:
                 return Response({"message": "Project associates not found"}, status=status.HTTP_204_NO_CONTENT)
 
             serializer = self.serializer_class(project_associates)
@@ -2343,4 +2458,23 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin):
 
         except Exception as error:
             write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="stakeholder_types")
+    def stakeholder_types(self, request, *args, **kwargs):
+        try:
+            return Response({"data": list(STAKEHOLDER.keys())}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=False, url_name="employees")
+    def employees(self, request, *args, **kwargs):
+        try:
+            stakeholder_type = request.GET.get('type')
+            role = STAKEHOLDER.get(stakeholder_type).get("role")
+            user_data = User.objects.filter(role__name=role, is_active=True, account_login=True).values(
+                'id', 'employee_id', "employee_name"
+            )
+            return Response({"data": user_data}, status=status.HTTP_200_OK)
+        except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

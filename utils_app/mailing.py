@@ -15,7 +15,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
     else:
         cc, bcc = [], []
         from_email = 'suman.m@consultadd.com'
-        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@cosnultadd.com']
+        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'piyush.y@consultadd.com', 'gufran.a@cosnultadd.com']
 
     if reply_to is None:
         reply_to = []

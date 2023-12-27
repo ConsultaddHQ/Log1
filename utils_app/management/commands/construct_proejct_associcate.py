@@ -4,14 +4,13 @@ from constance import config
 from django.core.management import BaseCommand
 
 from project.models import Project
+from utils_app.utils import create_cron_error
 from project.utils import assign_project_associates
-from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
-        job = create_cron_object(name='construct_project_associate')
         try:
             file = open('associates_registered.csv', "w+")
             writer = csv.writer(file)
@@ -34,4 +33,4 @@ class Command(BaseCommand):
                 )
                 print("Project associates created")
         except Exception as error:
-            create_cron_error(job, error)
+            create_cron_error("register_project_associate", error)
