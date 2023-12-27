@@ -99,7 +99,7 @@ class GoogleCalendar:
     def book_calendar(self, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id = "suman.m@consultadd.com"
+                calendar_id = "shreyas.k@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
             try:
@@ -116,7 +116,7 @@ class GoogleCalendar:
     def update_calendar(self, event_id, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id = "suman.m@consultadd.com"
+                calendar_id = "shreyas.k@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
             try:
@@ -158,7 +158,7 @@ class GoogleCalendar:
     def delete_calendar_booking(self, event_id, calendar_id, request):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id = "suman.m@consultadd.com"
+                calendar_id = "shreyas.k@consultadd.com"
             service = self.calendar_con(calendar_id)
             try:
                 service.events().delete(calendarId=calendar_id, eventId=event_id, sendUpdates='all').execute()
@@ -186,7 +186,7 @@ class GoogleCalendar:
                 data = {"id": email}
                 items.append(data)
 
-            service = self.calendar_con("suman.m@consultadd.com")
+            service = self.calendar_con("shreyas.k@consultadd.com")
 
             free_busy_query = {
                 "timeMax": end, "timeMin": start,

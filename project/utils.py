@@ -25,13 +25,13 @@ from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent, 
 
 def set_consultant_password(consultant):
     try:
-        if not consultant.is_active:
+        if not consultant.is_active and consultant.first_login:
             password = password_generator(password_length=10, strength=3)
             consultant.set_password(password)
             consultant.is_active = True
             consultant.save()
             return password, True
-        return "password", False
+        return "Use your old password, or reset it using your registered email address in the TimeTrack app", True
     except Exception as error:
         write_exception(message=error)
 
@@ -657,7 +657,7 @@ def get_country(city):
 
 def assign_project_associates(project, request=None, **kwargs):
     try:
-        city = project.submission.lead.city.split(",")
+        city = project.submission.lead.city.split(",") if project.submission.lead.city else None
         if city and city[1] != 'CA':
             vp = get_object_or_404(User, employee_id=2572)
             lead_sm = get_object_or_404(User, employee_id=2491)

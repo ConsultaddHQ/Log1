@@ -221,6 +221,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
     guests = serializers.SerializerMethodField()
     call_type = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
+    interview_type = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
     supervisor_detail = serializers.SerializerMethodField()
     supervisor_feedback = serializers.SerializerMethodField()
@@ -300,6 +301,25 @@ class InterviewListSerializer(serializers.ModelSerializer):
                 "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
             })
         return guests
+
+    @staticmethod
+    def get_interview_type(obj):
+        if obj.coding_present is None:
+            assistance = False
+            coding_required = False
+            if obj.guest_type in ['Coder', 'Assigned Coder']:
+                coding_required = True
+            elif obj.guest_type in ['Assistance', 'Assigned Assistance']:
+                assistance = True
+            elif obj.guest_type in ['Coder & Assistance', 'Assigned Coder & Assistance']:
+                assistance = True
+                coding_required = True
+        else:
+            assistance = obj.assistance_required
+            coding_required = obj.coding_present
+        return {
+            "coding_required": coding_required, "assistance": assistance
+        }
 
 
 class TestListSerializer(serializers.ModelSerializer):
