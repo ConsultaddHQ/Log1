@@ -429,7 +429,8 @@ class ProjectUtil:
         try:
             start_date = datetime.strptime(str(self.project.start_date), '%Y-%m-%d')
             week_day = start_date.weekday()
-            if week_day == 0:
+            if week_day == 6:
+                start_date = start_date + timedelta(days=1)
                 end_date = start_date + timedelta(days=6)
             else:
                 end_date = start_date + timedelta(days=6 - week_day)
