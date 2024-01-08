@@ -167,7 +167,7 @@ class ProjectViewSets(ModelViewSet):
                 employer = project.submission.employer
             mail_data = {
                 'template': '../templates/support.html',
-                'to': [config.ENGINEERING], 'cc': cc, 'bcc': ['shreyas.k@consultadd.com'], 'attachments': path,
+                'to': [config.ENGINEERING], 'cc': cc, 'bcc': [config.DEVELOPER_MAIL], 'attachments': path,
                 'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'context': {
                     'employer': employer, 'marketer_name': submission.created_by.employee_name,

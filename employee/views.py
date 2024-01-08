@@ -3,6 +3,7 @@ from itertools import chain
 from datetime import timedelta, datetime
 
 from dateutil import tz
+from constance import config
 from django.utils import timezone
 from rest_framework.mixins import *
 from rest_framework import exceptions
@@ -659,7 +660,7 @@ class ResetPasswordViewSets(GenericViewSet):
                     },
                 }
                 # res, error = user.send_mail(mail_data)
-                res, mail_sent, from_email = send_email(mail_data, "product@consultadd.com", request)
+                res, mail_sent, from_email = send_email(mail_data, config.APP_ADMIN, request)
                 if mail_sent:
                     return Response({"message": f"Mail sent on {user.email}", "data": res}, status=status.HTTP_200_OK)
                 else:
