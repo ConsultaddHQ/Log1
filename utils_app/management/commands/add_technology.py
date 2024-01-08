@@ -1,20 +1,13 @@
-import csv
 from django.core.management import BaseCommand
 
-from consultant.models import Consultant
-from employee.models import Certificate
-from utils_app.utils import create_cron_error, create_cron_object, get_timezone
+from project.models import ConsultantLeave
+from utils_app.utils import create_cron_object
 from utils_app.models import Choice, ContentType
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        job = create_cron_object(name='add_platform')
         try:
-            content_type = ContentType.objects.get(model='test')
-            platforms = ['CoderByte', 'Codility', 'Coderpad', 'CodeSignal', 'Amcat', 'Glider', 'FilteredAI', 'Kenexa',
-                         'Hackerrank', 'Interview Mocha', 'Hirevue', 'Ikm', 'Mettl', 'PluralSight', 'LeetCode']
-            for item in platforms:
-                Choice.objects.create(name=item, display_name=item, content_type=content_type, field='platform')
+            consultant_qs = ConsultantLeave.objects.filter(year=2023, is_expired=True)
         except Exception as error:
             print(error)
