@@ -32,19 +32,24 @@ def domain_verification(mail_id):
 
 
 def get_active_user(users):
-    active_users = []
+    if not isinstance(users, dict):
+        return {}
+
+    active_users = {}
     all_active_users = User.objects.filter(is_active=True, account_login=True).values_list('email', flat=True)
-    if type(users) is not list:
-        return []
-    else:
-        for user_mail in users:
-            if user_mail in GROUP_MAIL:
-                continue
-            elif not domain_verification(user_mail):
-                continue
+    for key, user_mails in users.items():
+        active_users.setdefault(key, [])
+        if not isinstance(user_mails, list):
+            return {}
+
+        for user_mail in user_mails:
+            if user_mail in GROUP_MAIL or not domain_verification(user_mail):
+                active_users.get(key).append(user_mail)
             elif user_mail not in all_active_users:
-                active_users.append(user_mail)
-    return active_users
+                continue
+            else:
+                active_users.get(key).append(user_mail)
+        return active_users
 
 
 def log_mail_status(status, mail_data, error=None):
@@ -162,9 +167,10 @@ def create_message(from_email, mail_data):
 
         message['from'] = from_email
         if os.environ.get('ENV', 'local') == 'prod':
-            message['to'] = ','.join(get_active_user(mail_data["to"]))
-            message['cc'] = ','.join(get_active_user(mail_data["cc"]))
-            message['bcc'] = ','.join(get_active_user(mail_data["bcc"]))
+            email_recipients = {"to": mail_data.get("to"), "cc": mail_data.get("cc"), "bcc": mail_data.get("bcc")}
+            active_users = get_active_user(email_recipients)
+            for key in email_recipients.keys():
+                message[key] = ','.join(active_users.get(key, []))
 
         else:
             message['to'] = ','.join(['piyush.y@consultadd.com', 'shreyas.k@consultadd.com', 'gufran.a@consultadd.com'])
@@ -182,9 +188,10 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
         obj['subject'] = subject
         obj['from'] = from_mail
         if os.environ.get('ENV', 'local') == 'prod':
-            obj['to'] = ','.join(get_active_user(to))
-            obj['cc'] = ','.join(get_active_user(cc))
-            obj['bcc'] = ','.join(get_active_user(bcc))
+            email_recipients = {"to": to, "cc": cc, "bcc": bcc}
+            active_users = get_active_user(email_recipients)
+            for key in email_recipients.keys():
+                obj[key] = ','.join(active_users.get(key, []))
         else:
             obj['cc'] = ''
             obj['bcc'] = ''
