@@ -17,7 +17,7 @@ from google.oauth2.service_account import Credentials
 from email.mime import application, multipart, text, base, image, audio
 
 SERVICE_ACCOUNT_FILE = '/home/ubuntu/log1/service.json'
-SCOPES = ['https://mail.google.com/', 'https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = ['https://mail.google.com/']
 GROUP_MAIL = [
     'legal@consultadd.com', 'finance@consultadd.com', 'relations@consultadd.com', 'recruitment@consultadd.com',
     'engineering@consultadd.com', 'bbookingg@gmail.com', 'vendormanagement@consultadd.com', 'marketing@consultadd.com'
@@ -31,13 +31,10 @@ def domain_verification(mail_id):
         return False
 
 
-def get_active_user(users):
-    if not isinstance(users, dict):
-        return {}
-
+def get_active_user(**kwargs):
     active_users = {}
     all_active_users = User.objects.filter(is_active=True, account_login=True).values_list('email', flat=True)
-    for key, user_mails in users.items():
+    for key, user_mails in kwargs.items():
         active_users.setdefault(key, [])
         if not isinstance(user_mails, list):
             return {}
@@ -84,10 +81,10 @@ def log_mail_status(status, mail_data, error=None):
 def create_service(mail_id):
     try:
         if os.environ.get('ENV', 'local') != 'prod':
-            mail_id = config.DEVELOPER_MAIL
+            mail_id = config.DEVELOPER
 
         if not mail_id or mail_id == config.APP_ADMIN or not domain_verification(mail_id):
-            mail_id = config.DEVELOPER_MAIL
+            mail_id = config.DEVELOPER
 
         credentials = Credentials.from_service_account_file(
             filename=config.GOOGLE_SERVICE_FILE, subject=mail_id, scopes=SCOPES
@@ -160,7 +157,7 @@ def create_message(from_email, mail_data):
         message['subject'] = mail_data.get("subject")
 
         if os.environ.get('ENV', 'local') != 'prod':
-            from_email = config.DEVELOPER_MAIL
+            from_email = config.DEVELOPER
 
         if from_email in ["suman.m@consultadd.com", "shreyas.k@consultadd.com"]:
             from_email = config.APP_ADMIN
@@ -168,7 +165,7 @@ def create_message(from_email, mail_data):
         message['from'] = from_email
         if os.environ.get('ENV', 'local') == 'prod':
             email_recipients = {"to": mail_data.get("to"), "cc": mail_data.get("cc"), "bcc": mail_data.get("bcc")}
-            active_users = get_active_user(email_recipients)
+            active_users = get_active_user(to=mail_data.get("to"), cc=mail_data.get("cc"), bcc=mail_data.get("bcc"))
             for key in email_recipients.keys():
                 message[key] = ','.join(active_users.get(key, []))
 
@@ -189,15 +186,13 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
         obj['from'] = from_mail
         if os.environ.get('ENV', 'local') == 'prod':
             email_recipients = {"to": to, "cc": cc, "bcc": bcc}
-            active_users = get_active_user(email_recipients)
+            active_users = get_active_user(to=to, cc=cc, bcc=bcc)
             for key in email_recipients.keys():
                 obj[key] = ','.join(active_users.get(key, []))
         else:
-            obj['cc'] = ''
-            obj['bcc'] = ''
-            obj['to'] = ','.join(
-                ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@consultadd.com']
-            )
+            obj['cc'] = ','.join(['gufran.a@consultadd.com'])
+            obj['bcc'] = ','.join(['shivam.k@consultadd.com'])
+            obj['to'] = ','.join(['shreyas.k@consultadd.com'])
         return obj, None
     except Exception as error:
         return None, str(error)
@@ -243,6 +238,8 @@ def execute_mail(service, mail_body, draft=False, media=None):
                 else:
                     draft = service.users().drafts().create(userId='me', body=mail_body).execute()
                 message = service.users().drafts().send(userId='me', body={'id': draft['id']}).execute()
+            elif media:
+                message = (service.users().messages().send(userId="me", media_body=media).execute())
             else:
                 message = (service.users().messages().send(userId="me", body=mail_body).execute())
             if 'SENT' in message.get('labelIds'):
@@ -271,7 +268,11 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
                 if not service:
                     log_mail_status("Not Sent", mail_data, "issue while creating service object")
                     return None, False, None
-                mail_obj = service.users().messages().get(userId='me', id=mail_id).execute()
+                try:
+                    mail_obj = service.users().messages().get(userId='me', id=mail_id).execute()
+                except Exception:
+                    service, from_mail = create_service(config.APP_ADMIN)
+                    return send_mail_without_thread(mail_data, service, request)
             else:
                 service, from_mail = create_service(config.APP_ADMIN)
                 return send_mail_without_thread(mail_data, service, request)
@@ -299,7 +300,7 @@ def send_email(mail_data, from_email, request=None, cron_execution=None):
         retry = 0
         service, from_mail = create_service(from_email)
         if not service:
-            log_mail_status("Not Sent", mail_data, from_mail)
+            log_mail_status("Not Sent", mail_data, "issue while creating service object")
             return None, False, None
 
         msg_resp = create_message(from_mail, mail_data)
@@ -377,7 +378,7 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
 def send_mail_without_thread(mail_data, service, request=None):
     try:
         from_email = config.APP_ADMIN
-        message = MIMEText(mail_data.get("body"), 'html')
+        message = multipart.MIMEMultipart()
         message, error = set_mail_config(
             mail_data.get("to"), from_email, mail_data.get("cc"),
             mail_data.get("bcc"), mail_data.get("subject"), message
@@ -393,15 +394,15 @@ def send_mail_without_thread(mail_data, service, request=None):
         message.attach(MIMEText(body, 'html'))
 
         file_size = False
-        if len(mail_data["attachments"]) > 0:
-            file_size = add_attachments(message, mail_data["attachments"])
+        if len(mail_data.get("attachments")) > 0:
+            file_size = add_attachments(message, mail_data.get("attachments"))
 
         if file_size:
             write_exception(str("Email size is more then 25 MB"), request)
             return str("Email size is more then 25 MB"), False, None
 
         media = MediaIoBaseUpload(BytesIO(message.as_bytes()), mimetype='message/rfc822', resumable=True)
-        message, status = execute_mail(service, media, False)
+        message, status = execute_mail(service, None, False, media)
         if status:
             log_mail_status("Sent", mail_data)
             return message.get('id'), True, from_email
@@ -430,7 +431,11 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             except Exception:
                 if _from_email:
                     service, from_mail = create_service(_from_email)
-                    mail_obj = service.users().messages().get(userId='me', id=mail_id).execute()
+                    try:
+                        mail_obj = service.users().messages().get(userId='me', id=mail_id).execute()
+                    except Exception:
+                        service, from_mail = create_service(config.APP_ADMIN)
+                        return send_mail_without_thread(mail_data, service, request)
                 else:
                     service, from_mail = create_service(config.APP_ADMIN)
                     return send_mail_without_thread(mail_data, service, request)
