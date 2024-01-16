@@ -418,7 +418,8 @@ def interview_card_data(obj, request):
                 f"*{feedback['question']}*:  {feedback['answer']}"
                 if feedback.get('answer_type') != 'multi_select'
                 else f"*{feedback['question']}*:  {feedback.get('answer', 'NA').replace('[', '').replace(']', '')}"
-                for feedback in supervisor_feedback_data)
+                for feedback in supervisor_feedback_data
+            )
             supervisor_data = {"feedback": sup_feedback, "header": ":telephone_receiver: Supervisor Feedback"}
             interview_data.append(supervisor_data)
 
@@ -434,7 +435,8 @@ def interview_card_data(obj, request):
                 }
                 coding_feedback_data.append(coding_feedback)
             guest = " ".join([
-                f"`<@{i.user.slack_id}>`" if i.user.slack_id else f"`{i.user.employee_name}`" for i in obj.guests.all()
+                f"`<@{i.user.slack_id}>`" if i.user.slack_id else f"`{i.user.employee_name}`"
+                for i in obj.guests.exclude(type__in=[None, 'other'])
             ])
             coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
             coding_feedback_data.insert(

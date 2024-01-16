@@ -277,9 +277,17 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type and obj.coding_present is None and (
-                (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or (
-                ('Assigned' or 'assigned') in obj.guest_type)):
+        # if obj.guest_type and obj.coding_present is None and (
+        #         (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or (
+        #         ('Assigned' or 'assigned') in obj.guest_type)):
+        #     return False
+        # return True
+        if obj.status in ['scheduled', 'rescheduled']:
+            return False
+        elif obj.guest_type and obj.guest_type != 'Not Required' and obj.coding_present is None:
+            return False
+        elif obj.supervisor.employee_id != 9999 and \
+                not obj.supervisor_feedback.filter(question__form_name='interview').all():
             return False
         return True
 
@@ -324,6 +332,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
 class TestListSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
+    deadline = serializers.SerializerMethodField()
     job_title = serializers.SerializerMethodField()
     marketer_id = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
@@ -342,6 +351,12 @@ class TestListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_client(obj):
         return obj.submission.client
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
     @staticmethod
     def get_marketer_id(obj):
@@ -379,6 +394,7 @@ class TestListSerializer(serializers.ModelSerializer):
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
+    deadline = serializers.SerializerMethodField()
     engineers = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
@@ -399,6 +415,12 @@ class TestCreateSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_assigned_to(obj):
         return obj.assign_to.all().values('id', 'employee_name')
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
     @staticmethod
     def get_submitted_by(obj):
