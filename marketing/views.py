@@ -1108,20 +1108,20 @@ class InterviewViewSets(ModelViewSet):
                 updated_fields.append(field.replace('_', ' '))
 
         updated_fields.append(check_updated_value(
-            prev_data.get('supervisor').get('supervisor_id'), request.data.get('supervisor'), 'Supervisor'
+            prev_data.get('supervisor').get('supervisor_id'), request.data.get('supervisor'), 'supervisor'
         ))
 
         updated_fields.append(check_updated_value(
-            prev_data.get('interview_type').get('assistance'), request.data.get('assistance'), 'Assistance Required Tag'
+            prev_data.get('interview_type').get('assistance'), request.data.get('assistance'), 'assistance required tag'
         ))
 
         updated_fields.append(check_updated_value(
-            prev_data.get('interview_type').get('coding_required'), request.data.get('coding'), 'Coding Required Tag'
+            prev_data.get('interview_type').get('coding_required'), request.data.get('coding'), 'coding required tag'
         ))
 
         prev_guest_user_ids = [guest_id.get('employee', {}).get('id') for guest_id in prev_data.get('guests')]
         updated_guest_user_ids = [guest_id.get('user_id') for guest_id in request.data.get('guest_info')]
-        updated_fields.append(check_updated_value(prev_guest_user_ids, updated_guest_user_ids, 'Guest List'))
+        updated_fields.append(check_updated_value(prev_guest_user_ids, updated_guest_user_ids, 'guest list'))
         updated_fields = list(filter(None, updated_fields))
         return ", ".join(updated_fields)
 
