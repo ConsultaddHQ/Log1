@@ -2367,6 +2367,7 @@ class InterviewViewSets(ModelViewSet):
                 interview.guest_type = 'Assigned Assistance'
             else:
                 interview.guest_type = 'Not Required'
+            interview.save()
 
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"

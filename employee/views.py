@@ -197,8 +197,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             users = User.objects.exclude(role__name='consultant')
             if is_active:
                 users = users.filter(is_active=True, account_login=True)
-            # else:
-            #     users = users.exclude(account_login=False)
+            else:
+                users = users.exclude(account_login=False)
 
             if user_type:
                 users = users.filter(role__name__iexact=user_type)
