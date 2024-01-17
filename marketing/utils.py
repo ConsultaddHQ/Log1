@@ -645,3 +645,9 @@ def add_or_update_guest(obj, request, guests=[]):
     except Exception as error:
         write_exception(error, request)
         return False
+
+
+def check_updated_value(pre_value, updated_value, key_name):
+    if pre_value != updated_value:
+        return key_name
+    return None

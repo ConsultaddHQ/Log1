@@ -530,13 +530,14 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         exclude = ('calendar_id',)
 
     def get_permission(self, obj):
-        user = self.context.get('user')
-        if user in [obj.marketer, obj.supervisor]:
-            return {'update': True}
-        authentic_user_id = []
-        authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
-        if obj.marketer.id in authentic_user_id or obj.supervisor.id in authentic_user_id:
-            return {"update": True}
+        user = self.context.get('user', None)
+        if user:
+            if user in [obj.marketer, obj.supervisor]:
+                return {'update': True}
+            authentic_user_id = []
+            authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
+            if obj.marketer.id in authentic_user_id or obj.supervisor.id in authentic_user_id:
+                return {"update": True}
         return {"update": False}
 
     @staticmethod
