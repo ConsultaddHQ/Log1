@@ -494,10 +494,16 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 ).order_by('name').values('id', 'name')
             else:
                 teams = request.user.associated_to.all()
+<<<<<<< Updated upstream
                 employers = [
                     {"id": request.user.team.id, "name": request.user.team.name},
                     {"id": consultadd_emp.id, "name": consultadd_emp.name},
                 ]
+=======
+                employers = [{"id": consultadd_emp.id, "name": consultadd_emp.name}]
+                if consultadd_emp != request.user.team:
+                    employers.append({"id": request.user.team.id, "name": request.user.team.name})
+>>>>>>> Stashed changes
                 for emp in teams:
                     employers.append({"id": emp.id, "name": emp.name})
             return Response({"data": employers}, status=200)
