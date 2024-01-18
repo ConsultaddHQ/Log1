@@ -7,7 +7,7 @@ from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
-from consultant.serializers import ConsultantSerializer
+from consultant.serializers import ConsultantSerializer, WorkAuth
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 
@@ -490,18 +490,26 @@ class SubmissionConProfile(serializers.ModelSerializer):
         model = Consultant
         fields = ('id', 'name', 'email', 'current_city', 'phone_no', 'status', 'profile')
 
+    @staticmethod
+    def get_visa_type(visa_type):
+        visa_types = WorkAuth.VISA_CHOICES
+        for visa in visa_types:
+            if visa_type in visa:
+                return visa[1]
+        return visa_type
+
     def get_profile(self, obj):
         submission = self.context['submission']
         return {
             "linkedin": submission.linkedin,
             "visa_end": submission.visa_end,
             "education": submission.education,
-            "visa_type": submission.visa_type,
             "other_link": submission.other_link,
             "visa_start": submission.visa_start,
             "current_city": submission.current_city,
             "date_of_birth": submission.date_of_birth,
             "marketer": submission.created_by.employee_name,
+            "visa_type": self.get_visa_type(submission.visa_type)
         }
 
 
