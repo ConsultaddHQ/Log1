@@ -528,6 +528,7 @@ def create_consultant(request, creator_id):
 
             # Adding Recruiter of Consultant
             recruiter_employee_email = request.data.get('recruiter')
+            recruiter_employee_id = request.data.get('recruiter_emp_id')
             qs = User.objects.filter(email=recruiter_employee_email)
             if qs:
                 recruiter = qs.first()
@@ -537,6 +538,17 @@ def create_consultant(request, creator_id):
                     poc_type='recruiter',
                     consultant_id=consultant_id,
                 )
+            else:
+                try:
+                    recruiter = get_object_or_404(User, employee_id=recruiter_employee_id)
+                    ConsultantPOC.objects.create(
+                        poc=recruiter,
+                        start=timezone.now(),
+                        poc_type='recruiter',
+                        consultant_id=consultant_id,
+                    )
+                except User.DoesNotExist:
+                    pass
 
             # Adding rate
             rate = request.data.get('rate', None)
@@ -683,6 +695,9 @@ def candidate_filter(request):
 
             if 'city' in filters:
                 consultants = consultants.filter(current_city__in=filters['city'])
+
+            if 'preferred_location' in filters:
+                consultants = consultants.filter(marketing__preferred_location__in=filters['preferred_location'])
 
             if 'days_on_bench' in filters:
                 day_filter = marketing_days_filter(filters['days_on_bench'])
