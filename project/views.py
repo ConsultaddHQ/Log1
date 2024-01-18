@@ -167,7 +167,7 @@ class ProjectViewSets(ModelViewSet):
                 employer = project.submission.employer
             mail_data = {
                 'template': '../templates/support.html',
-                'to': [config.ENGINEERING], 'cc': cc, 'bcc': [], 'attachments': path,
+                'to': [config.ENGINEERING], 'cc': cc, 'bcc': ['shreyas.k@consultadd.com'], 'attachments': path,
                 'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'context': {
                     'employer': employer, 'marketer_name': submission.created_by.employee_name,
@@ -723,7 +723,16 @@ class ProjectViewSets(ModelViewSet):
                     activity_created = True
                     project.consultant.save()
                     desc = f"PO status changed to Joined and Timesheet APP access mail is sent to consultant"
-                    if marketing.status == 'open':
+
+                    if request.data.get('close_all_cycle'):
+                        submitted_consultant = project.submission.consultant
+                        active_marketing = submitted_consultant.marketing.filter(status='open')
+                        for marketing in active_marketing:
+                            marketing.end = date.today()
+                            marketing.status = 'close'
+                            marketing.save()
+
+                    elif marketing.status == 'open':
                         marketing.end = date.today()
                         marketing.status = 'close'
                         marketing.save()

@@ -379,7 +379,8 @@ class ProjectUtil:
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
             activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
                                  f"*{self.project.submission.lead.job_title.strip()}*, terminated from " \
-                                 f"*{self.project.submission.client}* with the end date of *{self.project_end}*"
+                                 f"*{self.project.submission.client}* with the end date of * " \
+                                 f"{datetime.strptime(str(self.project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')}*"
 
             payload = {
                 "recruiter_name": recruiter_name, "status": status, "reason": reason,
@@ -429,7 +430,8 @@ class ProjectUtil:
         try:
             start_date = datetime.strptime(str(self.project.start_date), '%Y-%m-%d')
             week_day = start_date.weekday()
-            if week_day == 0:
+            if week_day == 6:
+                start_date = start_date + timedelta(days=1)
                 end_date = start_date + timedelta(days=6)
             else:
                 end_date = start_date + timedelta(days=6 - week_day)
