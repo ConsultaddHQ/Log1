@@ -167,7 +167,7 @@ class ProjectViewSets(ModelViewSet):
                 employer = project.submission.employer
             mail_data = {
                 'template': '../templates/support.html',
-                'to': [config.ENGINEERING], 'cc': cc, 'bcc': [], 'attachments': path,
+                'to': [config.ENGINEERING], 'cc': cc, 'bcc': ['shreyas.k@consultadd.com'], 'attachments': path,
                 'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'context': {
                     'employer': employer, 'marketer_name': submission.created_by.employee_name,
@@ -189,6 +189,7 @@ class ProjectViewSets(ModelViewSet):
             res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             delete_temp_file(path)
             if not msg:
+                write_exception(res, request=request)
                 return res, "error"
             return res, "ok"
         except Exception as error:
@@ -722,7 +723,16 @@ class ProjectViewSets(ModelViewSet):
                     activity_created = True
                     project.consultant.save()
                     desc = f"PO status changed to Joined and Timesheet APP access mail is sent to consultant"
-                    if marketing.status == 'open':
+
+                    if request.data.get('close_all_cycle'):
+                        submitted_consultant = project.submission.consultant
+                        active_marketing = submitted_consultant.marketing.filter(status='open')
+                        for marketing in active_marketing:
+                            marketing.end = date.today()
+                            marketing.status = 'close'
+                            marketing.save()
+
+                    elif marketing.status == 'open':
                         marketing.end = date.today()
                         marketing.status = 'close'
                         marketing.save()
@@ -1131,11 +1141,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             message = ""
             if not support_qs:
                 message, exception_msg = support_assignment_mail(project_support, request)
-                if exception_msg != 'Mail sent':
+                if exception_msg != 'ok':
                     message = "Unable to send support assignment mail &"
-                    # return Response(
-                    #     {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
-                    # )
                 else:
                     message = "Support assignment mail send &"
 

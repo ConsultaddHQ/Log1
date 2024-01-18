@@ -210,7 +210,7 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
     try:
         if "@consultadd.com" not in from_email:
             from_email = "product@consultadd.com"
-        service, from_mail_id = cred(from_email, cron_execution)
+        service, from_mail_id = cred(from_email, True)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = MIMEText(mail_data["body"])
