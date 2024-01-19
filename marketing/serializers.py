@@ -561,10 +561,13 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type and ((obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or
-                               (('Assigned' or 'assigned') in obj.guest_type)) and obj.coding_present is None:
+        if obj.status in ['scheduled', 'rescheduled'] or \
+                (obj.guest_type and obj.guest_type != 'Not Required' and obj.coding_present is None) or \
+                (obj.supervisor.employee_id != 9999 and
+                 not obj.supervisor_feedback.filter(question__form_name='interview').all()):
             return False
-        return True
+        else:
+            return True
 
     @staticmethod
     def get_interview_type(obj):

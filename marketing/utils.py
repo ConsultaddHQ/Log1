@@ -600,7 +600,6 @@ def update_interviewer_profiles(obj, request):
 
 
 def get_guest_type(request):
-    guest_type = "Not Required"
     coding_required = request.data.get('coding')
     assistance_required = request.data.get('assistance')
 
@@ -610,6 +609,8 @@ def get_guest_type(request):
         guest_type = "Assistance"
     elif coding_required and assistance_required:
         guest_type = "Coder & Assistance"
+    else:
+        guest_type = "Not Required"
     return guest_type
 
 
