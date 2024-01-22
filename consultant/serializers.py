@@ -204,11 +204,18 @@ class ExitConsultantSerializer(serializers.ModelSerializer):
 
 class ConsultantProfileSerializer(serializers.ModelSerializer):
     profile_owner = POCSerializer()
+    visa_type = serializers.SerializerMethodField()
 
     class Meta:
         model = ConsultantProfile
         fields = ('id', 'title', 'visa_type', 'visa_start', 'visa_end', 'education', 'date_of_birth', 'links',
                   'linkedin', 'current_city', 'profile_owner')
+
+    @staticmethod
+    def get_visa_type(obj):
+        if obj.visa_type:
+            return obj.get_visa_type_display()
+        return obj.visa_type
 
 
 class ConsultantCreateProfileSerializer(serializers.ModelSerializer):
@@ -254,7 +261,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'status', 'marketing', 'recruiter', 'retention', 'rate', 'work_auth', 'exit',
-                  'rate_revision', 'visa_type')
+                  'rate_revision', 'visa_type', 'current_city')
 
     @staticmethod
     def get_visa_type(obj):
