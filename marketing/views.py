@@ -1359,7 +1359,11 @@ class InterviewViewSets(ModelViewSet):
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
+
             queryset = queryset.order_by('id').distinct('id')
+
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
@@ -1419,9 +1423,11 @@ class InterviewViewSets(ModelViewSet):
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
 
             queryset = queryset.order_by('id').distinct('id')
-            response = HttpResponse('application/text')
+            response = HttpResponse()
             writer = csv.writer(response)
             writer.writerow(
                 ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
