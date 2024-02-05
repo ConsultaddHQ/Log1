@@ -3037,7 +3037,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     {"message": "Feedback must be of more than 10 character"}, status=status.HTTP_400_BAD_REQUEST
                 )
             test.status = request.data.get('status')
-            test.submitted_by = request.user
+            # test.submitted_by = request.user
             test.feedback = feedback
             test.save()
             assigned_test_points(test, request)
