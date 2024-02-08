@@ -1405,3 +1405,96 @@ class MessageCard:
             return res, msg
         except Exception as error:
             return False, error
+
+    @staticmethod
+    def personlized_interview_data_report(payload, url):
+        try:
+            if payload.get('data') is None:
+                return "No data to display", "ok"
+            card_data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":clipboard: Interview Scheduled Today",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"`Date : {date.today()}`"
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    }
+                ]
+            }
+
+            screening_type_headers = payload['data'].keys()
+            for header in screening_type_headers:
+                if not payload['data'][header]:
+                    continue
+                card_data['blocks'].append(
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"{header}",
+                            "emoji": True
+                        }
+                    }
+                )
+                sl = 1
+                for data in payload['data'][header]:
+                    card_data['blocks'].append(
+                        {
+                            "type": "section",
+                            "fields": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
+                                            f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
+                                            f"   *Time:* {data.get('start', None).split('::')[1]}\n\t   "
+                                            f"*Project Type:* {data.get('project_type')}"
+                                },
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
+                                            f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
+                                            f"\n `Call Type` {data.get('call_type')}"
+                                }
+                            ]
+                        },
+                    )
+                    sl += 1
+                card_data['blocks'].append(
+                    {
+                        "type": "divider"
+                    }
+                )
+            card_data['blocks'].append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "emoji": True,
+                                "text": "Download CSV"
+                            },
+                            "style": "primary",
+                            "url": payload['file_url'],
+                            "value": "click_me_123",
+                            "action_id": "button-action"
+                        }
+                    ]
+                }
+            )
+            return card_data
+        except Exception as error:
+            return error, "error"

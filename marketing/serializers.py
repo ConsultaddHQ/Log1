@@ -23,7 +23,7 @@ class VendorCompanySerializer(serializers.ModelSerializer):
 class VendorContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = VendorContact
-        fields = ('id', 'name', 'email', 'number')
+        fields = '__all__'
 
 
 class LeadCreateSerializer(serializers.ModelSerializer):
@@ -451,6 +451,8 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_vendor_contact(obj):
+        if obj.vendor_contact:
+            return VendorContactSerializer(obj.vendor_contact).data
         return None
 
     @staticmethod

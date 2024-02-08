@@ -293,6 +293,8 @@ CONSTANCE_CONFIG = OrderedDict([
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
+    ('SLACK_TOKEN', ('xoxb-3680421803520-3714045757607-z1nUh9vv8DifWmSOBNlgpMg5',
+                          'SLACK TOKEN')),
 
     ('LEGAL', ('legal@consultadd.com', 'Legal team Email ID')),
     ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin Email ID')),
@@ -350,7 +352,7 @@ CONSTANCE_CONFIG = OrderedDict([
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
-        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL'
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL', 'SLACK_TOKEN'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',

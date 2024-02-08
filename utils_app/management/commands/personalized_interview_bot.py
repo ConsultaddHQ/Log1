@@ -4,10 +4,10 @@ from django.core.management import BaseCommand
 
 from constance import config
 
-from log1.utils import write_info
+from log1.utils import write_info, send_personalized_message
 from marketing.models import Interview
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.utils import create_cron_error, create_cron_object, generate_s3_url
+from utils_app.utils import create_cron_error, create_cron_object, generate_s3_url, get_slack_id
 
 
 class Command(BaseCommand):
@@ -49,42 +49,22 @@ class Command(BaseCommand):
                 ('vendor_screening', 'Vendor Tech Screening')
             )
             interviews = Interview.objects.filter(
-                start_time__date=today_date, status__in=['scheduled', 'rescheduled']
+                start_time__date=today_date, status__in=['scheduled', 'rescheduled']).exclude(
+                supervisor__employee_id=9999
             ).order_by('start_time')
 
-            text = f""" <tr>
-                <th style="padding:5px 8px 5px 8px;">#</th>
-                <th style="padding:5px 8px 5px 8px;">CTB</th>
-                <th style="padding:5px 8px 5px 8px;">Round</th>
-                <th style="padding:5px 8px 5px 8px;">Type</th>
-                <th style="padding:5px 8px 5px 8px;">Start Time</th>
-                <th style="padding:5px 8px 5px 8px;">Consultant</th>
-                <th style="padding:5px 8px 5px 8px;">Client</th>
-                <th style="padding:5px 8px 5px 8px;">Marketer</th>
-                <th style="padding:5px 8px 5px 8px;">Job Position</th>
-                </tr>"""
             for screening_type in screening_types:
                 interviews_type = interviews.filter(screening_type=screening_type[0])
                 for index, interview in enumerate(interviews_type):
-                    if index == 0:
-                        slack_data[screening_type[1]] = []
+                    supervisor = interview.supervisor
+                    if not slack_data.get(supervisor, None):
+                        slack_data[supervisor] = {}
+                    if not slack_data.get(supervisor, {}).get(screening_type[1]):
+                        slack_data[supervisor] = {screening_type[1]: []}
                     position = interview.submission.lead.position.display_name \
                         if interview.submission.lead.position else interview.submission.lead.job_title
-                    text += f"""<tr>
-                                    <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {interview.supervisor.employee_name} </td>
-                                    <td style="padding:5px 8px 5px 8px; text-align: center;"> {interview.round} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {interview.get_interview_mode_display()} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> 
-                                            {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {interview.consultant.name} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {interview.submission.client} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {interview.marketer.employee_name} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {position} </td>
-                                </tr>"""
-                    supervisor = interview.supervisor
                     call_type = interview.call_type.display_name if interview.call_type else "NA"
-                    slack_data[screening_type[1]].append(
+                    slack_data[supervisor][screening_type[1]].append(
                         {
                             "type": interview.get_interview_mode_display(),
                             "screening_type": interview.get_screening_type_display(),
@@ -97,17 +77,25 @@ class Command(BaseCommand):
                             "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name
                         }
                     )
-            data = {
-                "title": "Interviews Scheduled for today &#128203;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
-            }
-            payload = {
-                "data": slack_data, "title": data.get('title'),
-                'file_url': self.create_csv_file(slack_data, "interview_scheduled")
-            }
-            if slack_data:
-                res, msg = slack.interview_data_report(payload, config.slack_announcement_url)
-                if msg == 'error':
-                    raise Exception(res)
+
+            for supervisor in slack_data.keys():
+                payload = {
+                    'file_url': self.create_csv_file(slack_data.get(supervisor), "interview_scheduled"),
+                    "data": slack_data.get(supervisor), "title": "Interviews Scheduled for today &#128203;"
+                }
+                if slack_data:
+                    card_data = slack.personlized_interview_data_report(payload, config.slack_announcement_url)
+                    member_id = supervisor.slack_id
+                    if not member_id:
+                        member_id = get_slack_id(supervisor)
+                        if not member_id:
+                            # create_cron_error(
+                            #     job,
+                            #     f"member_id not found for user {supervisor.employee_name} with email {supervisor.email}"
+                            # )
+                            print("member_id not found")
+                            continue
+                    breakpoint()
+                    send_personalized_message(member_id, card_data.get('blocks'))
         except Exception as error:
-            create_cron_error(job, error)
+            print(error)

@@ -169,11 +169,12 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
                 request, updated_keys, **{"object": vendor_contact, 'key': 'source_link', 'display_name': 'Source Link'}
             )
 
+            serializer = VendorContactSerializer(vendor_contact)
             if updated_keys:
                 desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
                 create_activity(submission_id, 'submission', request.user, desc, 'updated')
-                return Response({"message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
-            return Response({"message": "No change provided"}, status=HTTP_200_OK)
+                return Response({"data": serializer.data, "message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
+            return Response({"data": serializer.data, "message": "No change provided"}, status=HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=HTTP_400_BAD_REQUEST)
@@ -3159,13 +3160,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'title': title,
                 'category': 'alert',
                 'description': title,
+                'target_id': test.id,
                 'target_type': 'test',
                 'sender_user_type': 'user',
                 'parent_type': 'submission',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
                 'parent_id': test.submission.id,
-                'target_id': test.submitted_by.id,
             }
             create_notification(user_list, notification_data)
 

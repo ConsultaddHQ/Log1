@@ -1,11 +1,16 @@
 import os
+import ssl
 import sys
+
+import certifi
 import yaml
 import json
 import random
 import logging
 import requests
+from constance import config
 from bs4 import BeautifulSoup
+from slack_sdk import WebClient
 from datetime import date, timedelta
 from logging.config import dictConfig
 from django.contrib.auth.models import AnonymousUser
@@ -203,3 +208,20 @@ def html_to_text(html):
         soup = BeautifulSoup(html, features="html.parser")
         return soup.get_text('\n')
     return html
+
+
+def send_personalized_message(user_id, message):
+    try:
+
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        client = WebClient(token=config.SLACK_TOKEN, ssl=ssl_context)
+
+        if os.environ.get("ENV", "local") == 'prod':
+            resp = client.chat_postMessage(channel=user_id, blocks=message)
+        else:
+            user_id = 'U03L0TGDPAQ'
+            resp = client.chat_postMessage(channel=user_id, blocks=message)
+        return resp, "ok"
+    except Exception as error:
+        write_exception(error)
+        return error, "error"
