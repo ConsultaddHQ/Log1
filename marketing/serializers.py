@@ -681,6 +681,7 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
 
 
 class TestGetSerializer(serializers.ModelSerializer):
+    deadline = serializers.SerializerMethodField()
     engineers = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     attachments = AttachmentGetSerializer(many=True)
@@ -693,6 +694,12 @@ class TestGetSerializer(serializers.ModelSerializer):
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
                   'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
                   'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback', 'platform')
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
     @staticmethod
     def get_engineers(obj):
