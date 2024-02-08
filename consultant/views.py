@@ -915,16 +915,21 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             cycle = 1
             if latest_marketing_cycle:
                 cycle = latest_marketing_cycle.cycle + 1
+            preferred_location = request.data.get('preferred_location')
+            if preferred_location:
+                location = preferred_location.split(",")
+                if len(location) > 1:
+                    preferred_location = f'{location[0].replace(" ", "")},{location[1].replace(" ", "")}'
 
             consultant_marketing = ConsultantMarketing.objects.create(
                 cycle=cycle,
                 status='close',
                 rtg=request.data.get('rtg', False),
                 in_pool=request.data.get('in_pool'),
+                preferred_location=preferred_location,
                 start=request.data.get('marketing_start'),
                 consultant_id=request.data.get('consultant'),
                 previous_marketing_days=previous_marketing_days,
-                preferred_location=request.data.get('preferred_location'),
             )
             primary_marketer = request.data.get('primary_marketer', None)
             if primary_marketer:

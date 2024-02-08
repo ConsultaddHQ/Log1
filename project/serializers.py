@@ -597,6 +597,7 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
             support_info.append(
                 {
                     "start": support.start, "end": support.end,
+                    "support_person_emp_id": support.support.employee_id,
                     "duration": ProjectAssociatesSerializer.get_duration(support),
                     "id": support.id, "support_name": support.support.employee_name,
                     "status": " ".join(frequency.frequency.split("_")).capitalize() if frequency else None
@@ -609,15 +610,18 @@ class ProjectAssociatesSerializer(serializers.ModelSerializer):
         interview_info = [
             {
                 f'round': interview.round, "id": interview.id,
-                'supervisor': interview.supervisor.employee_name
-                if interview.supervisor.id != 9999 else f"Consultant - {interview.consultant.name}",
+                'supervisor': {
+                    "emp_id": interview.supervisor.employee_id,
+                    "name": interview.supervisor.employee_name
+                    if interview.supervisor.employee_id != 9999 else f"Consultant - {interview.consultant.name}"
+                },
                 'coders': list(
-                    interview.guests.filter(type__in=['Assistant', 'Coder', 'Coder & Assistant']).values_list(
-                        'user__employee_name', flat=True)
+                    interview.guests.filter(type__in=['Assistant', 'Coder', 'Coder & Assistant']).annotate(
+                        employee_name=F('user__employee_name'), employee_id=F('user__employee_id')
+                    ).values('employee_name', 'employee_id')
                 )
             } for interview in obj.interviews.all().order_by('id').distinct('id')
         ]
-
         return interview_info
 
     @staticmethod
