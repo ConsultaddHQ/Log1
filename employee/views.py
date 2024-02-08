@@ -613,7 +613,7 @@ class ResetPasswordViewSets(GenericViewSet):
 
         clear_expired(now_minus_expiry_time)
 
-        users = User.objects.filter(email__iexact=email)
+        users = User.objects.filter(email__iexact=email, is_active=True)
 
         active_user_found = False
         password_usable_user_found = False
@@ -1286,6 +1286,8 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.employee_name = request.data.get('name', user.employee_name)
             user.employee_id = request.data.get('employee_id', user.employee_id)
             user.team = Team.objects.get(name=request.data['team']) if request.data.get('team') else user.team
+            if user_previous_data[0].is_active != user.is_active:
+                user.account_login = user.is_active
             user.save()
             return Response({'data': user_previous_data, 'role': user_previous_role.values(),
                              "result": "User updated on log1 successfully"}, status=status.HTTP_201_CREATED)

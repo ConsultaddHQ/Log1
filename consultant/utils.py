@@ -505,10 +505,17 @@ def create_consultant(request, creator_id):
                 write_info(result, 'create_consultant', request)
             return consultant, "exists"
         else:
+            current_city = request.data.get('current_location', None)
+            if current_city:
+                location = current_city.split(",")
+                if len(location) > 1:
+                    current_city = f'{location[0].replace(" ", "")},{location[1].replace(" ", "")}'
+
             consultant = Consultant.objects.create(
                 is_active=True,
                 work_type='full_time',
                 phone_no=phone_numbers,
+                current_city=current_city,
                 links=links, skills=skills,
                 ssn=request.data.get('ssn'),
                 name=request.data.get('name'),
@@ -517,7 +524,6 @@ def create_consultant(request, creator_id):
                 gender=request.data.get('gender'),
                 country=request.data.get('country'),
                 date_of_birth=request.data.get('dob'),
-                current_city=request.data.get('current_location'),
                 marital_status=request.data.get('marital_status', 'unmarried'),
                 internal_employee=request.data.get('internal_employee', False),
             )
@@ -528,6 +534,7 @@ def create_consultant(request, creator_id):
 
             # Adding Recruiter of Consultant
             recruiter_employee_email = request.data.get('recruiter')
+            recruiter_employee_id = request.data.get('recruiter_emp_id')
             qs = User.objects.filter(email=recruiter_employee_email)
             if qs:
                 recruiter = qs.first()
@@ -537,6 +544,17 @@ def create_consultant(request, creator_id):
                     poc_type='recruiter',
                     consultant_id=consultant_id,
                 )
+            else:
+                try:
+                    recruiter = get_object_or_404(User, employee_id=recruiter_employee_id)
+                    ConsultantPOC.objects.create(
+                        poc=recruiter,
+                        start=timezone.now(),
+                        poc_type='recruiter',
+                        consultant_id=consultant_id,
+                    )
+                except User.DoesNotExist:
+                    pass
 
             # Adding rate
             rate = request.data.get('rate', None)
@@ -689,6 +707,9 @@ def candidate_filter(request):
 
             if 'preferred_location' in filters:
                 consultants = consultants.filter(marketing__preferred_location__in=filters.get('preferred_location'))
+
+            if 'preferred_location' in filters:
+                consultants = consultants.filter(marketing__preferred_location__in=filters['preferred_location'])
 
             if 'days_on_bench' in filters:
                 day_filter = marketing_days_filter(filters['days_on_bench'])

@@ -68,7 +68,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             if model:
                 content_type = ContentType.objects.get(model=model)
                 queryset = queryset.filter(content_type=content_type)
-            data = queryset.values('id', 'name', 'display_name', 'field', 'content_type__model')
+            data = queryset.order_by('display_name').values('id', 'name', 'display_name', 'field', 'content_type__model')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
