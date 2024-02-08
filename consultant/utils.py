@@ -505,10 +505,17 @@ def create_consultant(request, creator_id):
                 write_info(result, 'create_consultant', request)
             return consultant, "exists"
         else:
+            current_city = request.data.get('current_location', None)
+            if current_city:
+                location = current_city.split(",")
+                if len(location) > 1:
+                    current_city = f'{location[0].replace(" ", "")},{location[1].replace(" ", "")}'
+
             consultant = Consultant.objects.create(
                 is_active=True,
                 work_type='full_time',
                 phone_no=phone_numbers,
+                current_city=current_city,
                 links=links, skills=skills,
                 ssn=request.data.get('ssn'),
                 name=request.data.get('name'),
@@ -517,7 +524,6 @@ def create_consultant(request, creator_id):
                 gender=request.data.get('gender'),
                 country=request.data.get('country'),
                 date_of_birth=request.data.get('dob'),
-                current_city=request.data.get('current_location'),
                 marital_status=request.data.get('marital_status', 'unmarried'),
                 internal_employee=request.data.get('internal_employee', False),
             )

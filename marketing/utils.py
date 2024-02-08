@@ -436,9 +436,9 @@ def interview_card_data(obj, request):
                 coding_feedback_data.append(coding_feedback)
             guest = " ".join([
                 f"`<@{i.user.slack_id}>`" if i.user.slack_id else f"`{i.user.employee_name}`"
-                for i in obj.guests.exclude(type__in=[None, 'other'])
+                for i in obj.guests.filter(type__in=['Coder', 'Coder & Assistant', 'Assistant'])
             ])
-            coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
+            coding_feedback_data.insert(0, {"question": "Coders Name", "answer": guest if guest else "NA"})
             coding_feedback_data.insert(
                 1, {"question": "Coding Present", "answer": "Yes" if obj.coding_present else "No"}
             )
@@ -652,3 +652,14 @@ def check_updated_value(pre_value, updated_value, key_name):
     if pre_value != updated_value:
         return key_name
     return None
+
+
+def check_guest(data, guest_type):
+    if guest_type == 'coder':
+        types = ['Coder', 'Coder & Assistant']
+    else:
+        types = ['Assistant', 'Coder & Assistant']
+    for user in data:
+        if user.get('type') in types:
+            return True
+    return False
