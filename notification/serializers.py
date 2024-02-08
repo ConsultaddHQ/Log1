@@ -64,7 +64,8 @@ class NotificationListSerializer(serializers.ModelSerializer):
             }
         else:
             model_class = apps.get_model(obj.target_content_type.app_label, model_name)
-            target_obj = model_class.objects.filter(id=obj.target_object_id)
+            target_obj = model_class.objects.filter(id=obj.target_object_id) \
+                if obj.target_content_type.app_label != 'consultant' else None
             if target_obj:
                 if parent_model == 'consultant':
                     payload = {

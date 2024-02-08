@@ -7,7 +7,7 @@ from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
-from consultant.serializers import ConsultantSerializer
+from consultant.serializers import ConsultantSerializer, WorkAuth
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 
@@ -221,6 +221,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
     guests = serializers.SerializerMethodField()
     call_type = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
+    interview_type = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
     supervisor_detail = serializers.SerializerMethodField()
     supervisor_feedback = serializers.SerializerMethodField()
@@ -276,11 +277,13 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type and obj.coding_present is None and (
-                (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or (
-                ('Assigned' or 'assigned') in obj.guest_type)):
+        if obj.status in ['scheduled', 'rescheduled'] or \
+                (obj.guest_type and obj.guest_type != 'Not Required' and obj.coding_present is None) or \
+                (obj.supervisor.employee_id != 9999 and
+                 not obj.supervisor_feedback.filter(question__form_name='interview').all()):
             return False
-        return True
+        else:
+            return True
 
     @staticmethod
     def get_supervisor_feedback(obj):
@@ -301,9 +304,29 @@ class InterviewListSerializer(serializers.ModelSerializer):
             })
         return guests
 
+    @staticmethod
+    def get_interview_type(obj):
+        if obj.coding_present is None:
+            assistance = False
+            coding_required = False
+            if obj.guest_type in ['Coder', 'Assigned Coder']:
+                coding_required = True
+            elif obj.guest_type in ['Assistance', 'Assigned Assistance']:
+                assistance = True
+            elif obj.guest_type in ['Coder & Assistance', 'Assigned Coder & Assistance']:
+                assistance = True
+                coding_required = True
+        else:
+            assistance = obj.assistance_required
+            coding_required = obj.coding_present
+        return {
+            "coding_required": coding_required, "assistance": assistance
+        }
+
 
 class TestListSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
+    deadline = serializers.SerializerMethodField()
     job_title = serializers.SerializerMethodField()
     marketer_id = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
@@ -322,6 +345,12 @@ class TestListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_client(obj):
         return obj.submission.client
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
     @staticmethod
     def get_marketer_id(obj):
@@ -359,6 +388,7 @@ class TestListSerializer(serializers.ModelSerializer):
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
+    deadline = serializers.SerializerMethodField()
     engineers = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
@@ -379,6 +409,12 @@ class TestCreateSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_assigned_to(obj):
         return obj.assign_to.all().values('id', 'employee_name')
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
     @staticmethod
     def get_submitted_by(obj):
@@ -454,18 +490,26 @@ class SubmissionConProfile(serializers.ModelSerializer):
         model = Consultant
         fields = ('id', 'name', 'email', 'current_city', 'phone_no', 'status', 'profile')
 
+    @staticmethod
+    def get_visa_type(visa_type):
+        visa_types = WorkAuth.VISA_CHOICES
+        for visa in visa_types:
+            if visa_type in visa:
+                return visa[1]
+        return visa_type
+
     def get_profile(self, obj):
         submission = self.context['submission']
         return {
             "linkedin": submission.linkedin,
             "visa_end": submission.visa_end,
             "education": submission.education,
-            "visa_type": submission.visa_type,
             "other_link": submission.other_link,
             "visa_start": submission.visa_start,
             "current_city": submission.current_city,
             "date_of_birth": submission.date_of_birth,
             "marketer": submission.created_by.employee_name,
+            "visa_type": self.get_visa_type(submission.visa_type)
         }
 
 
@@ -488,13 +532,14 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         exclude = ('calendar_id',)
 
     def get_permission(self, obj):
-        user = self.context.get('user')
-        if user in [obj.marketer, obj.supervisor]:
-            return {'update': True}
-        authentic_user_id = []
-        authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
-        if obj.marketer.id in authentic_user_id or obj.supervisor.id in authentic_user_id:
-            return {"update": True}
+        user = self.context.get('user', None)
+        if user:
+            if user in [obj.marketer, obj.supervisor]:
+                return {'update': True}
+            authentic_user_id = []
+            authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
+            if obj.marketer.id in authentic_user_id or obj.supervisor.id in authentic_user_id:
+                return {"update": True}
         return {"update": False}
 
     @staticmethod
@@ -667,17 +712,20 @@ class TestGetSerializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        if user == obj.marketer:
-            return {'update': True}
-        authentic_user_id = []
-        authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
-        if obj.marketer.id in authentic_user_id:
-            return {"update": True}
+        if user:
+            if user == obj.marketer:
+                return {'update': True}
+            authentic_user_id = []
+            authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
+            if obj.marketer.id in authentic_user_id:
+                return {"update": True}
+            return {"update": False}
         return {"update": False}
 
     @staticmethod
     def get_engineer_feedback(obj):
-        answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by("question__position")
+        answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by(
+            "question__position")
         return QuestionAnswerSerializer(answers, many=True).data
 
 
