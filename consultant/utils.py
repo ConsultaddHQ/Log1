@@ -700,10 +700,10 @@ def candidate_filter(request):
                 consultants = consultants.filter(gender=filters['gender'])
 
             if 'city' in filters:
-                consultants = consultants.filter(current_city__in=filters['city'])
+                consultants = consultants.filter(current_city__in=filters.get('city'))
 
             if 'preferred_location' in filters:
-                consultants = consultants.filter(marketing__preferred_location__in=filters['preferred_location'])
+                consultants = consultants.filter(marketing__preferred_location__in=filters.get('preferred_location'))
 
             if 'days_on_bench' in filters:
                 day_filter = marketing_days_filter(filters['days_on_bench'])

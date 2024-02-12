@@ -116,7 +116,7 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_company': submission.vendor.name, 'marketer_name': submission.created_by.employee_name,
                 },
             }
-            res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
+            res, msg, mail_id = send_email_(mail_data, config.APP_ADMIN, request=request)
 
             if not msg:
                 return res, "error"
@@ -167,7 +167,7 @@ class ProjectViewSets(ModelViewSet):
                 employer = project.submission.employer
             mail_data = {
                 'template': '../templates/support.html',
-                'to': [config.ENGINEERING], 'cc': cc, 'bcc': ['shreyas.k@consultadd.com'], 'attachments': path,
+                'to': [config.ENGINEERING], 'cc': cc, 'bcc': [config.DEVELOPER], 'attachments': path,
                 'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'context': {
                     'employer': employer, 'marketer_name': submission.created_by.employee_name,
@@ -186,7 +186,7 @@ class ProjectViewSets(ModelViewSet):
                 mail_id = email_object.mail_id
                 from_mail = email_object.from_mail_id
 
-            res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
+            res, msg, mail_id = send_email_attachment_multiple(mail_data, config.APP_ADMIN, request, mail_id)
             delete_temp_file(path)
             if not msg:
                 write_exception(res, request=request)
@@ -199,23 +199,23 @@ class ProjectViewSets(ModelViewSet):
     def send_support_offer_mail(self, project, scrum_masters, request):
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
         support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
-        engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
-            if request.data.get('engineer', None) else None
+        # engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
+        #     if request.data.get('engineer', None) else None
         # if engineer:
         #     support = get_object_or_404(ProjectSupport, project=project, support=engineer)
         #     support_assignment_mail(support, request)
         message = "Project created"
         exception_msg = "Mail sent"
         if support_msg == 'error' and offer_msg == 'error':
-            message = "Project created, but unable to send Support and Offer mail"
+            message = "Project created, but unable to send support and offer mail"
             exception_msg = f"Support: {support_res}, Offer: {offer_res}"
 
         elif support_msg == 'error':
-            message = "Project created, but unable to send Support mail"
+            message = "Project created, but unable to send support mail"
             exception_msg = f"Support: {support_res}"
 
         elif offer_msg == 'error':
-            message = "Project created, but unable to send Offer mail"
+            message = "Project created, but unable to send offer mail"
             exception_msg = f"Offer: {offer_res}"
 
         return message, exception_msg
@@ -374,9 +374,9 @@ class ProjectViewSets(ModelViewSet):
                 from_mail = email_object.from_mail_id
 
             if mail_id:
-                res2, msg2, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
+                res2, msg2, mail_id = send_mail_in_thread(mail_data_eng, from_mail, request, mail_id)
             else:
-                res2, msg2, mail_id = send_email_(mail_data, from_mail, request=request)
+                res2, msg2, mail_id = send_email_(mail_data_eng, from_mail, request=request)
 
             if msg2:
                 res2 = "mail send"

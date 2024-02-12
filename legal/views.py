@@ -1,5 +1,7 @@
 import os
 from datetime import datetime
+
+from constance import config
 from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -12,8 +14,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
-from utils_app.mailing import send_email
 from consultant.models import Consultant
+from utils_app.thred_mail import send_email
 from employee.token import get_token_generator
 from utils_app.aws_utils import presigned_post_url, get_s3_object
 from consultant.permissions import ConsultantPetitionIsAuthenticated
@@ -38,7 +40,7 @@ class PetitionViewSets(ModelViewSet):
     @staticmethod
     def rejection_mail(beneficiary_name, petition, document, request):
         try:
-            to = ['sarang.m@consultadd.com']
+            to = [config.DEVELOPER]
             if os.environ.get('ENV') == 'prod':
                 to = [petition.beneficiary.email]
             mail_data = {
@@ -52,7 +54,7 @@ class PetitionViewSets(ModelViewSet):
                     'petitioner_name': petition.assigned_to.employee_name,
                 },
             }
-            res, msg = send_email(mail_data, petition.assigned_to.email, request=request)
+            res, msg, _ = send_email(mail_data, petition.assigned_to.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
