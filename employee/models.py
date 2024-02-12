@@ -10,7 +10,6 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from log1.utils import write_exception
-from utils_app.thred_mail import send_email as _send_mail
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
 
@@ -147,15 +146,15 @@ class User(AbstractUser, PermissionsMixin):
                 return consultant.first()
         return None
 
-    def send_mail(self, mail_data):
-        try:
-            res, msg, _ = _send_mail(mail_data, "product@consultadd.com")
-            if not msg:
-                return res, "error"
-            return res, "ok"
-        except Exception as error:
-            write_exception(message=error)
-            return error, "error"
+    # def send_mail(self, mail_data):
+    #     try:
+    #         res, msg, _ = _send_mail(mail_data, "product@consultadd.com")
+    #         if not msg:
+    #             return res, "error"
+    #         return res, "ok"
+    #     except Exception as error:
+    #         write_exception(message=error)
+    #         return error, "error"
 
     def save(self, *args, **kwargs):
         if not self.id and self.employee_name:
