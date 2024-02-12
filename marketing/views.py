@@ -32,8 +32,9 @@ from utils_app.slack_notification import MessageCard as slack
 from utils_app.thred_mail import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
-from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES
-from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES, get_slack_id
+from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, \
+    ERROR_MSG, send_personalized_message
 
 
 # Route - /vendor_company/
@@ -1141,6 +1142,29 @@ class InterviewViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def notify_on_slack(interview, request):
+        try:
+            slack_data = {interview.get_screening_type_display(): []}
+            msg_payload = create_sup_message_slack_payload(interview, request=None)
+            if not msg_payload:
+                write_exception("Issue in creating payload for personalized supervisor slack card", request)
+            slack_data[interview.get_screening_type_display()].append(msg_payload)
+            supervisor = interview.supervisor
+            payload = {
+                "data": slack_data, "title": "Interviews Scheduled for today &#128203;"
+            }
+            card_data, created = slack.daily_supervisor_interview(payload)
+            if not created:
+                write_exception("Issue while creating slack card json personalized supervisor slack card", request)
+            member_id = supervisor.slack_id
+            if not member_id:
+                member_id = get_slack_id(supervisor)
+            if member_id:
+                send_personalized_message(member_id, card_data.get("blocks"))
+        except Exception as error:
+            write_exception(error, request)
+
+    @staticmethod
     def check_activity(**kwargs):
         updated_fields = []
         prev_data = kwargs.get('prev')
@@ -1621,6 +1645,10 @@ class InterviewViewSets(ModelViewSet):
                 'sender_id': request.user.id, 'sender_user_type': 'user',
             }
             create_notification(user_list, notification_data)
+
+            if interview.start_time.date() == date.today() and interview.supervisor.employee_id != 9999:
+                self.notify_on_slack(interview, request)
+
             return Response({
                 "data": data[0], 'booking_response': booking_res, "message": "Interview created"
             }, status=status.HTTP_201_CREATED)
@@ -2065,6 +2093,10 @@ class InterviewViewSets(ModelViewSet):
                     'category': 'info', 'description': title, 'target_id': interview.id, 'recipient_user_type': 'user',
                 }
                 create_notification(user_list, notification_data)
+
+                if interview.start_time.date() == date.today() and interview.supervisor.employee_id != 9999:
+                    self.notify_on_slack(interview, request)
+
                 return Response({"data": data[0], "calendar": booking_res, "message": "Interview updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
