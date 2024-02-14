@@ -1142,7 +1142,7 @@ class InterviewViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
-    def notify_on_slack(interview: any, title: str, request: any):
+    def notify_on_slack(interview: any, title: str, request: any) -> None:
         try:
             slack_data = {interview.get_screening_type_display(): []}
             msg_payload = create_sup_message_slack_payload(interview, request=None)
@@ -1151,7 +1151,7 @@ class InterviewViewSets(ModelViewSet):
             slack_data[interview.get_screening_type_display()].append(msg_payload)
             supervisor = interview.supervisor
             payload = {
-                "data": slack_data, "title": f"{title} &#128203;"
+                "data": slack_data, "title": f"{title}"
             }
             card_data, created = slack.daily_supervisor_interview(payload)
             if not created:
