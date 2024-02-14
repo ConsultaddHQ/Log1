@@ -1417,7 +1417,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":clipboard: Interview Scheduled Today",
+                            "text": f":clipboard: {payload.get('title')}",
                             "emoji": True
                         }
                     },

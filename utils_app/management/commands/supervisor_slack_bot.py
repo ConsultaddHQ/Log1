@@ -43,9 +43,10 @@ class Command(BaseCommand):
 
             for supervisor in slack_data.keys():
                 payload = {
-                    "data": slack_data.get(supervisor), "title": "Interviews Scheduled for today &#128203;"
+                    "data": slack_data.get(supervisor), "title": "Your Interview's Booked for today &#128203;"
                 }
                 if slack_data:
+                    title = "Your Interview's Scheduled Today"
                     card_data, created = slack.daily_supervisor_interview(payload)
                     if not created:
                         create_cron_error(job, "Issue while creating slack card json personalized supervisor slack card")

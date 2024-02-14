@@ -1142,7 +1142,7 @@ class InterviewViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
-    def notify_on_slack(interview, request):
+    def notify_on_slack(interview: any, title: str, request: any):
         try:
             slack_data = {interview.get_screening_type_display(): []}
             msg_payload = create_sup_message_slack_payload(interview, request=None)
@@ -1151,7 +1151,7 @@ class InterviewViewSets(ModelViewSet):
             slack_data[interview.get_screening_type_display()].append(msg_payload)
             supervisor = interview.supervisor
             payload = {
-                "data": slack_data, "title": "Interviews Scheduled for today &#128203;"
+                "data": slack_data, "title": f"{title} &#128203;"
             }
             card_data, created = slack.daily_supervisor_interview(payload)
             if not created:
@@ -1647,7 +1647,7 @@ class InterviewViewSets(ModelViewSet):
             create_notification(user_list, notification_data)
 
             if interview.start_time.date() == date.today() and interview.supervisor.employee_id != 9999:
-                self.notify_on_slack(interview, request)
+                self.notify_on_slack(interview, "Interview Scheduled Today", request)
 
             return Response({
                 "data": data[0], 'booking_response': booking_res, "message": "Interview created"
@@ -2044,10 +2044,6 @@ class InterviewViewSets(ModelViewSet):
                         write_exception(str(error), request)
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
 
-                # Activity
-                desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
-                       f"to {end.date()} :: {end.time()}"
-                create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
                 if date.today() <= interview.start_time.date():
                     payload = {
@@ -2095,7 +2091,7 @@ class InterviewViewSets(ModelViewSet):
                 create_notification(user_list, notification_data)
 
                 if interview.start_time.date() == date.today() and interview.supervisor.employee_id != 9999:
-                    self.notify_on_slack(interview, request)
+                    self.notify_on_slack(interview, "Interview Rescheduled Today", request)
 
                 return Response({"data": data[0], "calendar": booking_res, "message": "Interview updated"}, status=202)
         except Exception as error:
