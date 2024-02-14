@@ -663,3 +663,27 @@ def check_guest(data, guest_type):
         if user.get('type') in types:
             return True
     return False
+
+
+def create_sup_message_slack_payload(obj: any, request: any = None) -> dict:
+    try:
+        duration = f"{round((obj.end_time - obj.start_time).total_seconds() / 60, 2)} mins"
+        position = obj.submission.lead.position.display_name \
+            if obj.submission.lead.position else obj.submission.lead.job_title
+        call_type = obj.call_type.display_name if obj.call_type else "NA"
+        payload = {
+            "duration": duration, "interview_id": obj.id,
+            "screening_type": obj.get_screening_type_display(),
+            "project_type": obj.submission.get_work_type_display(),
+            "start": obj.start_time.strftime('%m/%d/%Y::%I:%M %p EST'),
+            "marketer": obj.marketer.employee_name, "position": position,
+            "round": obj.round, "type": obj.get_interview_mode_display(),
+            "call_type": "otter.ai" if call_type == "Otter AI" else call_type,
+            "consultant": obj.consultant.name, "client": obj.submission.client,
+            "redirect_link": f"{config.APP_URL}#/details/{obj.submission_id}/interview?id={obj.id}"
+        }
+        return payload
+    except Exception as error:
+        write_exception(error, request)
+        return {}
+

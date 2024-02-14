@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 ('vendor_screening', 'Vendor Tech Screening')
             )
             interviews = Interview.objects.filter(
-                start_time__date=today_date, status__in=['scheduled', 'rescheduled', 'feedback_due'],
+                start_time__date=today_date, status__in=['scheduled', 'rescheduled']
             ).order_by('start_time')
 
             text = f""" <tr>
