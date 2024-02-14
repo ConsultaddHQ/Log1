@@ -12,6 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_202_ACCEPTED
 
 from marketing.utils import *
 from marketing.serializers import *
@@ -28,10 +29,10 @@ from activity.serializers import ActivitySerializer
 from utils_app.mailing import send_email_without_template
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.thred_mail import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES
+from utils_app.thred_mail import send_email_attachment_multiple, send_email_without_template
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 
 
@@ -84,16 +85,28 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
 
 
 # Route - /vendor_contact/
-class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, GenericViewSet):
+class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, GenericViewSet, UpdateModelMixin):
     queryset = VendorContact.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = VendorContactSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @staticmethod
+    def update_detail(request, updated_keys, **kwargs):
+        key = kwargs.get('key')
+        updated_key = check_updated_value(
+            getattr(kwargs.get('object'), key), request.data.get(key), kwargs.get('display_name')
+        )
+        if updated_key:
+            setattr(kwargs.get('object'), key, request.data.get(key))
+            kwargs.get('object').save()
+            updated_keys.append(kwargs.get('display_name'))
+        return updated_keys
+
     def retrieve(self, request, *args, **kwargs):
         try:
             contact = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
-            data = contact.values('id', 'name', 'email', 'number', 'company__name')
+            data = contact.values('id', 'name', 'email', 'number', 'company__name', 'source_link')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -122,8 +135,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
                 email=email,
                 company_id=company,
                 created_by=request.user,
-                name=request.data['name'],
-                number=request.data['number'],
+                name=request.data.get('name', None),
+                number=request.data.get('number', None),
+                source_link=request.data.get('source_link', None)
             )
             data = {
                 "id": contact.id,
@@ -135,6 +149,34 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            updated_keys = []
+            submission_id = request.data.get('sub_id')
+            vendor_contact = get_object_or_404(VendorContact, id=kwargs.get('pk'), created_by=request.user)
+
+            updated_keys = self.update_detail(
+                request, updated_keys, **{"object": vendor_contact, 'key': 'name', 'display_name': 'Name'}
+            )
+            updated_keys = self.update_detail(
+                request, updated_keys, **{"object": vendor_contact, 'key': 'email', 'display_name': 'Email'}
+            )
+            updated_keys = self.update_detail(
+                request, updated_keys, **{"object": vendor_contact, 'key': 'number', 'display_name': 'Number'}
+            )
+            updated_keys = self.update_detail(
+                request, updated_keys, **{"object": vendor_contact, 'key': 'source_link', 'display_name': 'Source Link'}
+            )
+
+            if updated_keys:
+                desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
+                create_activity(submission_id, 'submission', request.user, desc, 'updated')
+                return Response({"message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
+            return Response({"message": "No change provided"}, status=HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=HTTP_400_BAD_REQUEST)
 
 
 # Route - /lead/
@@ -2344,12 +2386,24 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='guest_feedback')
     def guest_feedback(self, request, pk):
         try:
+            guest_info = json.loads(request.data.get('guest_info', '[]'))
+            coding_present = True if request.data.get('coding_present') == 'true' else False
+            assistance_required = True if request.data.get('assistance_required') == 'true' else False
+
+            coder_available = check_guest(guest_info, 'coder')
+            assistant_available = check_guest(guest_info, 'assistant')
+            if coding_present and not coder_available:
+                return Response({"message": "Please select coder"}, status=400)
+            if assistance_required and not assistant_available:
+                return Response({"message": "Please select Assistant"}, status=400)
+
             queryset = Interview.objects.filter(id=pk, guests__user_id__in=[request.user.id])
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
             interview = queryset.first()
-            interview.coding_present = True if request.data.get('coding_present') == 'true' else False
-            interview.assistance_required = True if request.data.get('assistance_required') == 'true' else False
+            interview.coding_present = coding_present
+            interview.assistance_required = assistance_required
             interview.guest_remark = request.data.get('feedback', None)
             interview.save()
 
@@ -2357,7 +2411,7 @@ class InterviewViewSets(ModelViewSet):
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
-            add_or_update_guest(interview, request, json.loads(request.data.get('guest_info', '[]')))
+            add_or_update_guest(interview, request, guest_info)
 
             if interview.coding_present and interview.assistance_tech:
                 interview.guest_type = 'Assigned Coder & Assistance'
@@ -3076,7 +3130,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     {"message": "Feedback must be of more than 10 character"}, status=status.HTTP_400_BAD_REQUEST
                 )
             test.status = request.data.get('status')
-            test.submitted_by = request.user
             test.feedback = feedback
             test.save()
             assigned_test_points(test, request)
@@ -3105,7 +3158,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'title': title,
                 'category': 'alert',
                 'description': title,
-                'target_type': 'user',
+                'target_type': 'test',
                 'sender_user_type': 'user',
                 'parent_type': 'submission',
                 'sender_id': request.user.id,

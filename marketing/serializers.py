@@ -23,7 +23,7 @@ class VendorCompanySerializer(serializers.ModelSerializer):
 class VendorContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = VendorContact
-        fields = ('id', 'name', 'email', 'number')
+        fields = '__all__'
 
 
 class LeadCreateSerializer(serializers.ModelSerializer):
@@ -451,6 +451,8 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_vendor_contact(obj):
+        if obj.vendor_contact:
+            return VendorContactSerializer(obj).data
         return None
 
     @staticmethod
@@ -561,10 +563,13 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type and ((obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or
-                               (('Assigned' or 'assigned') in obj.guest_type)) and obj.coding_present is None:
+        if obj.status in ['scheduled', 'rescheduled'] or \
+                (obj.guest_type and obj.guest_type != 'Not Required' and obj.coding_present is None) or \
+                (obj.supervisor.employee_id != 9999 and
+                 not obj.supervisor_feedback.filter(question__form_name='interview').all()):
             return False
-        return True
+        else:
+            return True
 
     @staticmethod
     def get_interview_type(obj):
@@ -678,6 +683,7 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
 
 
 class TestGetSerializer(serializers.ModelSerializer):
+    deadline = serializers.SerializerMethodField()
     engineers = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     attachments = AttachmentGetSerializer(many=True)
@@ -690,6 +696,12 @@ class TestGetSerializer(serializers.ModelSerializer):
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
                   'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
                   'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback', 'platform')
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
     @staticmethod
     def get_engineers(obj):
