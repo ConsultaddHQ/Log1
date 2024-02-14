@@ -147,7 +147,7 @@ def export_to_csv(payload, columns, filename, request=None, report_type=None):
         return ""
 
 
-def get_slack_id(user_obj, request=None):
+def get_slack_id(user_obj: any, request: any = None):
     try:
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         client = WebClient(token=config.SLACK_TOKEN, ssl=ssl_context)

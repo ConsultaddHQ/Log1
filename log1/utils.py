@@ -210,7 +210,7 @@ def html_to_text(html):
     return html
 
 
-def send_personalized_message(user_id, message):
+def send_personalized_message(user_id: str, message: str):
     try:
 
         ssl_context = ssl.create_default_context(cafile=certifi.where())

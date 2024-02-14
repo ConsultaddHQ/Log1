@@ -665,7 +665,7 @@ def check_guest(data, guest_type):
     return False
 
 
-def create_sup_message_slack_payload(obj, request=None):
+def create_sup_message_slack_payload(obj: any, request: any = None):
     try:
         duration = f"{round((obj.end_time - obj.start_time).total_seconds() / 60, 2)} mins"
         position = obj.submission.lead.position.display_name \
