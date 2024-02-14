@@ -489,13 +489,12 @@ def create_consultant(request, creator_id):
         skills, links, phone_numbers = None, None, None
         req_links = request.data.get('links', [])
         req_skills = request.data.get('skills', [])
-        req_phone_numbers = request.data.get('phone_numbers', [])
+        req_phone_number = request.data.get('primary_no', [])
+
         if req_skills and None not in req_skills:
             skills = ", ".join(req_skills)
         if req_links and None not in req_links:
             links = ", ".join(req_links)
-        if req_phone_numbers and None not in req_phone_numbers:
-            phone_numbers = ", ".join(req_phone_numbers)
 
         qs = Consultant.objects.filter(email=request.data.get('email'))
         if qs:
@@ -514,7 +513,7 @@ def create_consultant(request, creator_id):
             consultant = Consultant.objects.create(
                 is_active=True,
                 work_type='full_time',
-                phone_no=phone_numbers,
+                phone_no=req_phone_number,
                 current_city=current_city,
                 links=links, skills=skills,
                 ssn=request.data.get('ssn'),
