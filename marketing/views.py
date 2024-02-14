@@ -31,8 +31,8 @@ from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
-from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES, get_slack_id
 from utils_app.thred_mail import send_email_attachment_multiple, send_email_without_template
+from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES, get_slack_id
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, \
     ERROR_MSG, send_personalized_message
 
