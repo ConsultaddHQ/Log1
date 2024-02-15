@@ -26,3 +26,4 @@ mailtoken.json
 calendar.json
 update_db.sh
 **/swagger.py
+mail_delivery_status.csv

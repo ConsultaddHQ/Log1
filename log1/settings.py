@@ -288,17 +288,23 @@ CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
     ('VERSION', ('R2022.10.2', 'Version')),
-    ('APP_VERSION', ('2.0.6', 'APP_Version')),
+    ('APP_VERSION', ('2.0.6', 'APP Version')),
+    ('EMAIL_MAX_RETRY', ('4', 'Email Max Retry')),
     ('APP_URL', ('https://app.log1.com/', 'Log1 URL')),
+    ('MAIL_LOGGER', ('mail_delivery_status.csv', 'MAIL LOGGER')),
+    ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
+    ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
+    ('SLACK_TOKEN', ('xoxb-3680421803520-3714045757607-z1nUh9vv8DifWmSOBNlgpMg5',
+                          'SLACK TOKEN')),
 
     ('LEGAL', ('legal@consultadd.com', 'Legal team Email ID')),
     ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin Email ID')),
     ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'Booking Email ID')),
     ('FINANCE', ('finance@consultadd.com', 'Finance team Email ID')),
-    ('APP_ADMIN', ('sarang.m@consultadd.com', 'Log1 App Admin Email ID')),
+    ('APP_ADMIN', ('product@consultadd.com', 'Log1 App Admin Email ID')),
     ('RELATIONS', ('relations@consultadd.com', 'Relations team Email ID')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team Email ID')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team Email ID')),
@@ -350,11 +356,12 @@ CONSTANCE_CONFIG = OrderedDict([
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
-        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL'
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL', 'EMAIL_MAX_RETRY',
+        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
-        'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN'
+        'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN', 'DEVELOPER'
     ),
     'Web-Hooks': (
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
