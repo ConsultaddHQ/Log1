@@ -1426,7 +1426,11 @@ class InterviewViewSets(ModelViewSet):
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
+
             queryset = queryset.order_by('id').distinct('id')
+
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
@@ -1486,9 +1490,11 @@ class InterviewViewSets(ModelViewSet):
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
 
             queryset = queryset.order_by('id').distinct('id')
-            response = HttpResponse('application/text')
+            response = HttpResponse()
             writer = csv.writer(response)
             writer.writerow(
                 ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
@@ -2441,6 +2447,16 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "No feedback given"}, status=400)
 
             add_or_update_guest(interview, request, guest_info)
+
+            if interview.coding_present and interview.assistance_tech:
+                interview.guest_type = 'Assigned Coder & Assistance'
+            elif interview.coding_present and not interview.assistance_tech:
+                interview.guest_type = 'Assigned Coder'
+            elif not interview.coding_present and interview.assistance_tech:
+                interview.guest_type = 'Assigned Assistance'
+            else:
+                interview.guest_type = 'Not Required'
+            interview.save()
 
             if interview.coding_present and interview.assistance_tech:
                 interview.guest_type = 'Assigned Coder & Assistance'
