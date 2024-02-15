@@ -3,8 +3,8 @@ from django.core.management import BaseCommand
 
 from consultant.models import Consultant
 from employee.models import Certificate
-from utils_app.utils import create_cron_error, create_cron_object, get_timezone
 from utils_app.models import Choice, ContentType
+from utils_app.utils import create_cron_error, create_cron_object, get_timezone
 
 
 class Command(BaseCommand):
