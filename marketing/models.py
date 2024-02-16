@@ -53,6 +53,7 @@ class VendorCompany(models.Model):
 
 class VendorContact(TimeStampedModel):
     name = models.CharField(_('Name'), max_length=50)
+    source_link = models.TextField(_('Source Link'), null=True, blank=True)
     email = models.EmailField(_('Email'), max_length=100, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=100, null=True, blank=True)
     company = models.ForeignKey(

@@ -1,9 +1,14 @@
 import os
 import csv
+import ssl
+
 import boto3
+import certifi
+from constance import config
 from pytz import timezone
 from datetime import datetime
 from geopy.geocoders import Nominatim
+from slack_sdk import WebClient
 from timezonefinder import TimezoneFinder
 
 from utils_app.models import CronJob, CronError
@@ -137,6 +142,18 @@ def export_to_csv(payload, columns, filename, request=None, report_type=None):
         file.close()
         file_url = generate_s3_url(file.name, request, report_type)
         return file_url
+    except Exception as error:
+        write_exception(error, request)
+        return ""
+
+
+def get_slack_id(user_obj: any, request: any = None) -> str:
+    try:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        client = WebClient(token=config.SLACK_TOKEN, ssl=ssl_context)
+        response = client.users_lookupByEmail(email=user_obj.email)
+        member_id = response.get('user', {}).get('id')
+        return member_id
     except Exception as error:
         write_exception(error, request)
         return ""
