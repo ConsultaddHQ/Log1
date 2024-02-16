@@ -452,7 +452,6 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_vendor_contact(obj):
         if obj.vendor_contact:
-            breakpoint()
             return VendorContactSerializer(obj.vendor_contact).data
         return {}
 
