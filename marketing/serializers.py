@@ -483,7 +483,7 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_vendor_contact(obj):
         if obj.vendor_contact:
-            return VendorContactSerializer(obj.vendor_contact)
+            return VendorContactSerializer(obj.vendor_contact).data
         return {}
 
     @staticmethod
