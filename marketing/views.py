@@ -2458,16 +2458,6 @@ class InterviewViewSets(ModelViewSet):
                 interview.guest_type = 'Not Required'
             interview.save()
 
-            if interview.coding_present and interview.assistance_tech:
-                interview.guest_type = 'Assigned Coder & Assistance'
-            elif interview.coding_present and not interview.assistance_tech:
-                interview.guest_type = 'Assigned Coder'
-            elif not interview.coding_present and interview.assistance_tech:
-                interview.guest_type = 'Assigned Assistance'
-            else:
-                interview.guest_type = 'Not Required'
-            interview.save()
-
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
             create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
