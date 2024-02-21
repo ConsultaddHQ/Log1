@@ -12,9 +12,10 @@ from slack_sdk import WebClient
 from timezonefinder import TimezoneFinder
 
 from utils_app.models import CronJob, CronError
+from tracking.models import ExportData, Devices
 from log1.utils import write_exception, write_info
 from utils_app.mailing import send_email_without_template
-from tracking.models import ExportData, Devices
+from utils_app.thred_mail import send_email_without_template as _send_email_without_template
 
 TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
@@ -88,12 +89,12 @@ def create_cron_error(job, description):
         )
         mail_data = {
             'cc': [], 'bcc': [],
-            'to': ['shreyas.k@consultadd.com', 'suman.m@consultadd.com'],
+            'to': ['shreyas.k@consultadd.com'],
             'body': f'Error :: {description}',
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
         if os.environ.get('ENV', 'local') == 'prod':
-            send_email_without_template(mail_data, 'log1.consultadd@gmail.com', None, None)
+            _send_email_without_template(mail_data, 'product@consultadd.com')
     except Exception as error:
         write_exception(message=error)
 
