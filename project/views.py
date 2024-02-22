@@ -485,19 +485,21 @@ class ProjectViewSets(ModelViewSet):
                         not_joined = projects.filter(
                             statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
                         )
+                    terminated = Project.objects.none()
                     if 'terminated' in filters['status']:
                         filters['status'].remove('terminated')
-                        projects = projects.filter(
+                        terminated = projects.filter(
                             statuses__status__istartswith='terminated', statuses__is_current=True
                         )
+                    cancelled = Project.objects.none()
                     if 'cancelled' in filters['status']:
                         filters['status'].remove('cancelled')
                         projects = projects.filter(
-                            statuses__status__istartswith='termination', statuses__is_current=True
+                            statuses__status__istartswith='cancelled', statuses__is_current=True
                         )
                     if filters['status']:
                         projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-                        projects = (projects | not_joined).distinct('id')
+                        projects = (projects | not_joined | cancelled | terminated).distinct('id')
 
             if filter_by_lead:
                 projects = projects.filter(submission__work_type=filter_by_lead)

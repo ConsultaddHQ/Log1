@@ -1426,7 +1426,11 @@ class InterviewViewSets(ModelViewSet):
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
+
             queryset = queryset.order_by('id').distinct('id')
+
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
@@ -1486,9 +1490,11 @@ class InterviewViewSets(ModelViewSet):
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
 
             queryset = queryset.order_by('id').distinct('id')
-            response = HttpResponse('application/text')
+            response = HttpResponse()
             writer = csv.writer(response)
             writer.writerow(
                 ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
@@ -2658,7 +2664,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                res, msg, from_mail = send_email_attachment_multiple(mail_data, config.APP_ADMIN, request=request)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2711,7 +2717,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if email_object:
                     mail_id = email_object.mail_id
                     from_mail = email_object.from_mail_id
-                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
+                res, msg, mail_id = send_email_attachment_multiple(mail_data, config.APP_ADMIN, request, mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"

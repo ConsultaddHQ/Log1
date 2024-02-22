@@ -1295,6 +1295,69 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['put'], detail=True, url_path='update_access')
+    def update_access(self, request, pk):
+        try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            user = User.objects.filter(employee_id=pk).first()
+            if not user:
+                return Response({"message": "User not found in log1"}, status=status.HTTP_400_BAD_REQUEST)
+            roles = user.role.filter().values_list('name', flat=True)
+
+            data = request.data.get('log1', {})
+            if not data:
+                return Response({"message": "No change recorded"}, status=status.HTTP_204_NO_CONTENT)
+
+            is_active = data.get("is_active", None)
+            team = request.data.get('team')
+            if is_active is not None:
+                if is_active:
+                    user.is_active = True
+                    is_role_changed = False if roles == data.get("role") else True
+                    if (not roles) or is_role_changed:
+                        user.role.remove(*roles)
+                        for role in data.get("role"):
+                            user_role = Role.objects.filter(name=role).first()
+                            user.role.add(user_role)
+                    if not user.team:
+                        user.team = Team.objects.get(name=team)
+                else:
+                    user.is_active = False
+                user.save()
+                return Response({"message": "User access updated"}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"message": "No change recorded"}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='deactivate')
+    def deactivate(self, request, pk):
+        try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            user = User.objects.filter(employee_id=pk).first()
+            if not user:
+                return Response({"message": "User not found in log1"}, status=status.HTTP_400_BAD_REQUEST)
+            if user.is_active:
+                user.is_active = False
+                user.account_login = False
+                user.save()
+                return Response({"message": "Deactivated Successfully"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": "No change required"}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Route - /calendar_info/
 class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):

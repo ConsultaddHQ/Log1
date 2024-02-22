@@ -686,4 +686,3 @@ def create_sup_message_slack_payload(obj: any, request: any = None) -> dict:
     except Exception as error:
         write_exception(error, request)
         return {}
-
