@@ -601,7 +601,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                     "context": {
                         "end_date": leave.to_date, "start_date": leave.from_date,
                         "consultant_name": consultant.name, "hours": leave.total_hours,
-                        "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}/{project_obj.first().id}/"
+                        "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}"
                     }
                 }
                 cal_id, res, _ = send_email(mail_data, consultant.email, request)
