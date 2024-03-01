@@ -1207,8 +1207,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                     employee_id=int(record.get('employee_id')),
                     password=make_password(record.get('password', 'consultadd')),
                     team=Team.objects.filter(
-                        name=record.get('team').strip().capitalize()
-                    ).first() if isinstance(record.get('team'), str) else None
+                        name=record.get('team')).first() if isinstance(record.get('team'), str) else None
                 ))
             users = User.objects.bulk_create(record_list)
             for user, role in zip(record_list, roles):
@@ -1286,7 +1285,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.employee_name = request.data.get('name', user.employee_name)
             user.employee_id = request.data.get('employee_id', user.employee_id)
             user.team = Team.objects.get(name=request.data['team']) if request.data.get('team') else user.team
-            if user_previous_data[0].is_active != user.is_active:
+            if user_previous_data[0].get('is_active') != user.is_active:
                 user.account_login = user.is_active
             user.save()
             return Response({'data': user_previous_data, 'role': user_previous_role.values(),
