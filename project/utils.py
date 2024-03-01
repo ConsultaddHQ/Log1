@@ -449,13 +449,20 @@ class ProjectUtil:
     def assign_leave(self):
         try:
             consultant = self.project.consultant
-            already_assigned = ConsultantLeave.objects.filter(consultant=consultant)
+            already_assigned = ConsultantLeave.objects.filter(consultant=consultant, year=datetime.now().year)
             if already_assigned:
                 return None
-            choices = Choice.objects.filter(content_type__model='consultantleave', field='leave')
+            choices = Choice.objects.filter(content_type__model='consultantleave', field='leave').exclude(
+                name='covid_emergency_sick_leave'
+            )
             for choice in choices:
+                if choice.name in ['sick_leave', 'pto']:
+                    leaves = (12.00 - datetime.now().month + 1.00)*8
+                else:
+                    leaves = 0.00
                 ConsultantLeave.objects.create(
-                    consultant=consultant, leave_type=choice, granted=0.0, balance=0.0, is_expired=False, year=2022
+                    consultant=consultant, leave_type=choice, granted=leaves,
+                    balance=leaves, is_expired=False, year=datetime.now().year
                 )
             return "leave Assigned"
         except Exception as error:
