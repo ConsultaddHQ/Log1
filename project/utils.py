@@ -608,7 +608,7 @@ def send_employer_change_notification(project, data, request):
         }
         desc = f"Employer changed from  {data['prev_employer']} to {data['new_employer']}"
         create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-        mail(mail_data, marketer_email, request=request)
+        send_email(mail_data, marketer_email, request=request)
     except Exception as error:
         write_exception(message=error, request=request)
         return error, "error"
