@@ -114,7 +114,7 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
         model = ConsultantMarketing
         fields = ('id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
                   'project_count', 'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count',
-                  'current_city')
+                  'current_city', 'ip_screening_count')
 
     @staticmethod
     def get_primary_marketer(obj):

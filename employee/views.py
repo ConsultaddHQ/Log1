@@ -1319,7 +1319,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                     user.is_active = True
                     is_role_changed = False if roles == data.get("role") else True
                     if (not roles) or is_role_changed:
-                        user.role.remove(*roles)
+                        user.role.remove(*user.role.all())
                         for role in data.get("role"):
                             user_role = Role.objects.filter(name=role).first()
                             user.role.add(user_role)
