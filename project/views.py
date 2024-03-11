@@ -952,6 +952,25 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                     ])
                 return response
             serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
+            if export:
+                response = HttpResponse(content_type='text/csv')
+                writer = csv.writer(response)
+                writer.writerow([
+                    'Project ID', 'Consultant Name', 'Client', 'Vendor', 'Remote Engineer', 'Marketer', 'PO Rate',
+                    'Company Payment Term', 'Consultant Payment Term', 'Redirection URL'
+                ])
+                for data in serializer.data:
+                    project = data.get('project', {})
+                    writer.writerow([
+                        project.get('project_id'), project.get('consultant_name'),
+                        project.get('client_name'), project.get('vendor_company'),
+                        project.get('remote_engineer'), project.get('marketer_name'),
+                        project.get('rate'), f"{project.get('payment_term')}% {data.get('payment_term_type')}",
+                        f"{project.get('consultant_payment_term')}% {data.get('payment_term_type')}",
+                        data.get('payment_term_type'),
+                        f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('project_id')}"
+                    ])
+                return response
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
