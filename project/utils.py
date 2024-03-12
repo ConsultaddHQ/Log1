@@ -357,8 +357,9 @@ class ProjectUtil:
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
                 "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type":self.project.submission.get_work_type_display(), "submission_id": self.project.submission.id,
-                "job_title": self.project.submission.lead.job_title,"w2_count":w2_count, "c2c_count":c2c_count
+                "project_type": self.project.submission.get_work_type_display(),
+                "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
+                "w2_count": w2_count, "c2c_count": c2c_count
             }
             slack.po_receive_message_card(payload, self.request)
 

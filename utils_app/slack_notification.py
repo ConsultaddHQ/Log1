@@ -795,10 +795,6 @@ class MessageCard:
                                 "type": "mrkdwn",
                                 "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
                             },
-                            {
-                                "type": "mrkdwn",
-                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
-                            },
                         ]
                     },
                     {
