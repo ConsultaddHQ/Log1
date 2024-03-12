@@ -719,3 +719,14 @@ def update_project_associate(associate_obj, request, **kwargs):
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+def check_has_active(consultant, request):
+    try:
+        po = Project.objects.filter(consultant=consultant, statuses__status='joined', statuses__is_current=True)
+        if po.first():
+            return True
+        return False
+    except Exception as error:
+        write_exception(error, request)
+        return None
