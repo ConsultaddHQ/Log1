@@ -357,8 +357,9 @@ class ProjectUtil:
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
                 "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type":self.project.submission.get_work_type_display(), "submission_id": self.project.submission.id,
-                "job_title": self.project.submission.lead.job_title,"w2_count":w2_count, "c2c_count":c2c_count
+                "project_type": self.project.submission.get_work_type_display(),
+                "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
+                "w2_count": w2_count, "c2c_count": c2c_count
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -715,6 +716,17 @@ def update_project_associate(associate_obj, request, **kwargs):
         if kwargs.get('update_type', '') == 'total_hours':
             associate_obj.total_hours += kwargs.get('total_hours')
             associate_obj.save()
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def check_has_active(consultant, request):
+    try:
+        po = Project.objects.filter(consultant=consultant, statuses__status='joined', statuses__is_current=True)
+        if po.first():
+            return True
+        return False
     except Exception as error:
         write_exception(error, request)
         return None
