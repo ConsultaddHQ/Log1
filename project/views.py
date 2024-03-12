@@ -485,19 +485,21 @@ class ProjectViewSets(ModelViewSet):
                         not_joined = projects.filter(
                             statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
                         )
+                    terminated = Project.objects.none()
                     if 'terminated' in filters['status']:
                         filters['status'].remove('terminated')
-                        projects = projects.filter(
+                        terminated = projects.filter(
                             statuses__status__istartswith='terminated', statuses__is_current=True
                         )
+                    cancelled = Project.objects.none()
                     if 'cancelled' in filters['status']:
                         filters['status'].remove('cancelled')
                         projects = projects.filter(
-                            statuses__status__istartswith='termination', statuses__is_current=True
+                            statuses__status__istartswith='cancelled', statuses__is_current=True
                         )
                     if filters['status']:
                         projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-                        projects = (projects | not_joined).distinct('id')
+                        projects = (projects | not_joined | cancelled | terminated).distinct('id')
 
             if filter_by_lead:
                 projects = projects.filter(submission__work_type=filter_by_lead)
@@ -682,7 +684,7 @@ class ProjectViewSets(ModelViewSet):
                 password, new_user = set_consultant_password(project.consultant)
                 resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
                 if resp_message == "ok":
-                    is_mail_sent = True;
+                    is_mail_sent = True
                 util.assign_leave()
 
             activity_created = False
@@ -918,6 +920,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
         first, last = get_page_limits(request)
         try:
             query = request.GET.get('query')
+            export = bool(request.GET.get('export', False))
             queryset = ProjectPaymentTerm.objects.all()
             project_type = request.GET.get('project_type')
 
@@ -928,7 +931,27 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 queryset = queryset.filter(
                     project__submission__consultant_marketing__consultant__name__istartswith=query)
 
-            serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
+            if export:
+                serializer = ProjectPaymentTermSerializer(queryset, many=True)
+                response = HttpResponse(content_type='text/csv')
+                writer = csv.writer(response)
+                writer.writerow([
+                    'Project ID', 'Consultant Name', 'Client', 'Vendor', 'Remote Engineer', 'Marketer', 'PO Rate',
+                    'Company Payment Term', 'Consultant Payment Term', 'Redirection URL'
+                ])
+                for data in serializer.data:
+                    project = data.get('project', {})
+                    writer.writerow([
+                        project.get('project_id'), project.get('consultant_name'),
+                        project.get('client_name'), project.get('vendor_company'),
+                        project.get('remote_engineer'), project.get('marketer_name'),
+                        project.get('rate'), f"{data.get('payment_term')}% {data.get('payment_term_type')}",
+                        f"{data.get('consultant_payment_term')}% {data.get('payment_term_type')}",
+                        data.get('payment_term_type'),
+                        f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('project_id')}"
+                    ])
+                return response
+            serializer = ProjectPaymentTermSerializer(queryset[first: last], many=True)
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)

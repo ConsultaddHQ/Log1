@@ -46,7 +46,7 @@ def get_active_user(**kwargs):
                 continue
             else:
                 active_users.get(key).append(user_mail)
-        return active_users
+    return active_users
 
 
 def log_mail_status(status, mail_data, error=None):

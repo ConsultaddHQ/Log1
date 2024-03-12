@@ -451,9 +451,9 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_vendor_contact(obj):
-        if obj.vendor_contact:
-            return VendorContactSerializer(obj.vendor_contact).data
-        return {}
+        # if obj.vendor_contact:
+        #     return VendorContactSerializer(obj.vendor_contact).data
+        return None
 
     @staticmethod
     def get_marketer_name(obj):
@@ -483,7 +483,7 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_vendor_contact(obj):
         if obj.vendor_contact:
-            return VendorContactSerializer(obj.vendor_contact)
+            return VendorContactSerializer(obj.vendor_contact).data
         return {}
 
     @staticmethod

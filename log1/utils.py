@@ -169,7 +169,7 @@ def post_msg_using_webhook(url, data):
             resp = requests.post(url, headers=headers, data=data)
             return resp, "ok"
         else:
-            url = "https://hooks.slack.com/services/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"
+            url = config.slack_products_dev
             resp = requests.post(url, headers=headers, data=data)
             return resp, "ok"
     except Exception as error:
