@@ -39,7 +39,8 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
     STAKEHOLDER
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
+    mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate, \
+    check_has_active
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
@@ -754,8 +755,9 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                    marketing.status = 'open'
-                    marketing.save()
+                    if not check_has_active(project.consultant, request):
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
                     project.support.update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
@@ -765,8 +767,9 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
-                    project.consultant.status = 'on_bench'
-                    project.consultant.save()
+                    if not check_has_active(project.consultant, request):
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
                     project.support.update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
@@ -776,8 +779,9 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
-                    project.consultant.status = 'on_bench'
-                    project.consultant.save()
+                    if not check_has_active(project.consultant, request):
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
                     project.support.update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Complete"
