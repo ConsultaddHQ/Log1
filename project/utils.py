@@ -357,8 +357,9 @@ class ProjectUtil:
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
                 "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type":self.project.submission.get_work_type_display(), "submission_id": self.project.submission.id,
-                "job_title": self.project.submission.lead.job_title,"w2_count":w2_count, "c2c_count":c2c_count
+                "project_type": self.project.submission.get_work_type_display(),
+                "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
+                "w2_count": w2_count, "c2c_count": c2c_count
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -449,13 +450,20 @@ class ProjectUtil:
     def assign_leave(self):
         try:
             consultant = self.project.consultant
-            already_assigned = ConsultantLeave.objects.filter(consultant=consultant)
+            already_assigned = ConsultantLeave.objects.filter(consultant=consultant, year=datetime.now().year)
             if already_assigned:
                 return None
-            choices = Choice.objects.filter(content_type__model='consultantleave', field='leave')
+            choices = Choice.objects.filter(content_type__model='consultantleave', field='leave').exclude(
+                name='covid_emergency_sick_leave'
+            )
             for choice in choices:
+                if choice.name in ['sick_leave', 'pto']:
+                    leaves = (12.00 - datetime.now().month + 1.00)*8
+                else:
+                    leaves = 0.00
                 ConsultantLeave.objects.create(
-                    consultant=consultant, leave_type=choice, granted=0.0, balance=0.0, is_expired=False, year=2022
+                    consultant=consultant, leave_type=choice, granted=leaves,
+                    balance=leaves, is_expired=False, year=datetime.now().year
                 )
             return "leave Assigned"
         except Exception as error:
@@ -601,7 +609,7 @@ def send_employer_change_notification(project, data, request):
         }
         desc = f"Employer changed from  {data['prev_employer']} to {data['new_employer']}"
         create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-        mail(mail_data, marketer_email, request=request)
+        send_email(mail_data, marketer_email, request=request)
     except Exception as error:
         write_exception(message=error, request=request)
         return error, "error"
@@ -708,6 +716,17 @@ def update_project_associate(associate_obj, request, **kwargs):
         if kwargs.get('update_type', '') == 'total_hours':
             associate_obj.total_hours += kwargs.get('total_hours')
             associate_obj.save()
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def check_has_active(consultant, request):
+    try:
+        po = Project.objects.filter(consultant=consultant, statuses__status='joined', statuses__is_current=True)
+        if po.first():
+            return True
+        return False
     except Exception as error:
         write_exception(error, request)
         return None

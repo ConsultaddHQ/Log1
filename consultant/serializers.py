@@ -102,6 +102,7 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
 
 class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
     primary_marketer_team = serializers.SerializerMethodField()
+    ip_screening_count = serializers.SerializerMethodField()
     primary_marketer = serializers.SerializerMethodField()
     submission_count = serializers.SerializerMethodField()
     interview_count = serializers.SerializerMethodField()
@@ -113,7 +114,7 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
         model = ConsultantMarketing
         fields = ('id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
                   'project_count', 'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count',
-                  'current_city')
+                  'current_city', 'ip_screening_count')
 
     @staticmethod
     def get_primary_marketer(obj):
@@ -138,7 +139,13 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_interview_count(obj):
         return Interview.objects.filter(
-            submission__consultant_marketing=obj
+            submission__consultant_marketing=obj, screening_type='interview'
+        ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+
+    @staticmethod
+    def get_ip_screening_count(obj):
+        return Interview.objects.filter(
+            submission__consultant_marketing=obj, screening_type__in=['ip_screening', 'vendor_screening']
         ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
 
 

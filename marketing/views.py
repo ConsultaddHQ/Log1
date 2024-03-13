@@ -2664,7 +2664,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                res, msg, from_mail = send_email_attachment_multiple(mail_data, config.APP_ADMIN, request=request)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2717,7 +2717,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if email_object:
                     mail_id = email_object.mail_id
                     from_mail = email_object.from_mail_id
-                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
+                res, msg, mail_id = send_email_attachment_multiple(mail_data, config.APP_ADMIN, request, mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"

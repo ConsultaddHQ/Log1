@@ -39,7 +39,8 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
     STAKEHOLDER
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate
+    mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate, \
+    check_has_active
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
@@ -684,7 +685,7 @@ class ProjectViewSets(ModelViewSet):
                 password, new_user = set_consultant_password(project.consultant)
                 resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
                 if resp_message == "ok":
-                    is_mail_sent = True;
+                    is_mail_sent = True
                 util.assign_leave()
 
             activity_created = False
@@ -754,8 +755,9 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                    marketing.status = 'open'
-                    marketing.save()
+                    if not check_has_active(project.consultant, request):
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
                     project.support.update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
@@ -765,8 +767,9 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
-                    project.consultant.status = 'on_bench'
-                    project.consultant.save()
+                    if not check_has_active(project.consultant, request):
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
                     project.support.update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
@@ -776,8 +779,9 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
-                    project.consultant.status = 'on_bench'
-                    project.consultant.save()
+                    if not check_has_active(project.consultant, request):
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
                     project.support.update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Complete"
@@ -920,6 +924,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
         first, last = get_page_limits(request)
         try:
             query = request.GET.get('query')
+            export = bool(request.GET.get('export', False))
             queryset = ProjectPaymentTerm.objects.all()
             project_type = request.GET.get('project_type')
 
@@ -930,7 +935,27 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 queryset = queryset.filter(
                     project__submission__consultant_marketing__consultant__name__istartswith=query)
 
-            serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
+            if export:
+                serializer = ProjectPaymentTermSerializer(queryset, many=True)
+                response = HttpResponse(content_type='text/csv')
+                writer = csv.writer(response)
+                writer.writerow([
+                    'Project ID', 'Consultant Name', 'Client', 'Vendor', 'Remote Engineer', 'Marketer', 'PO Rate',
+                    'Company Payment Term', 'Consultant Payment Term', 'Redirection URL'
+                ])
+                for data in serializer.data:
+                    project = data.get('project', {})
+                    writer.writerow([
+                        project.get('project_id'), project.get('consultant_name'),
+                        project.get('client_name'), project.get('vendor_company'),
+                        project.get('remote_engineer'), project.get('marketer_name'),
+                        project.get('rate'), f"{data.get('payment_term')}% {data.get('payment_term_type')}",
+                        f"{data.get('consultant_payment_term')}% {data.get('payment_term_type')}",
+                        data.get('payment_term_type'),
+                        f"{config.APP_URL}#/details/{project.get('submission_id')}/project?id={project.get('project_id')}"
+                    ])
+                return response
+            serializer = ProjectPaymentTermSerializer(queryset[first: last], many=True)
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
