@@ -3,16 +3,17 @@ from django.utils import timezone
 from datetime import timedelta, date
 from django.core.management import BaseCommand
 
-from notification.models import UserNotification
 from employee.models import User
-from django.contrib.auth.models import ContentType
 from project.models import ProjectSupport
+from notification.models import UserNotification
+from django.contrib.auth.models import ContentType
 from utils_app.utils import create_cron_error, create_cron_object
 from notification.utils import  create_notification, push_notification
 
 
 class Command(BaseCommand):
-    help = "This command send the push notification to project support person if project updates are pending form last 7 days "
+    help = "This command send the push notification to project support person " \
+           "if project updates are pending form last 7 days "
 
     def handle(self, *args, **options):
         job = create_cron_object('support_push_notification')
@@ -33,7 +34,7 @@ class Command(BaseCommand):
                                   project__start_date__gte=date.today())
 
             project_support_persons = ProjectSupport.objects.filter(
-                Q(end__isnull=True,is_proxy_support=False, statuses__is_current=True,
+                Q(end__isnull=True, is_proxy_support=False, statuses__is_current=True,
                   project__support_required=True) & (
                         active_projects | training_projects)).order_by('project__id').distinct('project__id')
 
@@ -43,7 +44,7 @@ class Command(BaseCommand):
                 notification, created = UserNotification.objects.get_or_create(
                     user=User.objects.get(id=support_person.support.id), content_type=content_type
                 )
-                if created:
+                if created or not notification.is_active:
                     notification.is_active = True
                     notification.save()
 
@@ -62,8 +63,8 @@ class Command(BaseCommand):
                 # Push Notification
                 message_body = {
                     "body": f"your {support_person.project.consultant.name} updates were not given for last weeks",
-                    "title":"project update due",
-                    "category": "alert",
+                    "title": "project update due",
+                    "category": "PopUp",
                     "show_in_foreground": True,
                     "click_action": f"https://app.log1.com/#/project/{support_person.project.id}/project_update",
                     "data": {

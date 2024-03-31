@@ -13,7 +13,8 @@ from notification.utils import create_notification, push_notification
 
 
 class Command(BaseCommand):
-    help = "This command is send the push notification to project support person if it's project consultant feedback is due form last 30 days"
+    help = "This command is send the push notification to project support person " \
+           "if it's project consultant feedback is due form last 30 days"
 
     def handle(self, *args, **options):
         job = create_cron_object('feedback_push_notification')
@@ -41,9 +42,10 @@ class Command(BaseCommand):
 
             content_type = ContentType.objects.get(model='consultant')
             for support_person in project_support_persons:
-                notification, created = UserNotification.objects.get_or_create(user=User.objects.get(id=support_person.support.id),
-                                                                               content_type=content_type)
-                if created:
+                notification, created = UserNotification.objects.get_or_create(
+                    user=User.objects.get(id=support_person.support.id), content_type=content_type
+                )
+                if created or not notification.is_active:
                     notification.is_active = True
                     notification.save()
                 data = {
@@ -63,8 +65,8 @@ class Command(BaseCommand):
                 # Push Notification
                 message_body = {
                     "body": f"your {support_person.project.consultant.name} feedback were not given form last 30 days",
-                    "title":"project update due",
-                    "category": "alert",
+                    "title": "Consultant Feedback Due",
+                    "category": "PopUp",
                     "show_in_foreground": True,
                     "click_action": "https://app.log1.com/#/engineering_module",
                     "data": {
