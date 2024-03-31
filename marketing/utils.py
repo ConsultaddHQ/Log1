@@ -157,8 +157,8 @@ def change_to_feedback_due():
         for supervisor in supervisor_list:
             content_type = ContentType.objects.get(model='interview')
             notification, created = UserNotification.objects.get_or_create(user=supervisor, content_type=content_type)
-            if created:
-                notification.is_active=True
+            if created or (not notification.is_active and notification.count >= 4):
+                notification.is_active = True
                 notification.save()
                 message_body = {
                     "body": "interview feedback due", "title": "interview feedback due", "category": "PopUp",
