@@ -100,6 +100,8 @@ class EmployeeAuthViewSets(GenericViewSet):
                 return Response({"message": "Employee Id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
 
             user = queryset.first()
+            if user and not user.account_login:
+                return Response({"message": "Your account is not active"}, status=status.HTTP_400_BAD_REQUEST)
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
                 # need to check if cookies id is available or not
@@ -145,8 +147,6 @@ class EmployeeAuthViewSets(GenericViewSet):
                                     display_name=location_data["display_name"]
                                 )
 
-                if not user.account_login:
-                    return Response({"message": "Your account is not active"}, status=status.HTTP_400_BAD_REQUEST)
                 user.last_login = datetime.now()
                 user.save()
 
@@ -1347,11 +1347,9 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user = User.objects.filter(employee_id=pk).first()
             if not user:
                 return Response({"message": "User not found in log1"}, status=status.HTTP_400_BAD_REQUEST)
-            if user.is_active:
-                user.is_active = False
-                user.account_login = False
-                user.save()
-                return Response({"message": "Deactivated Successfully"}, status=status.HTTP_202_ACCEPTED)
+            user.is_active = False
+            user.account_login = False
+            user.save()
             return Response({"message": "No change required"}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
