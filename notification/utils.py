@@ -99,8 +99,9 @@ def push_notification_consultant(registration_ids, message_body):
     except Exception as error:
         return error
 
+
 @shared_task()
-def schedule_push_notification(user_id,count,type):
+def schedule_push_notification(user_id, count, type):
     try:
         if type == 'interview':
             message_body = {
@@ -112,7 +113,7 @@ def schedule_push_notification(user_id,count,type):
             }
         if type == 'project':
              message_body = {
-                 "body": f"your projets updates were not given for last weeks",
+                 "body": f"your projects updates were not given for last weeks",
                  "title": "project update due",
                  "category": "alert",
                  "show_in_foreground": True,
@@ -146,11 +147,11 @@ def schedule_push_notification(user_id,count,type):
                 object_id=user_id, content_type__model='user').values_list('device_id', flat=True))
         delay = timedelta(hours=2).total_seconds()
         sleep(delay)
-        push_notification_consultant(registration_ids, message_body)
         content_type = ContentType.objects.get(model=type)
         notification = UserNotification.objects.filter(user=user_id,content_type=content_type).first()
         notification.is_active=True
         notification.save()
+        push_notification_consultant(registration_ids, message_body)
     except Exception as error:
         write_exception(error, None)
         return str(error), False

@@ -145,7 +145,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     notification.is_active = False
                     notification.count += 1
                     notification.save()
-                    if notification.count < 4:
+                    if notification.count < 5:
                         schedule_push_notification.delay(user_id, notification.count, 'interview')
                 else:
                     if notification:
@@ -158,7 +158,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     notification.is_active = False
                     notification.count += 1
                     notification.save()
-                    if notification.count < 4:
+                    if notification.count < 5:
                         schedule_push_notification.delay(user_id, notification.count, 'consultant')
 
             if 'project' in type_list:
@@ -168,7 +168,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     notification.is_active = False
                     notification.count += 1
                     notification.save()
-                    if notification.count < 4:
+                    if notification.count < 5:
                         schedule_push_notification.delay(user_id, notification.count, 'project')
 
             return Response({"message": "Notification snoozed for next 2 hours"}, status=200)
@@ -177,7 +177,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='notification_due')
-    def notification_due(self, request,pk):
+    def notification_due(self, request, pk):
         try:
             interview_content_type = ContentType.objects.get(model='interview')
             project_content_type = ContentType.objects.get(model='project')

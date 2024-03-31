@@ -146,7 +146,7 @@ class Notification(models.Model):
 class UserNotification(TimeStampedModel):
     is_active = models.BooleanField(default=False)
     count = models.IntegerField(_('count'), default=1)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE , null=True, blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,
         related_name='pushnotification',
