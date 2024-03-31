@@ -488,14 +488,12 @@ class ProjectViewSets(ModelViewSet):
                         )
                     terminated = Project.objects.none()
                     if 'terminated' in filters['status']:
-                        filters['status'].remove('terminated')
                         terminated = projects.filter(
                             statuses__status__istartswith='terminated', statuses__is_current=True
                         )
                     cancelled = Project.objects.none()
                     if 'cancelled' in filters['status']:
-                        filters['status'].remove('cancelled')
-                        projects = projects.filter(
+                        cancelled = projects.filter(
                             statuses__status__istartswith='cancelled', statuses__is_current=True
                         )
                     if filters['status']:
