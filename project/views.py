@@ -347,7 +347,7 @@ class ProjectViewSets(ModelViewSet):
             # if mail_id:                     
             #     res1, msg1, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
             # else:
-            res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
+            res1, msg1, mail_id = send_email_(mail_data, config.APP_ADMIN, request=request)
 
             if msg1:
                 res1 = "mail send"
@@ -375,9 +375,9 @@ class ProjectViewSets(ModelViewSet):
                 from_mail = email_object.from_mail_id
 
             if mail_id:
-                res2, msg2, mail_id = send_mail_in_thread(mail_data_eng, from_mail, request, mail_id)
+                res2, msg2, mail_id = send_mail_in_thread(mail_data_eng, config.APP_ADMIN, request, mail_id)
             else:
-                res2, msg2, mail_id = send_email_(mail_data_eng, from_mail, request=request)
+                res2, msg2, mail_id = send_email_(mail_data_eng, config.APP_ADMIN, request=request)
 
             if msg2:
                 res2 = "mail send"

@@ -1314,6 +1314,15 @@ class MessageCard:
             coders = ""
             for i in payload.get('coders'):
                 coders = coders + " " + f"`{i}`"
+            if payload.get('type').capitalize() == 'Offline':
+                engineering_feedback = f"*Submitted By:*  {coders}\n " \
+                                    f"*Reviewed By:*   {payload.get('reviewed_by')} \n" \
+                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                    f"*Feedback*:  {payload.get('coder_remark')}"
+            else:
+                engineering_feedback = f"*Submitted By:*  {coders}\n " \
+                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                    f"*Feedback*:  {payload.get('coder_remark')}"
             card_data = {
                 "blocks": [
                     {
@@ -1357,9 +1366,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"*Submitted By:*  {coders}\n "
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n "
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                            "text": engineering_feedback
                         }
                     },
                     {
