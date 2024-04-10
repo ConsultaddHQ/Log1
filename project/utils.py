@@ -273,19 +273,25 @@ class ProjectUtil:
             ).count()
             w2_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type__in = ["w2","full_time"]
+                submission__work_type__in=["w2", "full_time"]
             ).count()
             c2c_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one,
                 submission__work_type="c2c"
-
             ).count()
+            us_count = Project.objects.filter(
+                statuses__status=project_status, statuses__created__gte=day_one
+            ).exclude(submission__marketing_team__name='Consultadd Canada').count()
+            cn_count = Project.objects.filter(
+                statuses__status=project_status, statuses__created__gte=day_one
+            ).filter(submission__marketing_team__name='Consultadd Canada').count()
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
                 submission__marketing_team=team,
             ).count()
-            return total_count, team_count, team.name, w2_count, c2c_count
+
+            return total_count, team_count, team.name, w2_count, c2c_count, us_count, cn_count
         except Exception as error:
             write_exception(message=error, request=self.request)
 
@@ -343,7 +349,7 @@ class ProjectUtil:
             if recruiter:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
-            total, team_count, team, w2_count, c2c_count = self.fetch_project_count("received")
+            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("received")
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
             supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
@@ -357,8 +363,9 @@ class ProjectUtil:
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
                 "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type":self.project.submission.get_work_type_display(), "submission_id": self.project.submission.id,
-                "job_title": self.project.submission.lead.job_title,"w2_count":w2_count, "c2c_count":c2c_count
+                "project_type": self.project.submission.get_work_type_display(),
+                "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
+                "w2_count": w2_count, "c2c_count": c2c_count, "cn": cn_count, "us": us_count
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -715,6 +722,17 @@ def update_project_associate(associate_obj, request, **kwargs):
         if kwargs.get('update_type', '') == 'total_hours':
             associate_obj.total_hours += kwargs.get('total_hours')
             associate_obj.save()
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def check_has_active(consultant, request):
+    try:
+        po = Project.objects.filter(consultant=consultant, statuses__status='joined', statuses__is_current=True)
+        if po.first():
+            return True
+        return False
     except Exception as error:
         write_exception(error, request)
         return None

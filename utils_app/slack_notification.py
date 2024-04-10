@@ -725,14 +725,17 @@ class MessageCard:
             return str(error)
 
     @staticmethod
-    def po_receive_message_card(payload, request):
+    def po_receive_message_card(payload, request=None):
         try:
             project_count = ''
             if payload.get('w2_count', 'NA') != 0:
-                project_count += f"*`W2`* - *{payload.get('w2_count', 'NA')}*"
-                project_count += "  "
+                project_count += f"*`W2`* - *{payload.get('w2_count', 'NA')}*   "
             if payload.get('c2c_count', 'NA') != 0:
-                project_count += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*"
+                project_count += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*   "
+            if payload.get('us', 'NA') != 0:
+                project_count += f"*`US`* - *{payload.get('us', 'NA')}*   "
+            if payload.get('cn', 'NA') != 0:
+                project_count += f"*`CANADA`* - *{payload.get('cn', 'NA')}*"
 
             data = {
                 "blocks": [
@@ -795,10 +798,6 @@ class MessageCard:
                                 "type": "mrkdwn",
                                 "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
                             },
-                            {
-                                "type": "mrkdwn",
-                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
-                            },
                         ]
                     },
                     {
@@ -841,7 +840,7 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"{project_count}   *`Total`* - *{payload.get('total', 'NA')}*"
+                                "text": f"{project_count}\n*`Total`* - *{payload.get('total', 'NA')}*"
                             }
                         ]
                     },
