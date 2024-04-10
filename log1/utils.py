@@ -63,16 +63,19 @@ def write_exception(message, request=None):
         text += log_request(request)
     try:
         _, _, tb = sys.exc_info()
-        f = tb.tb_frame
-        lineno = tb.tb_lineno
-        function = f.f_code.co_name
-        filename = f.f_code.co_filename
-        classname = None
-        if 'self' in f.f_locals:
-            classname = f.f_locals["self"].__class__.__name__
-        data = f'Error in {filename} : Class - {classname} : Function - {function} : Line no - ' \
-               f'{lineno} : Message - {message}'
-        logger.error(text + data)
+        if tb:
+            f = tb.tb_frame
+            lineno = tb.tb_lineno
+            function = f.f_code.co_name
+            filename = f.f_code.co_filename
+            classname = None
+            if 'self' in f.f_locals:
+                classname = f.f_locals["self"].__class__.__name__
+            data = f'Error in {filename} : Class - {classname} : Function - {function} : Line no - ' \
+                   f'{lineno} : Message - {message}'
+            logger.error(text + data)
+        else:
+            logger.error(f'Message - {message}')
     except Exception as error:
         text += f"Exception in {error}"
         logger.error(text)
