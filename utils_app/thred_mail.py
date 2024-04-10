@@ -394,7 +394,7 @@ def send_mail_without_thread(mail_data, service, request=None):
         message.attach(MIMEText(body, 'html'))
 
         file_size = False
-        if len(mail_data.get("attachments")) > 0:
+        if mail_data.get("attachments", None) and len(mail_data.get("attachments")) > 0:
             file_size = add_attachments(message, mail_data.get("attachments"))
 
         if file_size:

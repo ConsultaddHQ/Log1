@@ -3224,11 +3224,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             test_type = test.engineer_feedback.filter(question__title='Select type of test').first().answer
             rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
+            if test_type.capitalize() == 'Offline':
+                reviewed_by_obj = test.engineer_feedback.filter(question__title='Reviewed By').first()
+                reviewed_by = reviewed_by_obj.answer if reviewed_by_obj else None
+            else:
+                reviewed_by = None
+
             payload = {
                 'id': test.id,
                 'type': test_type,
                 'coder_rating': rating,
                 'feedback': test.feedback,
+                'reviewed_by': reviewed_by,
                 'client': test.submission.client,
                 'status': test.get_status_display(),
                 'coder_remark': test.engineer_remarks,
