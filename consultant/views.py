@@ -2025,7 +2025,7 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
         try:
             email = request.data.get('email', None)
             if email:
-                consultant = Consultant.objects.filter(email=email.lower())
+                consultant = Consultant.objects.filter(email__iexact=email.lower())
                 if not consultant:
                     return Response({"error": "User not found"}, status=404)
                 consultant = consultant.first()

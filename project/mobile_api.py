@@ -23,8 +23,8 @@ from consultant.permissions import ConsultantIsAuthenticated
 from utils_app.aws_utils import get_s3_object, download_s3_object
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
-from project.utils import check_days, mark_in_active, timesheet_submission_mail
-from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, \
+from project.utils import check_days, mark_in_active
+from project.models import Project, TimeSheet, PayrollSchedule, ConsultantLeave, Leave, TimesheetRequest, \
     TimetrackEvent, TimetrackEventFeedback
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
     ConsultantLeaveSerializer, LeaveSerializer, TimetrackEventSerializer
