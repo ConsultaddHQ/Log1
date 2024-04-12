@@ -2275,7 +2275,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
-            margin = request.GET.get('margin', {})
+            margin = json.loads(request.GET.get('margin', '{}'))
             export = json.loads(request.GET.get('export', 'false'))
 
             if start:
