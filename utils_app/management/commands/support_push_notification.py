@@ -25,12 +25,11 @@ class Command(BaseCommand):
             one_day_ago = today - timedelta(days=1)
 
             # Query to fetch the project support person
-            # user case send the notification to user on daily base if can not submit the feedback script run daily
             active_projects = Q(~Q(project__updates__created__gte=seven_days_ago), start__lte=seven_days_ago,
                                 statuses__created__lte=seven_days_ago,
                                 statuses__frequency__in=['active', 'less_active'])
 
-            training_projects = Q(~Q(project__updates__created__gte=one_day_ago),
+            training_projects = Q(~Q(project__updates__created__gte=seven_days_ago),
                                   project__start_date__gte=date.today())
 
             project_support_persons = ProjectSupport.objects.filter(
