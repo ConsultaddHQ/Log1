@@ -315,7 +315,7 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            total, team_count, team, w2_count, c2c_count = self.fetch_project_count("joined")
+            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("joined")
             # team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name

@@ -347,7 +347,7 @@ class ProjectViewSets(ModelViewSet):
             # if mail_id:                     
             #     res1, msg1, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
             # else:
-            res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
+            res1, msg1, mail_id = send_email_(mail_data, config.APP_ADMIN, request=request)
 
             if msg1:
                 res1 = "mail send"
@@ -375,9 +375,9 @@ class ProjectViewSets(ModelViewSet):
                 from_mail = email_object.from_mail_id
 
             if mail_id:
-                res2, msg2, mail_id = send_mail_in_thread(mail_data_eng, from_mail, request, mail_id)
+                res2, msg2, mail_id = send_mail_in_thread(mail_data_eng, config.APP_ADMIN, request, mail_id)
             else:
-                res2, msg2, mail_id = send_email_(mail_data_eng, from_mail, request=request)
+                res2, msg2, mail_id = send_email_(mail_data_eng, config.APP_ADMIN, request=request)
 
             if msg2:
                 res2 = "mail send"
@@ -2275,18 +2275,15 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
-            margin = request.GET.get('margin', 'below_21')
+            margin = json.loads(request.GET.get('margin', '{}'))
+            export = json.loads(request.GET.get('export', 'false'))
+
             if start:
                 start = datetime.strptime(start, '%Y-%m-%d').date()
             if end:
                 end = datetime.strptime(end, '%Y-%m-%d').date()
-            if margin == '21-30':
-                gte, lte = 21, 30
-            elif margin == 'above_30':
-                gte, lte = 30, 100
-            else:
-                gte, lte = 0, 21
-            export = json.loads(request.GET.get('export', 'false'))
+            gte, lte = margin.get('gte', 20), margin.get('lte', 100)
+
             consultants = Consultant.objects.filter(status__in=['on_project'])
             if query:
                 consultants = consultants.filter(name__istartswith=query)
@@ -2312,7 +2309,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 if end and revision_date > end:
                     continue
                 margin = project_rate - consultant_rate
-                margin_percentage = round((margin / project_rate) * 100, 2)
+                # margin_percentage = round((margin / project_rate) * 100, 2)
                 marketer = {}
                 assigned_marketer = ConsultantPOC.objects.filter(
                     poc_type='marketer', consultant_id=consultant.id, end=None).first()
@@ -2322,30 +2319,30 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 else:
                     marketer['name'] = assigned_marketer.poc.employee_name
                     marketer['email'] = assigned_marketer.poc.email
-                if (start or end) and gte <= margin_percentage <= lte:
+                if (start or end) and gte <= margin <= lte:
                     data.append({
                         "rate": consultant_rate,
                         "po_rate": project_rate,
                         "last_revision": revision_date,
                         "consultant_id": consultant.id,
-                        "margin": f"{round(margin, 1)}({margin_percentage}%)",
+                        "margin": f"{round(margin, 1)}",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
                         "marketer_email": marketer.get('email'),
                         'vendor_name': project.submission.lead.vendor_company.name
                     })
-                elif (date.today() - timedelta(days=170) > revision_date) and gte <= margin_percentage <= lte:
+                elif (date.today() - timedelta(days=170) > revision_date) and gte <= margin <= lte:
                     data.append({
                         "rate": consultant_rate,
                         "po_rate": project_rate,
                         "last_revision": revision_date,
                         "consultant_id": consultant.id,
+                        "margin": f"{round(margin, 1)}",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
                         "marketer_email": marketer.get('email'),
-                        "margin": f"{round(margin, 1)}({margin_percentage}%)",
                         'vendor_name': project.submission.lead.vendor_company.name
                     })
             file_url = None
