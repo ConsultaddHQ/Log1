@@ -1002,7 +1002,7 @@ class LeaveBalanceViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
         try:
             check_access(request)
             year = request.GET.get('year', date.today().year)
-            queryset = ConsultantLeave.objects.filter(consultant__id=kwargs.get('pk'), year=year)
+            queryset = ConsultantLeave.objects.filter(consultant__id=kwargs.get('pk'), year=year, on_hold=False)
 
             queryset = queryset.annotate(
                 leave=Case(
