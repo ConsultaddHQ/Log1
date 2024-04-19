@@ -40,7 +40,7 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate, \
-    check_has_active, terminate_leaves
+    check_has_active, update_leave_status
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
@@ -762,7 +762,7 @@ class ProjectViewSets(ModelViewSet):
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
                     po_status = project_status_obj.get_status_display()
                     util.send_cancellation_notification(po_status)
-                    terminate_leaves(project, request)
+                    update_leave_status(project, request)
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
@@ -775,7 +775,7 @@ class ProjectViewSets(ModelViewSet):
                     po_status = project_status_obj.get_status_display()
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     util.send_termination_notification(po_status)
-                    terminate_leaves(project, request)
+                    update_leave_status(project, request)
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
@@ -787,7 +787,7 @@ class ProjectViewSets(ModelViewSet):
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification()
-                    terminate_leaves(project, request)
+                    update_leave_status(project, request)
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             # Activity

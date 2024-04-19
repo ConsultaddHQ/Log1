@@ -770,7 +770,7 @@ def mark_consultant_leave_on_hold(consultant, request=None):
         return None
 
 
-def terminate_leaves(obj, request=None):
+def update_leave_status(obj, request=None):
     try:
         result = dict()
         consultant = obj.consultant
