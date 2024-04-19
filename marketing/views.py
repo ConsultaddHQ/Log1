@@ -3167,7 +3167,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.status = request.data.get('status')
             test.feedback = feedback
             test.save()
-            assigned_test_points(test, request)
+            if test.get_status_display() != 'Cancelled':
+                assigned_test_points(test, request)
 
             # Activity
             desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
@@ -3186,7 +3187,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             # App Notification
             user_list = [user for user in test.engineer.all()]
-            user_list.append(test.submitted_by)
+            if test.submitted_by:
+                user_list.append(test.submitted_by)
             title = f"Feedback Added for Test :: {test.submission.consultant.name}"
 
             notification_data = {
@@ -3222,8 +3224,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
-            test_type = test.engineer_feedback.filter(question__title='Select type of test').first().answer
-            rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
+            emoji_dict = {'Passed': ':+1:', 'Failed': ':-1:', 'Cancelled': ':x:'}
+            test_type_obj = test.engineer_feedback.filter(question__title='Select type of test').first()
+            test_type = test_type_obj.answer if test_type_obj else "NA"
+            rating_obj = test.engineer_feedback.filter(question__title='Rate your performance').first()
+            rating = rating_obj.answer if rating_obj else "NA"
             if test_type.capitalize() == 'Offline':
                 reviewed_by_obj = test.engineer_feedback.filter(question__title='Reviewed By').first()
                 reviewed_by = reviewed_by_obj.answer if reviewed_by_obj else None
@@ -3238,14 +3243,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'reviewed_by': reviewed_by,
                 'client': test.submission.client,
                 'status': test.get_status_display(),
-                'coder_remark': test.engineer_remarks,
                 'vendor': test.submission.vendor.name,
                 'consultant_name': test.submission.consultant.name,
-                'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
+                'emoji': emoji_dict.get(test.get_status_display()),
+                'coder_remark': test.engineer_remarks if test.engineer_remarks else "NA",
                 'test_url': f'{config.APP_URL}#/details/{test.submission.id}/test?id={test.id}',
                 'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
-                           test.engineer.filter()],
+                           test.engineer.filter()]
             }
             res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
             if not res:
