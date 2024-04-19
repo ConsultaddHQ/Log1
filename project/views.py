@@ -410,6 +410,7 @@ class ProjectViewSets(ModelViewSet):
         export = json.loads(request.GET.get('export', 'false'))
         filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_lead = request.GET.get('filter_by_lead', None)
+        filter_by_region = request.GET.get('filter_by_region', None)
 
         try:
             # search project by client and consultant
@@ -548,7 +549,17 @@ class ProjectViewSets(ModelViewSet):
                     "in_house": projects.filter(is_remote=True).count(),
                     "consultant": projects.filter(is_remote=False).count()
                 },
+                "project_by_region": {
+                    "USA": projects.exclude(submission__marketing_team__name='Consultadd Canada').count(),
+                    "CANADA": projects.filter(submission__marketing_team__name='Consultadd Canada').count()
+                }
             }
+
+            if filter_by_region:
+                if filter_by_region == 'USA':
+                    projects = projects.exclude(submission__marketing_team__name='Consultadd Canada')
+                elif filter_by_region == 'CANADA':
+                    projects = projects.filter(submission__marketing_team__name='Consultadd Canada')
 
             if sort_by in ['created', 'modified']:
                 order_by = f"-{sort_by}"
