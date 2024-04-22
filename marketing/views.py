@@ -2962,6 +2962,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             users = get_authenticated_users(request)
             test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by__in=users)
             prev_platform = test.platform
+            prev_status = test.get_status_display()
             new_platform = request.data.get('platform', prev_platform)
             if prev_platform != new_platform:
                 test_content_type = ContentType.objects.get(model='test')
@@ -2974,16 +2975,20 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
                     )
             serializer = TestUpdateSerializer(test, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-
-                # Activity
-                desc = f"Test details updated"
-                create_activity(test.submission.id, 'submission', request.user, desc, 'created')
-
-                return Response({"data": serializer.data, "message": "Test updated"}, status=202)
-            else:
+            if not serializer.is_valid():
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
+            serializer.save()
+
+            if prev_status.lower() != request.data.get('status', 'cancelled').lower():
+                if test.submitted_by and test.get_status_display() == 'Cancelled':
+                    resp = send_slack_message(test, request)
+                    if not resp:
+                        return Response({"message": "Slack message not sent"}, status=400)
+
+            # Activity
+            desc = f"Test details updated"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'updated')
+            return Response({"data": serializer.data, "message": "Test updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -3222,34 +3227,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
-            test_type = test.engineer_feedback.filter(question__title='Select type of test').first().answer
-            rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
-            if test_type.capitalize() == 'Offline':
-                reviewed_by_obj = test.engineer_feedback.filter(question__title='Reviewed By').first()
-                reviewed_by = reviewed_by_obj.answer if reviewed_by_obj else None
-            else:
-                reviewed_by = None
-
-            payload = {
-                'id': test.id,
-                'type': test_type,
-                'coder_rating': rating,
-                'feedback': test.feedback,
-                'reviewed_by': reviewed_by,
-                'client': test.submission.client,
-                'status': test.get_status_display(),
-                'coder_remark': test.engineer_remarks,
-                'vendor': test.submission.vendor.name,
-                'consultant_name': test.submission.consultant.name,
-                'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
-                'test_url': f'{config.APP_URL}#/details/{test.submission.id}/test?id={test.id}',
-                'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
-                'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
-                           test.engineer.filter()],
-            }
-            res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
-            if not res:
-                write_exception(msg, request)
+            resp = send_slack_message(test, request)
+            if not resp:
+                return Response({"message": "Slack message not sent"}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
         except Exception as error:
