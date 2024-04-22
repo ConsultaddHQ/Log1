@@ -507,6 +507,13 @@ class ProjectViewSets(ModelViewSet):
             if filter_by_time:
                 projects = get_time_filter(projects, filter_by_time)
 
+            region_unfiltered_qs = projects
+            if filter_by_region:
+                if filter_by_region == 'USA':
+                    projects = projects.exclude(submission__marketing_team__name='Consultadd Canada')
+                elif filter_by_region == 'CANADA':
+                    projects = projects.filter(submission__marketing_team__name='Consultadd Canada')
+
             if not status_count:
                 status_count = {
                     "total": projects.count(),
@@ -550,16 +557,10 @@ class ProjectViewSets(ModelViewSet):
                     "consultant": projects.filter(is_remote=False).count()
                 },
                 "project_by_region": {
-                    "USA": projects.exclude(submission__marketing_team__name='Consultadd Canada').count(),
-                    "CANADA": projects.filter(submission__marketing_team__name='Consultadd Canada').count()
+                    "USA": region_unfiltered_qs.exclude(submission__marketing_team__name='Consultadd Canada').count(),
+                    "CANADA": region_unfiltered_qs.filter(submission__marketing_team__name='Consultadd Canada').count()
                 }
             }
-
-            if filter_by_region:
-                if filter_by_region == 'USA':
-                    projects = projects.exclude(submission__marketing_team__name='Consultadd Canada')
-                elif filter_by_region == 'CANADA':
-                    projects = projects.filter(submission__marketing_team__name='Consultadd Canada')
 
             if sort_by in ['created', 'modified']:
                 order_by = f"-{sort_by}"
