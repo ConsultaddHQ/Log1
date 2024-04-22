@@ -2979,7 +2979,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
             serializer.save()
 
-            if prev_status.lower() != request.data.get('status', 'cancelled').lower():
+            if prev_status.lower() != serializer.data.get('status', 'cancelled').lower():
                 if test.submitted_by and test.get_status_display() == 'Cancelled':
                     resp = send_slack_message(test, request)
                     if not resp:
