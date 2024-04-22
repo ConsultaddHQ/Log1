@@ -428,9 +428,17 @@ class TestCreateSerializer(serializers.ModelSerializer):
 
 
 class TestUpdateSerializer(serializers.ModelSerializer):
+    deadline = serializers.SerializerMethodField()
+
     class Meta:
         model = Test
         fields = '__all__'
+
+    @staticmethod
+    def get_deadline(obj):
+        if isinstance(obj.deadline, datetime):
+            return obj.deadline.date()
+        return obj.deadline
 
 
 class SubmissionV2Serializer(serializers.ModelSerializer):

@@ -686,3 +686,38 @@ def create_sup_message_slack_payload(obj: any, request: any = None) -> dict:
     except Exception as error:
         write_exception(error, request)
         return {}
+
+
+def send_slack_message(test_obj, request):
+    try:
+        emoji_dict = {'Passed': ':+1:', 'Failed': ':-1:', 'Cancelled': ":x:"}
+        test_type = test_obj.engineer_feedback.filter(question__title='Select type of test').first().answer
+        rating = test_obj.engineer_feedback.filter(question__title='Rate your performance').first().answer
+        if test_type.capitalize() == 'Offline':
+            reviewed_by_obj = test_obj.engineer_feedback.filter(question__title='Reviewed By').first()
+            reviewed_by = reviewed_by_obj.answer if reviewed_by_obj else None
+        else:
+            reviewed_by = None
+        payload = {
+            'id': test_obj.id,
+            'type': test_type,
+            'coder_rating': rating,
+            'feedback': test_obj.feedback,
+            'reviewed_by': reviewed_by,
+            'client': test_obj.submission.client,
+            'status': test_obj.get_status_display(),
+            'cancel_reason': test_obj.cancel_reason,
+            'coder_remark': test_obj.engineer_remarks,
+            'vendor': test_obj.submission.vendor.name,
+            'emoji': emoji_dict.get(test_obj.get_status_display()),
+            'consultant_name': test_obj.submission.consultant.name,
+            'test_url': f'{config.APP_URL}#/details/{test_obj.submission.id}/test?id={test_obj.id}',
+            'marketer': f'<@{test_obj.marketer.slack_id}>' if test_obj.marketer.slack_id else test_obj.marketer.employee_name,
+            'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
+                       test_obj.engineer.filter()],
+        }
+        res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
+        return res
+    except Exception as error:
+        write_exception(error, request)
+        return None
