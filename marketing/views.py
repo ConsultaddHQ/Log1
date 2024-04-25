@@ -887,10 +887,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             pending_before = date.today() - timedelta(days=25)
             test_lst = Test.objects.filter(
-                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte="2022-01-01"
             ).exclude(modified__gte=pending_before)
             interview_lst = Interview.objects.filter(
-                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte="2022-01-01"
             ).exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:
@@ -1225,9 +1225,13 @@ class InterviewViewSets(ModelViewSet):
             return error
 
     @staticmethod
-    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last, filter_by_call_type=None):
+    def get_count_and_queryset(queryset, sort_by, first, last, count_filters):
         try:
             # Interview counts by status
+            filter_by_status = count_filters.get("filter_by_status")
+            filter_by_region = count_filters.get("filter_by_region")
+            filter_by_call_type = count_filters.get("filter_by_call_type")
+
             queryset = queryset.order_by('id').distinct('id')
 
             status_count_qs = queryset
@@ -1254,6 +1258,15 @@ class InterviewViewSets(ModelViewSet):
 
             if filter_by_call_type and len(filter_by_call_type) > 0:
                 queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+
+            filtered_qs = queryset
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
+
+            data_counts['USA'] = filtered_qs.exclude(submission__marketing_team__name='Consultadd Canada').count()
+            data_counts['Canada'] = filtered_qs.filter(submission__marketing_team__name='Consultadd Canada').count()
 
             if sort_by in ['created', 'modified', 'start_time']:
                 order_by = f"-{sort_by}"
@@ -1392,7 +1405,7 @@ class InterviewViewSets(ModelViewSet):
             change_to_feedback_due()
             queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
-                "query": query, "filter_for": filter_for, "filter_json": filter_json
+                "query": query, "filter_for": filter_for, "filter_json": filter_json, "by_region": by_region
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
@@ -1402,9 +1415,12 @@ class InterviewViewSets(ModelViewSet):
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
                     filter_call_type = filters["call_type"]
 
-            data, screen_data = self.get_count_and_queryset(
-                queryset, filter_by_status, sort_by, first, last, filter_call_type
-            )
+            filter_counts = {
+                "filter_by_status": filter_by_status,
+                "filter_by_call_type": filter_call_type,
+                "filter_by_region": request.GET.get('by_region', None)
+            }
+            data, screen_data = self.get_count_and_queryset(queryset, sort_by, first, last, filter_counts)
             if screen_data == 'error':
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 

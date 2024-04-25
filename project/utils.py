@@ -265,36 +265,31 @@ class ProjectUtil:
         marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
         self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
 
-    def fetch_project_count(self, project_status):
+    def fetch_project_count(self, project_status, by_team=False):
         try:
-            team = self.project.submission.marketing_team
+            counts = {}
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).count()
-            w2_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type__in=["w2", "full_time"]
-            ).count()
-            c2c_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type="c2c"
-            ).count()
-            us_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).exclude(submission__marketing_team__name='Consultadd Canada').count()
-            cn_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).filter(submission__marketing_team__name='Consultadd Canada').count()
-            team_count = Project.objects.filter(
-                statuses__status=project_status,
-                statuses__created__gte=day_one,
-                submission__marketing_team=team,
-            ).count()
+            po_qs = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one)
+            team_name = self.project.submission.marketing_team.name
 
-            return total_count, team_count, team.name, w2_count, c2c_count, us_count, cn_count
+            if by_team:
+                if team_name == 'Consultadd Canada':
+                    po_qs = po_qs.filter(submission__marketing_team__name='Consultadd Canada')
+                else:
+                    po_qs = po_qs.exclude(submission__marketing_team__name='Consultadd Canada')
+
+                counts['total_count'] = po_qs.count()
+                counts['team_count'] = po_qs.filter(submission__marketing_team__name=team_name).count()
+                counts['w2_count'] = po_qs.filter(submission__work_type='w2').count()
+                counts['c2c_count'] = po_qs.filter(submission__work_type='c2c').count()
+            else:
+                counts['total_count'] = po_qs.count()
+                counts['team_count'] = po_qs.filter(submission__marketing_team__name=team_name).count()
+
+            return counts, team_name
         except Exception as error:
             write_exception(message=error, request=self.request)
+            return {}, None
 
     def fetch_project_termination_count(self):
         try:
@@ -316,8 +311,7 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("joined")
-            # team_name = self.project.submission.created_by.team.name
+            counts, team_name = self.fetch_project_count("joined")
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -331,9 +325,9 @@ class ProjectUtil:
                                  f"*{self.project.submission.lead.job_title.strip()}*"
 
             payload = {
-                "submission_id": self.project.submission.id, "project_id": self.project.id,
-                "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
-                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team, "team": team_count,
+                "activity_title": activity_title, "activity_text": self.activity_text,  "employer": self.employer,
+                "submission_id": self.project.submission.id, "project_id": self.project.id, "team_name": team_name,
+                "team": counts.get('team_count'),"total": counts.get('total_count'), "recruiter_name": recruiter_name,
                 "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0],
                                                   '%Y-%m-%d').strftime('%a, %d %B %Y'),
             }
@@ -350,7 +344,7 @@ class ProjectUtil:
             if recruiter:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
-            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("received")
+            counts, team_name = self.fetch_project_count("received", True)
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
             supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
@@ -362,11 +356,11 @@ class ProjectUtil:
             payload = {
                 "client": self.project.submission.client, "consultant": self.consultant.name,
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
-                "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
-                "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type": self.project.submission.get_work_type_display(),
+                "activity_text": self.activity_text, "total": counts.get('total_count'), "employer": self.employer,
+                "team": team_name, "recruiter_name": recruiter_name, "project_start": self.project_start,
+                "team_count": counts.get('team_count'), "project_type": self.project.submission.get_work_type_display(),
                 "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
-                "w2_count": w2_count, "c2c_count": c2c_count, "cn": cn_count, "us": us_count
+                "w2_count": counts.get('w2_count'), "c2c_count": counts.get('c2c_count')
             }
             slack.po_receive_message_card(payload, self.request)
 

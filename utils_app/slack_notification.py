@@ -732,10 +732,6 @@ class MessageCard:
                 project_count += f"*`W2`* - *{payload.get('w2_count', 'NA')}*   "
             if payload.get('c2c_count', 'NA') != 0:
                 project_count += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*   "
-            if payload.get('us', 'NA') != 0:
-                project_count += f"*`US`* - *{payload.get('us', 'NA')}*   "
-            if payload.get('cn', 'NA') != 0:
-                project_count += f"*`CANADA`* - *{payload.get('cn', 'NA')}*"
 
             data = {
                 "blocks": [
@@ -840,7 +836,7 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"{project_count}\n*`Total`* - *{payload.get('total', 'NA')}*"
+                                "text": f"{project_count}    *`Total`* - *{payload.get('total', 'NA')}*"
                             }
                         ]
                     },
@@ -861,7 +857,11 @@ class MessageCard:
                     }
                 ]
             }
-            post_msg_using_webhook(config.slack_offer_url, data)
+            if payload.get('team') == 'Consultadd Canada':
+                slack_url = config.slack_canada_offer_url
+            else:
+                slack_url = config.slack_usa_offer_url
+            post_msg_using_webhook(slack_url, data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
@@ -995,7 +995,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":clipboard: Interview Scheduled Today",
+                            "text": f":clipboard: {payload.get('title')}",
                             "emoji": True
                         }
                     },
