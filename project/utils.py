@@ -280,13 +280,13 @@ class ProjectUtil:
                 else:
                     po_qs = po_qs.exclude(submission__marketing_team__name='Consultadd Canada')
 
-                counts['total_count'] = po_qs.count()
-                counts['team_count'] = po_qs.filter(submission__marketing_team__name=team_name).count()
-                counts['w2_count'] = po_qs.filter(submission__work_type='w2').count()
-                counts['c2c_count'] = po_qs.filter(submission__work_type='c2c').count()
+                counts.update({'total_count': po_qs.count()})
+                counts.update({'w2_count': po_qs.filter(submission__work_type='w2').count()})
+                counts.update({'c2c_count': po_qs.filter(submission__work_type='c2c').count()})
+                counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
             else:
-                counts['total_count'] = po_qs.count()
-                counts['team_count'] = po_qs.filter(submission__marketing_team__name=team_name).count()
+                counts.update({'total_count': po_qs.count()})
+                counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
 
             return counts, team_name
         except Exception as error:

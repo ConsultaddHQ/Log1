@@ -881,16 +881,17 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     @action(methods=['get'], detail=False, url_path='feedback_due')
     def marketer_feedback_due(self, request):
+        check_after = "2022-01-01"
         try:
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             pending_before = date.today() - timedelta(days=25)
             test_lst = Test.objects.filter(
-                status='feedback_due', submission__created_by=request.user, created__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
             interview_lst = Interview.objects.filter(
-                status='feedback_due', submission__created_by=request.user, created__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:

@@ -365,11 +365,13 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
         'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN', 'DEVELOPER'
     ),
-    'Web-Hooks': (
+    'Teams-Web-Hooks-URL': (
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
         'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
         'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
         'products_dev', 'new_recruit_on_bench', 'pre_joining_feedback_url', 'candidate_feedback_url',
+    ),
+    'Slack-Web-Hooks-URL': (
         'slack_engineering_url', 'slack_test_team_url', 'slack_usa_offer_url', 'slack_canada_offer_url',
         'slack_canada_interview_update_url', 'slack_usa_interview_update_url', 'slack_interview_feedback_url',
         'slack_project_termination_url', 'slack_loud_speakers_url', 'slack_joined_url', 'slack_marketing_report_url',
