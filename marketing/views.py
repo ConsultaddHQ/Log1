@@ -1406,7 +1406,7 @@ class InterviewViewSets(ModelViewSet):
             change_to_feedback_due()
             queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
-                "query": query, "filter_for": filter_for, "filter_json": filter_json, "by_region": by_region
+                "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
