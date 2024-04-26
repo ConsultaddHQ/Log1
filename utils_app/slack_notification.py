@@ -1314,6 +1314,23 @@ class MessageCard:
             coders = ""
             for i in payload.get('coders'):
                 coders = coders + " " + f"`{i}`"
+
+            if payload.get('type').capitalize() == 'Offline':
+                engineering_feedback = f"*Submitted By:*  {coders}\n " \
+                                    f"*Reviewed By:*   {payload.get('reviewed_by')} \n" \
+                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                    f"*Feedback*:  {payload.get('coder_remark')}"
+            else:
+                engineering_feedback = f"*Submitted By:*  {coders}\n " \
+                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                    f"*Feedback*:  {payload.get('coder_remark')}"
+
+            if payload.get('emoji') == ":x:":
+                block_header = "Reason of Cancellation"
+                block_subject = f"*Provided By:* `{payload.get('marketer')}` \n*Reason:* {payload.get('cancel_reason')}"
+            else:
+                block_header = "Marketer Feedback"
+                block_subject = f"*Marketer Name:* `{payload.get('marketer')}` \n*Feedback:* {payload.get('feedback')}"
             card_data = {
                 "blocks": [
                     {
@@ -1357,16 +1374,14 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"*Submitted By:*  {coders}\n "
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n "
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                            "text": engineering_feedback
                         }
                     },
                     {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":lower_left_fountain_pen:  Marketer Feedback",
+                            "text": f":lower_left_fountain_pen:  {block_header}",
                             "emoji": True
                         }
                     },
@@ -1374,7 +1389,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"*Marketer Name:* `{payload.get('marketer')}` \n*Feedback:* {payload.get('feedback')}"
+                            "text": f"{block_subject}"
                         }
                     },
                     {
