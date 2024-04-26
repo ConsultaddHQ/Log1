@@ -895,8 +895,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             ).exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:
-                return Response({"marketer_feedback_due": True}, status=202)
-            return Response({"marketer_feedback_due": False}, status=202)
+                return Response({"marketer_feedback_due": True}, status=status.HTTP_200_OK)
+            return Response({"marketer_feedback_due": False}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
