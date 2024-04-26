@@ -499,7 +499,7 @@ class ProjectViewSets(ModelViewSet):
                         )
                     if filters['status']:
                         projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-                        projects = (projects | not_joined | cancelled | terminated).distinct('id')
+                        projects = (projects | not_joined | cancelled | terminated).order_by('id').distinct('id')
 
             if filter_by_lead:
                 projects = projects.filter(submission__work_type=filter_by_lead)
