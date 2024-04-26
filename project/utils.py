@@ -269,7 +269,9 @@ class ProjectUtil:
         try:
             counts = {}
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            po_qs = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one)
+            po_qs = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one).exclude(
+                submission__status='archive'
+            )
             team_name = self.project.submission.marketing_team.name
 
             if by_team:
