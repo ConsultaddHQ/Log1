@@ -369,15 +369,27 @@ class ProjectOrderSerializer(serializers.ModelSerializer):
 
 
 class ConsultantLeaveSerializer(serializers.ModelSerializer):
+    lapsed = serializers.SerializerMethodField()
     leave_type = serializers.SerializerMethodField()
 
     class Meta:
         model = ConsultantLeave
-        fields = ('id', 'granted', 'balance', 'leave_type', 'year', 'is_expired')
+        fields = ('id', 'granted', 'balance', 'leave_type', 'year', 'is_expired', 'on_hold', 'lapsed')
 
     @staticmethod
     def get_leave_type(obj):
         return obj.leave_type.display_name
+
+    @staticmethod
+    def get_lapsed(obj):
+        total_leaves_consumed = 0
+        consumed_leaves = Leave.objects.filter(
+            leave_type__leave_type__name=obj.leave_type.name, consultant=obj.consultant, leave_type__year=date.today().year
+        ).filter(status__in=['approved', 'pending', 'applied'])
+        for leave in consumed_leaves:
+            total_leaves_consumed += leave.total_hours
+        lapsed = obj.granted - (obj.balance + total_leaves_consumed)
+        return lapsed
 
 
 class LeaveSerializer(serializers.ModelSerializer):

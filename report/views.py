@@ -773,37 +773,32 @@ class MarketingReportViewSets(GenericViewSet):
     @staticmethod
     def get_marketing_team_report_data(team, **kwargs):
         try:
-            start = kwargs.get('start')
             end = kwargs.get('end')
-            team_data = kwargs.get('team_data')
+            start = kwargs.get('start')
             request = kwargs.get('request')
+            team_data = kwargs.get('team_data')
 
             bench_consultant = Consultant.objects.filter(
-                marketing__teams__in=team, marketing__status='open',
-                created__gte=start, created__lte=end
+                created__gte=start, created__lte=end, marketing__teams__in=team, marketing__status='open'
             ).order_by('id').distinct('id')
             submission = Submission.objects.filter(
-                marketing_team__in=team,
-                created__gte=start, created__lte=end,
-            ).exclude(status='draft').order_by('id').distinct('id')
+                marketing_team__in=team, created__gte=start, created__lte=end
+            ).exclude(status__in=['draft', 'archive']).order_by('id').distinct('id')
             interview = Interview.objects.filter(
-                start_time__gte=start, start_time__lte=end,
-                submission__marketing_team__in=team
-            ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id')
+                start_time__gte=start, start_time__lte=end, submission__marketing_team__in=team
+            ).exclude(status='cancelled').exclude(
+                submission__status='archive').order_by('submission_id').distinct('submission_id')
             offer = Project.objects.filter(
-                submission__marketing_team__in=team,
-                created__gte=start, created__lte=end,
-            ).order_by('id').distinct('id')
+                submission__marketing_team__in=team, created__gte=start, created__lte=end,
+            ).exclude(submission__status='archive').order_by('id').distinct('id')
             joining = Project.objects.filter(
-                statuses__status='joined',
-                submission__marketing_team__in=team,
                 statuses__created__gte=start, statuses__created__lte=end,
-            ).order_by('id').distinct('id')
+                statuses__status='joined', submission__marketing_team__in=team,
+            ).exclude(submission__status='archive').order_by('id').distinct('id')
             completion = Project.objects.filter(
-                statuses__status='complete',
-                submission__marketing_team__in=team,
                 statuses__created__gte=start, statuses__created__lte=end,
-            ).order_by('id').distinct('id')
+                statuses__status='complete', submission__marketing_team__in=team
+            ).exclude(submission__status='archive').order_by('id').distinct('id')
 
             termination_type = request.GET.get("termination_type", None)
             termination_mapping = {
@@ -814,16 +809,14 @@ class MarketingReportViewSets(GenericViewSet):
 
             if termination_type == "Other":
                 termination = Project.objects.filter(
-                    statuses__status=is_start_with,
-                    submission__marketing_team__in=team,
                     statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id')
+                    statuses__status=is_start_with, submission__marketing_team__in=team,
+                ).exclude(submission__status='archive').order_by('id').distinct('id')
             else:
                 termination = Project.objects.filter(
-                    statuses__status__istartswith=is_start_with,
-                    submission__marketing_team__in=team,
                     statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id')
+                    statuses__status__istartswith=is_start_with, submission__marketing_team__in=team,
+                ).exclude(submission__status='archive').order_by('id').distinct('id')
 
             scrum_master = ''
             if team_data:
@@ -838,10 +831,10 @@ class MarketingReportViewSets(GenericViewSet):
             offer_count = offer.count()
             joining_count = joining.count()
             interview_count = interview.count()
-            bench_consultant_count = bench_consultant.count()
             submission_count = submission.count()
             completion_count = completion.count()
             termination_count = termination.count()
+            bench_consultant_count = bench_consultant.count()
 
             team_data = {
                 'data': {
@@ -908,13 +901,15 @@ class MarketingReportViewSets(GenericViewSet):
             data = []
             export_data = []
             for team in teams:
-                team_data = self.get_marketing_team_report_data(team=[team], start=start, end=end, request=request,
-                                                                team_data=True)
+                team_data = self.get_marketing_team_report_data(
+                    team=[team], start=start, end=end, request=request, team_data=True
+                )
                 data.append(team_data.get('data'))
                 export_data.append(team_data.get('count'))
 
-            team_data = self.get_marketing_team_report_data(team=teams, start=start, end=end, request=request,
-                                                            team_data=False)
+            team_data = self.get_marketing_team_report_data(
+                team=teams, start=start, end=end, request=request, team_data=False
+            )
             data.append(team_data.get('data'))
             export_data.append(team_data.get('count'))
 
@@ -950,27 +945,22 @@ class MarketingReportViewSets(GenericViewSet):
                 end = date.today()
 
             submission_count = Submission.objects.filter(
-                created_by__team__id=pk,
-                created__gte=start, created__lte=end,
+                created_by__team__id=pk, created__gte=start, created__lte=end,
             ).exclude(status='draft').order_by('id').distinct('id').count()
             interview_count = Interview.objects.filter(
-                created__gte=start, created__lte=end,
-                submission__marketing_team__id=pk
+                created__gte=start, created__lte=end, submission__marketing_team__id=pk
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
-                submission__marketing_team__id=pk,
-                statuses__status__in=['new', 'received', 'on_boarded'],
                 statuses__created__gte=start, statuses__created__lte=end,
+                submission__marketing_team__id=pk, statuses__status__in=['new', 'received', 'on_boarded'],
             ).order_by('id').distinct('id').count()
             joining_count = Project.objects.filter(
-                statuses__status='joined',
-                submission__marketing_team__id=pk,
                 statuses__created__gte=start, statuses__created__lte=end,
+                statuses__status='joined', submission__marketing_team__id=pk,
             ).order_by('id').distinct('id').count()
             termination_count = Project.objects.filter(
-                statuses__status__istartswith='terminated',
-                submission__marketing_team__id=pk,
                 statuses__created__gte=start, statuses__created__lte=end,
+                statuses__status__istartswith='terminated', submission__marketing_team__id=pk,
             ).order_by('id').distinct('id').count()
 
             counts_data = [
