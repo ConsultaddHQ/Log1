@@ -1235,6 +1235,11 @@ class InterviewViewSets(ModelViewSet):
 
             queryset = queryset.order_by('id').distinct('id')
 
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
+
             status_count_qs = queryset
             if filter_by_call_type:
                 status_count_qs = queryset.filter(call_type__display_name__in=filter_by_call_type)
@@ -1260,14 +1265,8 @@ class InterviewViewSets(ModelViewSet):
             if filter_by_call_type and len(filter_by_call_type) > 0:
                 queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
 
-            filtered_qs = queryset
-            if filter_by_region == "canada":
-                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
-            elif filter_by_region == "usa":
-                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
-
-            data_counts['USA'] = filtered_qs.exclude(submission__marketing_team__name='Consultadd Canada').count()
-            data_counts['Canada'] = filtered_qs.filter(submission__marketing_team__name='Consultadd Canada').count()
+            data_counts['USA'] = queryset.exclude(submission__marketing_team__name='Consultadd Canada').count()
+            data_counts['Canada'] = queryset.filter(submission__marketing_team__name='Consultadd Canada').count()
 
             if sort_by in ['created', 'modified', 'start_time']:
                 order_by = f"-{sort_by}"
