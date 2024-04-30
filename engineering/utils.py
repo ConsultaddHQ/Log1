@@ -232,13 +232,16 @@ def assigned_test_points(test, request):
         if coding_question_answer:
             coding_answers = coding_question_answer.answer
         employee_associated = test.engineer.all()
-        points = calculate_points(
-            test_type=test_type,
-            test_current_status=test.status,
-            test_platform_name=platform_name,
-            no_mcq_q=mcqs, no_coding_q=coding_answers,
-            no_of_people_involved=len(employee_associated)
-        )
+        if employee_associated:
+            points = calculate_points(
+                test_type=test_type,
+                test_current_status=test.status,
+                test_platform_name=platform_name,
+                no_mcq_q=mcqs, no_coding_q=coding_answers,
+                no_of_people_involved=len(employee_associated)
+            )
+        else:
+            points = 0
         for engineer in employee_associated:
             if 1 <= test.created.month <= 6:
                 cycle_start = datetime(test.created.year + 1, 1, 1)

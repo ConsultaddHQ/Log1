@@ -732,10 +732,6 @@ class MessageCard:
                 project_count += f"*`W2`* - *{payload.get('w2_count', 'NA')}*   "
             if payload.get('c2c_count', 'NA') != 0:
                 project_count += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*   "
-            if payload.get('us', 'NA') != 0:
-                project_count += f"*`US`* - *{payload.get('us', 'NA')}*   "
-            if payload.get('cn', 'NA') != 0:
-                project_count += f"*`CANADA`* - *{payload.get('cn', 'NA')}*"
 
             data = {
                 "blocks": [
@@ -840,7 +836,7 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"{project_count}\n*`Total`* - *{payload.get('total', 'NA')}*"
+                                "text": f"{project_count}    *`Total`* - *{payload.get('total', 'NA')}*"
                             }
                         ]
                     },
@@ -861,7 +857,11 @@ class MessageCard:
                     }
                 ]
             }
-            post_msg_using_webhook(config.slack_offer_url, data)
+            if payload.get('team') == 'Consultadd Canada':
+                slack_url = config.slack_canada_offer_url
+            else:
+                slack_url = config.slack_usa_offer_url
+            post_msg_using_webhook(slack_url, data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
@@ -995,7 +995,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":clipboard: Interview Scheduled Today",
+                            "text": f":clipboard: {payload.get('title')}",
                             "emoji": True
                         }
                     },
@@ -1314,6 +1314,7 @@ class MessageCard:
             coders = ""
             for i in payload.get('coders'):
                 coders = coders + " " + f"`{i}`"
+
             if payload.get('type').capitalize() == 'Offline':
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
                                     f"*Reviewed By:*   {payload.get('reviewed_by')} \n" \
@@ -1323,6 +1324,13 @@ class MessageCard:
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
                                     f"*Performance Rating:* {payload.get('coder_rating')} \n " \
                                     f"*Feedback*:  {payload.get('coder_remark')}"
+
+            if payload.get('emoji') == ":x:":
+                block_header = "Reason of Cancellation"
+                block_subject = f"*Provided By:* `{payload.get('marketer')}` \n*Reason:* {payload.get('cancel_reason')}"
+            else:
+                block_header = "Marketer Feedback"
+                block_subject = f"*Marketer Name:* `{payload.get('marketer')}` \n*Feedback:* {payload.get('feedback')}"
             card_data = {
                 "blocks": [
                     {
@@ -1373,7 +1381,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":lower_left_fountain_pen:  Marketer Feedback",
+                            "text": f":lower_left_fountain_pen:  {block_header}",
                             "emoji": True
                         }
                     },
@@ -1381,7 +1389,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"*Marketer Name:* `{payload.get('marketer')}` \n*Feedback:* {payload.get('feedback')}"
+                            "text": f"{block_subject}"
                         }
                     },
                     {

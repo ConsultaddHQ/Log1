@@ -40,7 +40,7 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate, \
-    check_has_active
+    check_has_active, update_leave_status
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
@@ -410,6 +410,7 @@ class ProjectViewSets(ModelViewSet):
         export = json.loads(request.GET.get('export', 'false'))
         filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_lead = request.GET.get('filter_by_lead', None)
+        filter_by_region = request.GET.get('filter_by_region', None)
 
         try:
             # search project by client and consultant
@@ -498,13 +499,20 @@ class ProjectViewSets(ModelViewSet):
                         )
                     if filters['status']:
                         projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-                        projects = (projects | not_joined | cancelled | terminated).distinct('id')
+                        projects = (projects | not_joined | cancelled | terminated).order_by('id').distinct('id')
 
             if filter_by_lead:
                 projects = projects.filter(submission__work_type=filter_by_lead)
 
             if filter_by_time:
                 projects = get_time_filter(projects, filter_by_time)
+
+            region_unfiltered_qs = projects
+            if filter_by_region:
+                if filter_by_region == 'USA':
+                    projects = projects.exclude(submission__marketing_team__name='Consultadd Canada')
+                elif filter_by_region == 'CANADA':
+                    projects = projects.filter(submission__marketing_team__name='Consultadd Canada')
 
             if not status_count:
                 status_count = {
@@ -548,6 +556,10 @@ class ProjectViewSets(ModelViewSet):
                     "in_house": projects.filter(is_remote=True).count(),
                     "consultant": projects.filter(is_remote=False).count()
                 },
+                "project_by_region": {
+                    "USA": region_unfiltered_qs.exclude(submission__marketing_team__name='Consultadd Canada').count(),
+                    "CANADA": region_unfiltered_qs.filter(submission__marketing_team__name='Consultadd Canada').count()
+                }
             }
 
             if sort_by in ['created', 'modified']:
@@ -762,6 +774,7 @@ class ProjectViewSets(ModelViewSet):
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
                     po_status = project_status_obj.get_status_display()
                     util.send_cancellation_notification(po_status)
+                    update_leave_status(project, request)
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
@@ -774,6 +787,7 @@ class ProjectViewSets(ModelViewSet):
                     po_status = project_status_obj.get_status_display()
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     util.send_termination_notification(po_status)
+                    update_leave_status(project, request)
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
@@ -785,7 +799,7 @@ class ProjectViewSets(ModelViewSet):
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification()
-
+                    update_leave_status(project, request)
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             # Activity

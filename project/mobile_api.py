@@ -530,7 +530,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def balance(self, request, pk):
         try:
             # year = date.today().year
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False)
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False, on_hold=False)
             # leaves = ConsultantLeave.objects.filter(consultant_id=pk)
             serial = ConsultantLeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
@@ -544,7 +544,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             attachment = None
             data = request.data
             consultant = request.user
-            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
+            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
             # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
             leave = Leave.objects.create(
                 leave_type=leave_type,
@@ -628,7 +628,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def type(self, request, pk):
         try:
             data = []
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False)
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False, on_hold=False)
             for leave in leaves:
                 data.append({"id": leave.id, "leave_type": leave.leave_type.display_name, "balance": leave.balance})
 
