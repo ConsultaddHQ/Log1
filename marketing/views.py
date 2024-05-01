@@ -1526,7 +1526,11 @@ class InterviewViewSets(ModelViewSet):
             if filter_json:
                 filters = json.loads(filter_json)
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
+<<<<<<< HEAD
                     queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
+=======
+                    queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+>>>>>>> 072f4e753d1fa215849b4e56e7c9dd68545f9084
 
             if filter_by_region == "canada":
                 queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
