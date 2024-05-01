@@ -1,3 +1,5 @@
+import json
+
 import pytz
 import difflib
 from datetime import date
@@ -1434,6 +1436,7 @@ class InterviewViewSets(ModelViewSet):
         query = request.GET.get('query', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        filter_by_region = request.GET.get('by_region', None)
 
         try:
             queryset = Interview.objects.all()
@@ -1441,6 +1444,16 @@ class InterviewViewSets(ModelViewSet):
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
@@ -1499,6 +1512,7 @@ class InterviewViewSets(ModelViewSet):
         query = request.GET.get('query', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        filter_by_region = request.GET.get('by_region', None)
 
         try:
             queryset = Interview.objects.all()
@@ -1508,6 +1522,16 @@ class InterviewViewSets(ModelViewSet):
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             queryset = queryset.order_by('id').distinct('id')
             response = HttpResponse()
