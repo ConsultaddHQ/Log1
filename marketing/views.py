@@ -1439,7 +1439,7 @@ class InterviewViewSets(ModelViewSet):
         filter_by_region = request.GET.get('by_region', None)
 
         try:
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
@@ -1448,7 +1448,7 @@ class InterviewViewSets(ModelViewSet):
             if filter_json:
                 filters = json.loads(filter_json)
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
-                    queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
 
             if filter_by_region == "canada":
                 queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
@@ -1515,7 +1515,7 @@ class InterviewViewSets(ModelViewSet):
         filter_by_region = request.GET.get('by_region', None)
 
         try:
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
@@ -1526,7 +1526,7 @@ class InterviewViewSets(ModelViewSet):
             if filter_json:
                 filters = json.loads(filter_json)
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
-                    queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
 
             if filter_by_region == "canada":
                 queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
