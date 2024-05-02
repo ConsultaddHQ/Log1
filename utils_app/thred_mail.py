@@ -90,6 +90,9 @@ def create_service(mail_id):
             filename=config.GOOGLE_SERVICE_FILE, subject=mail_id, scopes=SCOPES
         )
         service = build('gmail', 'v1', credentials=credentials)
+
+        if mail_id == config.DEVELOPER:
+            mail_id = config.APP_ADMIN
         return service, mail_id
     except Exception as e:
         return False, str(e)

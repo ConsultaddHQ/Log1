@@ -306,6 +306,7 @@ class ConsultantLeave(TimeStampedModel):
     year = models.IntegerField(_('Year'))
     balance = models.FloatField(_('Balance Left'))
     granted = models.FloatField(_('Granted Leaves'))
+    on_hold = models.BooleanField(_('Leave on Hold'), default=False)
     is_expired = models.BooleanField(_('Leave Expired'), default=False)
     leave_type = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='type')
     consultant = models.ForeignKey(

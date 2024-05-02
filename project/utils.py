@@ -1,8 +1,10 @@
 import os
 import json
+
+from django.db.models import Q
 from pytz import timezone
 from django.utils import timezone as tz
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from django.shortcuts import get_object_or_404
 
 from constance import config
@@ -10,7 +12,6 @@ from employee.models import User
 from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
-from utils_app.mailing import send_email as mail
 from notification.models import Notification, FCMDevice
 from consultant.models import Consultant, ConsultantPOC
 from consultant.utils import send_notification_for_user
@@ -264,36 +265,33 @@ class ProjectUtil:
         marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
         self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
 
-    def fetch_project_count(self, project_status):
+    def fetch_project_count(self, project_status, by_team=False):
         try:
-            team = self.project.submission.marketing_team
+            counts = {}
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).count()
-            w2_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type__in=["w2", "full_time"]
-            ).count()
-            c2c_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type="c2c"
-            ).count()
-            us_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).exclude(submission__marketing_team__name='Consultadd Canada').count()
-            cn_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).filter(submission__marketing_team__name='Consultadd Canada').count()
-            team_count = Project.objects.filter(
-                statuses__status=project_status,
-                statuses__created__gte=day_one,
-                submission__marketing_team=team,
-            ).count()
+            po_qs = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one).exclude(
+                submission__status='archive'
+            )
+            team_name = self.project.submission.marketing_team.name
 
-            return total_count, team_count, team.name, w2_count, c2c_count, us_count, cn_count
+            if by_team:
+                if team_name == 'Consultadd Canada':
+                    po_qs = po_qs.filter(submission__marketing_team__name='Consultadd Canada')
+                else:
+                    po_qs = po_qs.exclude(submission__marketing_team__name='Consultadd Canada')
+
+                counts.update({'total_count': po_qs.count()})
+                counts.update({'w2_count': po_qs.filter(submission__work_type='w2').count()})
+                counts.update({'c2c_count': po_qs.filter(submission__work_type='c2c').count()})
+                counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
+            else:
+                counts.update({'total_count': po_qs.count()})
+                counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
+
+            return counts, team_name
         except Exception as error:
             write_exception(message=error, request=self.request)
+            return {}, None
 
     def fetch_project_termination_count(self):
         try:
@@ -315,8 +313,7 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("joined")
-            # team_name = self.project.submission.created_by.team.name
+            counts, team_name = self.fetch_project_count("joined")
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -330,9 +327,9 @@ class ProjectUtil:
                                  f"*{self.project.submission.lead.job_title.strip()}*"
 
             payload = {
-                "submission_id": self.project.submission.id, "project_id": self.project.id,
-                "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
-                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team, "team": team_count,
+                "activity_title": activity_title, "activity_text": self.activity_text,  "employer": self.employer,
+                "submission_id": self.project.submission.id, "project_id": self.project.id, "team_name": team_name,
+                "team": counts.get('team_count'),"total": counts.get('total_count'), "recruiter_name": recruiter_name,
                 "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0],
                                                   '%Y-%m-%d').strftime('%a, %d %B %Y'),
             }
@@ -349,7 +346,7 @@ class ProjectUtil:
             if recruiter:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
-            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("received")
+            counts, team_name = self.fetch_project_count("received", True)
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
             supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
@@ -361,11 +358,11 @@ class ProjectUtil:
             payload = {
                 "client": self.project.submission.client, "consultant": self.consultant.name,
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
-                "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
-                "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type": self.project.submission.get_work_type_display(),
+                "activity_text": self.activity_text, "total": counts.get('total_count'), "employer": self.employer,
+                "team": team_name, "recruiter_name": recruiter_name, "project_start": self.project_start,
+                "team_count": counts.get('team_count'), "project_type": self.project.submission.get_work_type_display(),
                 "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
-                "w2_count": w2_count, "c2c_count": c2c_count, "cn": cn_count, "us": us_count
+                "w2_count": counts.get('w2_count'), "c2c_count": counts.get('c2c_count')
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -456,22 +453,38 @@ class ProjectUtil:
     def assign_leave(self):
         try:
             consultant = self.project.consultant
-            already_assigned = ConsultantLeave.objects.filter(consultant=consultant, year=datetime.now().year)
-            if already_assigned:
-                return None
-            choices = Choice.objects.filter(content_type__model='consultantleave', field='leave').exclude(
+            leave_choices = Choice.objects.filter(content_type__model='consultantleave', field='leave').exclude(
                 name='covid_emergency_sick_leave'
             )
-            for choice in choices:
-                if choice.name in ['sick_leave', 'pto']:
-                    leaves = (12.00 - datetime.now().month + 1.00)*8
-                else:
-                    leaves = 0.00
-                ConsultantLeave.objects.create(
-                    consultant=consultant, leave_type=choice, granted=leaves,
-                    balance=leaves, is_expired=False, year=datetime.now().year
+            for leave_choice in leave_choices:
+                consultant_leave = ConsultantLeave.objects.filter(
+                    leave_type=leave_choice, year=date.today().year, is_expired=False, consultant=consultant
                 )
-            return "leave Assigned"
+                if not consultant_leave:
+                    if leave_choice.name == 'pto':
+                        leaves = (12 - datetime.now().month + 1) * 8
+                    elif leave_choice.name == 'sick_leave':
+                        leaves = 48
+                    else:
+                        leaves = 0.00
+                    ConsultantLeave.objects.create(
+                        consultant=consultant, leave_type=leave_choice,
+                        granted=leaves, balance=leaves, year=date.today().year
+                    )
+                else:
+                    latest = consultant_leave.order_by('-id').first()
+                    if latest.on_hold:
+                        perv_granted = latest.granted
+                        prev_balance = latest.balance
+                        if leave_choice.name == 'pto':
+                            desired_leaves = (12 - datetime.now().month + 1) * 8
+                            balance = min(desired_leaves, prev_balance)
+                        else:
+                            balance = prev_balance
+                        ConsultantLeave.objects.create(
+                            consultant=consultant, leave_type=leave_choice, granted=perv_granted,
+                            balance=balance, year=date.today().year
+                        )
         except Exception as error:
             write_exception(message=error, request=self.request)
             return error, "error"
@@ -729,10 +742,84 @@ def update_project_associate(associate_obj, request, **kwargs):
 
 def check_has_active(consultant, request):
     try:
-        po = Project.objects.filter(consultant=consultant, statuses__status='joined', statuses__is_current=True)
+        po = Project.objects.filter(statuses__status='joined', statuses__is_current=True).filter(
+            Q(consultant=consultant) | Q(submission__consultant_marketing__consultant=consultant)
+        )
         if po.first():
             return True
         return False
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+def mark_consultant_leave_on_hold(consultant, request=None):
+    try:
+        consultant_leaves = ConsultantLeave.objects.filter(
+            year=datetime.now().year, consultant=consultant, is_expired=False, on_hold=False
+        )
+        for leave in consultant_leaves:
+            leave.on_hold = True
+            leave.save()
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def update_leave_status(obj, request=None):
+    try:
+        result = dict()
+        consultant = obj.consultant
+        if not check_has_active(consultant, request):
+            mark_consultant_leave_on_hold(consultant, request)
+            result[consultant] = True
+            send_leave_expire_notification(consultant, obj, request)
+        else:
+            result[consultant] = False
+
+        sub_consultant = obj.submission.consultant
+        if not check_has_active(consultant, request):
+            mark_consultant_leave_on_hold(sub_consultant, request)
+            result[sub_consultant] = True
+            send_leave_expire_notification(sub_consultant, obj, request)
+        else:
+            result[sub_consultant] = False
+        return result
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def send_leave_expire_notification(consultant, po_obj, request):
+    try:
+        sender_content_type = ContentType.objects.get(model='user')
+        target_content_type = ContentType.objects.get(model='consultantleave')
+        recipient_content_type = ContentType.objects.get(model='consultant')
+
+        title = f"Leaves for year {datetime.now().year} has been expired as your project with " \
+                f"client {po_obj.submission.client} has been {po_obj.status}"
+
+        Notification.objects.create(
+            title=title, category="info", recipient_content_type=recipient_content_type,
+            recipient_object_id=consultant.id, sender_content_type=sender_content_type, description=title,
+            target_content_type=target_content_type, target_object_id=consultant.id, sender_object_id=request.user.id,
+        )
+
+        # Push Notification
+        message_body = {
+            "body": title, "title": f"Leave Expiration", "category": "Info",
+            "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
+            "data": {
+                'target': 'timesheet', 'target_id': consultant.id,
+                'is_read': False, 'is_deleted': False, 'timestamp': str(tz.now()),
+            },
+        }
+
+        object_ids = consultant.consultant_token.all().values_list('key', flat=True)
+        registration_ids = list(
+            FCMDevice.objects.filter(
+                object_id__in=list(object_ids), content_type__model='consultanttoken'
+            ).values_list('device_id', flat=True))
+        push_notification_consultant(registration_ids, message_body)
+    except Exception as error:
+        write_exception(error, request)

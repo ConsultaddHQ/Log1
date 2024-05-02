@@ -230,11 +230,12 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
 
                     active_projects = Q(
                         ~Q(project__updates__created__gte=seven_days_ago), start__lte=seven_days_ago,
-                        statuses__created__lte=seven_days_ago,statuses__frequency__in=['active', 'less_active']
+                        statuses__created__lte=seven_days_ago, statuses__frequency__in=['active', 'less_active']
                     )
 
                     training_projects = Q(
-                        ~Q(project__updates__created__gte=seven_days_ago), project__start_date__gte=date.today()
+                        ~Q(project__updates__created__gte=seven_days_ago),
+                        start__lte=seven_days_ago, project__start_date__gte=date.today()
                     )
 
                     project_supports = ProjectSupport.objects.filter(

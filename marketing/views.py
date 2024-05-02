@@ -1,3 +1,5 @@
+import json
+
 import pytz
 import difflib
 from datetime import date
@@ -881,21 +883,22 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     @action(methods=['get'], detail=False, url_path='feedback_due')
     def marketer_feedback_due(self, request):
+        check_after = "2022-01-01"
         try:
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             pending_before = date.today() - timedelta(days=25)
             test_lst = Test.objects.filter(
-                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
             interview_lst = Interview.objects.filter(
-                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:
-                return Response({"marketer_feedback_due": True}, status=202)
-            return Response({"marketer_feedback_due": False}, status=202)
+                return Response({"marketer_feedback_due": True}, status=status.HTTP_200_OK)
+            return Response({"marketer_feedback_due": False}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1225,10 +1228,19 @@ class InterviewViewSets(ModelViewSet):
             return error
 
     @staticmethod
-    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last, filter_by_call_type=None):
+    def get_count_and_queryset(queryset, sort_by, first, last, count_filters):
         try:
             # Interview counts by status
+            filter_by_status = count_filters.get("filter_by_status")
+            filter_by_region = count_filters.get("filter_by_region")
+            filter_by_call_type = count_filters.get("filter_by_call_type")
+
             queryset = queryset.order_by('id').distinct('id')
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             status_count_qs = queryset
             if filter_by_call_type:
@@ -1254,6 +1266,9 @@ class InterviewViewSets(ModelViewSet):
 
             if filter_by_call_type and len(filter_by_call_type) > 0:
                 queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+
+            data_counts['USA'] = queryset.exclude(submission__marketing_team__name='Consultadd Canada').count()
+            data_counts['Canada'] = queryset.filter(submission__marketing_team__name='Consultadd Canada').count()
 
             if sort_by in ['created', 'modified', 'start_time']:
                 order_by = f"-{sort_by}"
@@ -1402,9 +1417,12 @@ class InterviewViewSets(ModelViewSet):
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
                     filter_call_type = filters["call_type"]
 
-            data, screen_data = self.get_count_and_queryset(
-                queryset, filter_by_status, sort_by, first, last, filter_call_type
-            )
+            filter_counts = {
+                "filter_by_status": filter_by_status,
+                "filter_by_call_type": filter_call_type,
+                "filter_by_region": request.GET.get('by_region', None)
+            }
+            data, screen_data = self.get_count_and_queryset(queryset, sort_by, first, last, filter_counts)
             if screen_data == 'error':
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 
@@ -1418,13 +1436,24 @@ class InterviewViewSets(ModelViewSet):
         query = request.GET.get('query', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        filter_by_region = request.GET.get('by_region', None)
 
         try:
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
@@ -1483,15 +1512,26 @@ class InterviewViewSets(ModelViewSet):
         query = request.GET.get('query', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        filter_by_region = request.GET.get('by_region', None)
 
         try:
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             queryset = queryset.order_by('id').distinct('id')
             response = HttpResponse()
@@ -2962,6 +3002,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             users = get_authenticated_users(request)
             test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by__in=users)
             prev_platform = test.platform
+            prev_status = test.get_status_display()
             new_platform = request.data.get('platform', prev_platform)
             if prev_platform != new_platform:
                 test_content_type = ContentType.objects.get(model='test')
@@ -2974,16 +3015,20 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
                     )
             serializer = TestUpdateSerializer(test, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-
-                # Activity
-                desc = f"Test details updated"
-                create_activity(test.submission.id, 'submission', request.user, desc, 'created')
-
-                return Response({"data": serializer.data, "message": "Test updated"}, status=202)
-            else:
+            if not serializer.is_valid():
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
+            serializer.save()
+
+            if prev_status.lower() != serializer.data.get('status', 'cancelled').lower():
+                if test.submitted_by and test.get_status_display() == 'Cancelled':
+                    resp = send_slack_message(test, request)
+                    if not resp:
+                        return Response({"message": "Slack message not sent"}, status=400)
+
+            # Activity
+            desc = f"Test details updated"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'updated')
+            return Response({"data": serializer.data, "message": "Test updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -3222,34 +3267,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
-            test_type = test.engineer_feedback.filter(question__title='Select type of test').first().answer
-            rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
-            if test_type.capitalize() == 'Offline':
-                reviewed_by_obj = test.engineer_feedback.filter(question__title='Reviewed By').first()
-                reviewed_by = reviewed_by_obj.answer if reviewed_by_obj else None
-            else:
-                reviewed_by = None
-
-            payload = {
-                'id': test.id,
-                'type': test_type,
-                'coder_rating': rating,
-                'feedback': test.feedback,
-                'reviewed_by': reviewed_by,
-                'client': test.submission.client,
-                'status': test.get_status_display(),
-                'coder_remark': test.engineer_remarks,
-                'vendor': test.submission.vendor.name,
-                'consultant_name': test.submission.consultant.name,
-                'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
-                'test_url': f'{config.APP_URL}#/details/{test.submission.id}/test?id={test.id}',
-                'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
-                'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
-                           test.engineer.filter()],
-            }
-            res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
-            if not res:
-                write_exception(msg, request)
+            resp = send_slack_message(test, request)
+            if not resp:
+                return Response({"message": "Slack message not sent"}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
         except Exception as error:
