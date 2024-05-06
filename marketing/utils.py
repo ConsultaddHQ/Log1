@@ -694,7 +694,11 @@ def send_slack_message(test_obj, request):
         emoji_dict = {'Passed': ':+1:', 'Failed': ':-1:', 'Cancelled': ":x:"}
         test_type = test_obj.engineer_feedback.filter(question__title='Select type of test').first().answer
         rating = test_obj.engineer_feedback.filter(question__title='Rate your performance').first().answer
-        coders = [f'<@{eng.slack_id}>' if eng.slack_id else get_slack_id(eng) for eng in test_obj.engineer.filter()]
+        coders = [
+            f'<@{eng.slack_id}>' if eng.slack_id else f'<@{get_slack_id(eng)}>'
+            if not get_slack_id(eng).isalpha() else eng.employee_name
+            for eng in test_obj.engineer.filter()
+        ]
         if test_type.capitalize() == 'Offline':
             reviewed_by_obj = test_obj.engineer_feedback.filter(question__title='Reviewed By').first()
             reviewers = [
