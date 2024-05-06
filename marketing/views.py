@@ -1606,6 +1606,17 @@ class InterviewViewSets(ModelViewSet):
             if not assigned:
                 return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
+            required_default_guest_ids = [2667, 2688]
+            required_salesforce_interview_guests_qs = User.objects.filter(employee_id__in=required_default_guest_ids)
+            guests_list = set(interview.guests.filter().values_list('user__employee_id', flat=True))
+            if interview.submission.marketing_team.name == 'Salesforce Squad':
+                guests_to_add = [
+                    GuestInfo.objects.get_or_create(type='other', user=obj)[0]
+                    for obj in required_salesforce_interview_guests_qs if obj.employee_id not in guests_list
+                ]
+                interview.guests.add(*guests_to_add)
+                interview.save()
+
             # Activity
             end = interview.end_time.strftime("%Y-%m-%d %H-%M")
             start = interview.start_time.strftime("%Y-%m-%d %H-%M")
