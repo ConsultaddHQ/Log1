@@ -3254,7 +3254,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
+                "click_action": "https://log1.com",
                 "data": {
                     'target': 'test',
                     'is_read': False,
