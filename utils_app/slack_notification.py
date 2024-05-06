@@ -1311,13 +1311,16 @@ class MessageCard:
     @staticmethod
     def send_test_feedback(payload, url):
         try:
-            coders = ""
+            coders, reviewed_by = "", ""
             for i in payload.get('coders'):
                 coders = coders + " " + f"`{i}`"
 
+            for j in payload.get('reviewed_by'):
+                reviewed_by += f"`{j}`  "
+
             if payload.get('type').capitalize() == 'Offline':
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Reviewed By:*   {payload.get('reviewed_by')} \n" \
+                                    f"*Reviewed By:*   {reviewed_by} \n" \
                                     f"*Performance Rating:* {payload.get('coder_rating')} \n " \
                                     f"*Feedback*:  {payload.get('coder_remark')}"
             else:
