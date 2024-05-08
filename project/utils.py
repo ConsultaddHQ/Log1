@@ -281,7 +281,7 @@ class ProjectUtil:
                     po_qs = po_qs.exclude(submission__marketing_team__name='Consultadd Canada')
 
                 counts.update({'total_count': po_qs.count()})
-                counts.update({'w2_count': po_qs.filter(submission__work_type='w2').count()})
+                counts.update({'w2_count': po_qs.filter(submission__work_type__in=['w2', 'full_time']).count()})
                 counts.update({'c2c_count': po_qs.filter(submission__work_type='c2c').count()})
                 counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
             else:
@@ -295,16 +295,20 @@ class ProjectUtil:
 
     def fetch_project_termination_count(self):
         try:
-            team = self.project.submission.marketing_team
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_count = Project.objects.filter(
-                statuses__status__istartswith="terminated", statuses__created__gte=day_one
-            ).count()
-            team_count = Project.objects.filter(
-                statuses__created__gte=day_one,
-                submission__marketing_team=team,
-                statuses__status__istartswith="terminated"
-            ).count()
+            team = self.project.submission.marketing_team
+            if team == 'Consultadd Canada':
+                po_qs = Project.objects.filter(
+                    submission__marketing_team__name='Consultadd Canada',
+                    statuses__status__istartswith="terminated", statuses__created__gte=day_one
+                )
+            else:
+                po_qs = Project.objects.filter(
+                    statuses__status__istartswith="terminated", statuses__created__gte=day_one
+                ).exclude(submission__marketing_team__name='Consultadd Canada')
+
+            total_count = po_qs.count()
+            team_count = po_qs.filter(submission__marketing_team=team).count()
             return total_count, team_count, team.name
         except Exception as error:
             write_exception(message=error, request=self.request)
@@ -313,7 +317,12 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            counts, team_name = self.fetch_project_count("joined")
+            counts, team_name = self.fetch_project_count("joined", True)
+            if self.project.submission.marketing_team.name != 'Consultadd Canada':
+                slack_url = config.slack_usa_joining_termination
+            else:
+                slack_url = config.slack_canada_joining_termination
+
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -327,11 +336,12 @@ class ProjectUtil:
                                  f"*{self.project.submission.lead.job_title.strip()}*"
 
             payload = {
-                "activity_title": activity_title, "activity_text": self.activity_text,  "employer": self.employer,
-                "submission_id": self.project.submission.id, "project_id": self.project.id, "team_name": team_name,
-                "team": counts.get('team_count'),"total": counts.get('total_count'), "recruiter_name": recruiter_name,
+                "recruiter_name": recruiter_name, "project_id": self.project.id,
+                "team": counts.get('team_count'), "total": counts.get('total_count'),
+                "slack_url": slack_url, "activity_title": activity_title, "activity_text": self.activity_text,
+                "employer": self.employer, "submission_id": self.project.submission.id, "team_name": team_name,
                 "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0],
-                                                  '%Y-%m-%d').strftime('%a, %d %B %Y'),
+                                                  '%Y-%m-%d').strftime('%a, %d %B %Y')
             }
             slack.consultant_joined_message_card(payload, self.request)
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
@@ -386,10 +396,15 @@ class ProjectUtil:
                                  f"*{self.project.submission.client}* with the end date of * " \
                                  f"{datetime.strptime(str(self.project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')}*"
 
+            if self.project.submission.marketing_team.name != 'Consultadd Canada':
+                slack_url = config.slack_usa_joining_termination
+            else:
+                slack_url = config.slack_canada_joining_termination
+
             payload = {
-                "recruiter_name": recruiter_name, "status": status, "reason": reason,
-                "sub_title": activity_sub_title, "activity_text": self.activity_text, "team": team,
-                "months": months, "employer": self.employer, "city": self.project.city, "total": total,
+                "recruiter_name": recruiter_name, "status": status, "reason": reason,  "team": team,
+                "sub_title": activity_sub_title, "activity_text": self.activity_text, "total": total,
+                "months": months, "employer": self.employer, "city": self.project.city, "slack_url": slack_url,
                 "submission_id": self.project.submission.id, "project_id": self.project.id, "team_count": team_count
             }
             slack.po_termination_message_card(payload, self.request)

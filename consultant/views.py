@@ -1657,7 +1657,12 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
+
+            if not request.data.get('last_date', None) or not request.data.get('resign_date', None):
+                return Response(
+                    {"message": "Last date or Resignation date not provided"}, status=status.HTTP_400_BAD_REQUEST
+                )
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
             con_exit = ConsultantExit.objects.create(

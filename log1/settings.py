@@ -338,7 +338,6 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_pool_channel_url', ('URL', 'Slack 45dayslimit Channel')),
     ('slack_loud_speakers_url', ('URL', 'Slack Loudspeaker Channel')),
     ('slack_marketing_report_url', ('URL', 'Slack Marketing Report')),
-    ('slack_joined_url', ('URL', 'Slack Joining Announcement Channel')),
     ('slack_offer_failure_url', ('URL', 'Slack Offer Failure Channel')),
     ('slack_interview_feedback_url', ('URL', 'Slack Interview Feedback')),
     ('slack_exit_interview_url', ('URL', 'Slack Exit Interview Channel')),
@@ -351,7 +350,9 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_canada_offer_url', ('URL', 'Slack Canada Offer Announcement Channel')),
     ('slack_usa_interview_update_url', ('URL', 'Slack USA Interview Update Channel')),
     ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
+    ('slack_usa_joining_termination', ('URL', 'Slack USA Joining Termination Channel')),
     ('slack_canada_interview_update_url', ('URL', 'Slack Canada Interview Update Channel')),
+    ('slack_canada_joining_termination', ('URL', 'Slack Canada Joining Termination Channel')),
     ('slack_test_channel_url', ('URL', 'Slack Test Channel')),
     ('OKR_URL', ('https://dlwngz4tmfcbh.cloudfront.net/login', 'OKR URL')),
 ])
@@ -374,10 +375,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
     'Slack-Web-Hooks-URL': (
         'slack_engineering_url', 'slack_test_team_url', 'slack_usa_offer_url', 'slack_canada_offer_url',
         'slack_canada_interview_update_url', 'slack_usa_interview_update_url', 'slack_interview_feedback_url',
-        'slack_project_termination_url', 'slack_loud_speakers_url', 'slack_joined_url', 'slack_marketing_report_url',
-        'slack_general_url', 'slack_offer_failure_url', 'slack_products_dev', 'slack_new_recruit_on_bench',
-        'slack_pre_joining_feedback_url', 'slack_recruitment_url', 'slack_pool_channel_url', 'slack_exit_interview_url',
-        'slack_candidate_feedback_url', 'slack_engineering_private_url', 'slack_consultadd_compete_url',
-        'slack_test_channel_url'
-    ),
+        'slack_loud_speakers_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
+        'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url', 'slack_recruitment_url',
+        'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
+        'slack_engineering_private_url', 'slack_consultadd_compete_url', 'slack_test_channel_url',
+        'slack_canada_joining_termination', 'slack_usa_joining_termination'
+    )
 }
