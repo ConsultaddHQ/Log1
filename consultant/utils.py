@@ -169,7 +169,7 @@ def send_exit_interview_detail(terminate, request):
         return error
 
 
-def terminate_consultant(terminate, request=None):
+def terminate_consultant(terminate, request):
     try:
         consultant = terminate.consultant
         consultant.status = 'terminated'
