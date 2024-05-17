@@ -533,7 +533,7 @@ class MessageCard:
             }
 
             # Sending message on Messaging Tool
-            post_msg_using_webhook(config.slack_joined_url, data)
+            post_msg_using_webhook(payload.get("slack_url"), data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
@@ -717,7 +717,7 @@ class MessageCard:
                 ]
             }
             # Sending message on Messaging Tool
-            post_msg_using_webhook(config.slack_project_termination_url, data)
+            post_msg_using_webhook(payload.get('slack_url'), data)
 
             return "ok"
         except Exception as error:
