@@ -60,7 +60,7 @@ class Command(BaseCommand):
                 "data": data, "report_name": "monthly_joining",
                 "title": "Monthly Project joining Report :MEMO:",
             }
-            # res, msg = MessageCard.data_report(payload, config.slack_joined_url)
+            # res, msg = MessageCard.data_report(payload, config.slack_usa_joining_termination)
             # if msg == 'error':
             #     raise Exception(res)
         except Exception as error:

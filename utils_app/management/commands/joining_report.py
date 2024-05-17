@@ -77,7 +77,7 @@ class Command(BaseCommand):
                 "data": data, "report_name": "project_joining",
                 "title": data.get('title'),
             }
-            # res, msg = MessageCard.data_report(payload, config.slack_joined_url)
+            # res, msg = MessageCard.data_report(payload, config.slack_usa_joining_termination)
             # if msg == 'error':
             #     raise Exception(res)
         except Exception as error:

@@ -149,7 +149,7 @@ def schedule_push_notification(user_id, count, type):
         sleep(delay)
         content_type = ContentType.objects.get(model=type)
         notification = UserNotification.objects.filter(user=user_id,content_type=content_type).first()
-        notification.is_active=True
+        notification.is_active = True
         notification.save()
         push_notification_consultant(registration_ids, message_body)
     except Exception as error:
