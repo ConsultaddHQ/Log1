@@ -53,7 +53,7 @@ class Command(BaseCommand):
                 "data": data, "title": data.get('title'),
                 "report_name": "monday_po_alert",
             }
-            # MessageCard.data_report(payload, config.slack_joined_url)
+            # MessageCard.data_report(payload, config.slack_usa_joining_termination)
 
             text = f"<tr>" \
                    f"<th style='padding:2px 8px 0px 8px;'>Consultant</th>" \
@@ -99,7 +99,7 @@ class Command(BaseCommand):
                 "data": data, "title": data.get('title'),
                 "report_name": "monday_po_alert",
             }
-            # res, msg = MessageCard.data_report(payload, config.slack_joined_url)
+            # res, msg = MessageCard.data_report(payload, config.slack_usa_joining_termination)
             # if msg == 'error':
             #     create_cron_error(job, res)
             payload = {

@@ -662,9 +662,13 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_question_answer(obj):
-        if obj.answer and ": " in obj.answer and obj.question.answer_type in ["yes_attachment", "no_attachment",
-                                                                              "yes_remark", "no_remark"]:
+        if obj.answer and ": " in obj.answer and obj.question.answer_type in [
+            "yes_attachment", "no_attachment", "yes_remark", "no_remark"
+        ]:
             answer = obj.answer.split(": ")
+        elif obj.question.title == 'Reviewed By' and obj.answer:
+            reviewed_by = [reviewer.split(":")[0] for reviewer in obj.answer.split(", ")]
+            answer = [", ".join(reviewed_by), None]
         else:
             answer = [obj.answer, None]
         data = {
