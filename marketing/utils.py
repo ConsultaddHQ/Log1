@@ -23,6 +23,7 @@ from notification.models import FCMDevice, UserNotification
 from marketing.serializers import InterviewerProfileSerializer
 from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile, GuestInfo
 
+from utils_app.utils import get_slack_id
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from notification.utils import push_notification_consultant, create_notification
@@ -196,8 +197,8 @@ def get_interview_title(interview):
 
         return f"Call Supervisor - {call_supervisor} " \
                f"{'(Consultant)' if is_consultant == True else ''} :: {interview.round}R :: " \
-               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::"\
-               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::"\
+               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::" \
+               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::" \
                f"{interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"
 
     except Exception as error:
@@ -693,17 +694,31 @@ def send_slack_message(test_obj, request):
         emoji_dict = {'Passed': ':+1:', 'Failed': ':-1:', 'Cancelled': ":x:"}
         test_type = test_obj.engineer_feedback.filter(question__title='Select type of test').first().answer
         rating = test_obj.engineer_feedback.filter(question__title='Rate your performance').first().answer
+        coders = [
+            f'<@{eng.slack_id}>' if eng.slack_id else f'<@{get_slack_id(eng)}>'
+            if not get_slack_id(eng).isalpha() else eng.employee_name
+            for eng in test_obj.engineer.filter()
+        ]
         if test_type.capitalize() == 'Offline':
             reviewed_by_obj = test_obj.engineer_feedback.filter(question__title='Reviewed By').first()
-            reviewed_by = reviewed_by_obj.answer if reviewed_by_obj else None
+            reviewers = [
+                f'<@{get_slack_id(User.objects.filter(employee_id=int(reviewer_info.split(":")[-1])).first(), request)}>'
+                if len(reviewer_info.split(":")) > 1 and reviewer_info.split(":")[-1].isalnum() and
+                   User.objects.filter(employee_id=int(reviewer_info.split(":")[-1])).exists()
+                else reviewer_info.split(":")[0]
+                for reviewer_info in reviewed_by_obj.answer.split(", ")
+            ]
+
         else:
-            reviewed_by = None
+            reviewers = list()
+
         payload = {
+            'coders': coders,
             'id': test_obj.id,
             'type': test_type,
             'coder_rating': rating,
+            'reviewed_by': reviewers,
             'feedback': test_obj.feedback,
-            'reviewed_by': reviewed_by,
             'client': test_obj.submission.client,
             'status': test_obj.get_status_display(),
             'cancel_reason': test_obj.cancel_reason,
@@ -713,8 +728,6 @@ def send_slack_message(test_obj, request):
             'consultant_name': test_obj.submission.consultant.name,
             'test_url': f'{config.APP_URL}#/details/{test_obj.submission.id}/test?id={test_obj.id}',
             'marketer': f'<@{test_obj.marketer.slack_id}>' if test_obj.marketer.slack_id else test_obj.marketer.employee_name,
-            'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
-                       test_obj.engineer.filter()],
         }
         res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
         return res
