@@ -533,7 +533,7 @@ class MessageCard:
             }
 
             # Sending message on Messaging Tool
-            post_msg_using_webhook(config.slack_joined_url, data)
+            post_msg_using_webhook(payload.get("slack_url"), data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
@@ -717,7 +717,7 @@ class MessageCard:
                 ]
             }
             # Sending message on Messaging Tool
-            post_msg_using_webhook(config.slack_project_termination_url, data)
+            post_msg_using_webhook(payload.get('slack_url'), data)
 
             return "ok"
         except Exception as error:
@@ -987,8 +987,6 @@ class MessageCard:
     @staticmethod
     def interview_data_report(payload, url):
         try:
-            if payload.get('data') is None:
-                return "No data to display", "ok"
             card_data = {
                 "blocks": [
                     {
@@ -1011,6 +1009,20 @@ class MessageCard:
                     }
                 ]
             }
+
+            if not payload.get("data", None):
+                card_data['blocks'].append(
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"No Interviews Scheduled.",
+                            "emoji": True
+                        }
+                    }
+                )
+                res, msg = post_msg_using_webhook(url, card_data)
+                return res, msg
 
             screening_type_headers = payload['data'].keys()
             for header in screening_type_headers:
