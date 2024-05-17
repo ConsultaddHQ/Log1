@@ -10,30 +10,32 @@ from utils_app.slack_notification import MessageCard as slack
 from utils_app.utils import create_cron_error, create_cron_object, generate_s3_url
 
 
+def create_csv_file(payload, report_name):
+    try:
+        if not payload:
+            return None
+        filename = f"{report_name}_{datetime.now().strftime('%d-%B-%Y')}"
+        file = open(f'{filename}.csv', 'w')
+        writer = csv.writer(file)
+        writer.writerow(['Consultant', 'Marketer', 'Supervisor', 'Screening Type', 'Type',
+                         'Round', 'Client', 'Time', 'Job Title', 'Project Type'])
+        for key in payload.keys():
+            for data in payload[key]:
+                writer.writerow([
+                    data.get('consultant'), data.get('marketer'), data.get('ctb_name'), data.get('screening_type'),
+                    data.get('type'), data.get('round'), data.get('client'), data.get('start'), data.get('position'),
+                    data.get('project_type')
+                ])
+        file.close()
+        file_url = generate_s3_url(file.name)
+        return file_url
+    except Exception as error:
+        write_info(message=f"{error}", function='create_csv_file')
+        return "file_url"
+
+
 class Command(BaseCommand):
     help = "This command is for posting scheduled and rescheduled interviews on channel"
-
-    @staticmethod
-    def create_csv_file(payload, report_name):
-        try:
-            filename = f"{report_name}_{datetime.now().strftime('%d-%B-%Y')}"
-            file = open(f'{filename}.csv', 'w')
-            writer = csv.writer(file)
-            writer.writerow(['Consultant', 'Marketer', 'Supervisor', 'Screening Type', 'Type',
-                             'Round', 'Client', 'Time', 'Job Title', 'Project Type'])
-            for key in payload.keys():
-                for data in payload[key]:
-                    writer.writerow([
-                        data.get('consultant'), data.get('marketer'), data.get('ctb_name'), data.get('screening_type'),
-                        data.get('type'), data.get('round'), data.get('client'), data.get('start'), data.get('position'),
-                        data.get('project_type')
-                    ])
-            file.close()
-            file_url = generate_s3_url(file.name)
-            return file_url
-        except Exception as error:
-            write_info(message=f"{error}", function='create_csv_file')
-            return "file_url"
 
     @staticmethod
     def get_slack_message_card_data(interview):
@@ -53,6 +55,17 @@ class Command(BaseCommand):
             "consultant": interview.consultant.name, "client": interview.submission.client,
             "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name
         }
+
+    @staticmethod
+    def post_msg_to_slack(data, region):
+        payload = {
+            'file_url': create_csv_file(data, "interview_scheduled"),
+            "data": data, "title": f"{region} Interviews Scheduled for today",
+        }
+        res, msg = slack.interview_data_report(payload, config.slack_usa_interview_update_url)
+        if msg == 'error':
+            raise Exception(res)
+        return res, msg
 
     # noinspection PyTypeChecker
     def handle(self, *args, **options):
@@ -76,12 +89,12 @@ class Command(BaseCommand):
                 interviews_type = interviews.filter(screening_type=screening_type[0])
                 for index, interview in enumerate(interviews_type):
                     if index == 0:
-                        if interview.submission.marketing_team == 'Consultadd Canada':
+                        if interview.submission.marketing_team.name == 'Consultadd Canada':
                             cn_slack_data[screening_type[1]] = []
                         else:
                             us_slack_data[screening_type[1]] = []
 
-                    if interview.submission.marketing_team == 'Consultadd Canada':
+                    if interview.submission.marketing_team.name == 'Consultadd Canada':
                         if screening_type[1] not in cn_slack_data.keys():
                             cn_slack_data[screening_type[1]] = []
                         cn_slack_data[screening_type[1]].append(self.get_slack_message_card_data(interview))
@@ -90,22 +103,14 @@ class Command(BaseCommand):
                             us_slack_data[screening_type[1]] = []
                         us_slack_data[screening_type[1]].append(self.get_slack_message_card_data(interview))
 
-            if us_slack_data:
-                payload = {
-                    "data": us_slack_data, "title": "USA Interviews Scheduled for today &#128203;",
-                    'file_url': self.create_csv_file(us_slack_data, "interview_scheduled")
-                }
-                res, msg = slack.interview_data_report(payload, config.slack_usa_interview_update_url)
-                if msg == 'error':
-                    raise Exception(res)
+            try:
+                self.post_msg_to_slack(us_slack_data, 'USA')
+            except Exception as error:
+                create_cron_error(job, error)
+            try:
+                self.post_msg_to_slack(cn_slack_data, 'Canada')
+            except Exception as error:
+                create_cron_error(job, error)
 
-            if cn_slack_data:
-                payload = {
-                    "data": cn_slack_data, "title": "Canada Interviews Scheduled for today &#128203;",
-                    'file_url': self.create_csv_file(cn_slack_data, "interview_scheduled")
-                }
-                res, msg = slack.interview_data_report(payload, config.slack_canada_interview_update_url)
-                if msg == 'error':
-                    raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)
