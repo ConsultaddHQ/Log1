@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from rest_framework import status
-from django.db.models import Q, Max
+from django.db.models import Q, Max, Count
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -993,7 +993,7 @@ class MarketingReportViewSets(GenericViewSet):
                 bench_consultant = bench_consultant.filter(marketing__teams__name=filter_by_team,
                                                            marketing__status='open')
 
-            data, url = list(), ""
+            data, url, modified_Data = list(), "", list()
             total = bench_consultant.count()
             if export:
                 first, last = 0, len(bench_consultant)
@@ -1004,36 +1004,79 @@ class MarketingReportViewSets(GenericViewSet):
                     preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                 teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                 recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                submission_count = Submission.objects.filter(
-                    consultant_marketing__consultant=consultant
-                ).exclude(status='cancelled').count()
-                interview_count = Interview.objects.filter(
-                    submission__consultant_marketing__consultant=consultant
-                ).exclude(status='cancelled').distinct('submission').order_by().count()
-                project_count = Project.objects.filter(consultant=consultant).count()
-                days = (
-                               date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+
+                submission_queryset = Submission.objects.filter(
+                    consultant_marketing__consultant=consultant,
+                    consultant_marketing=marketing
+                ).exclude(status='cancelled')
+                submission_count = submission_queryset.count()
+
+                interview_queryset = Interview.objects.filter(
+                    submission__consultant_marketing__consultant=consultant,
+                    submission__consultant_marketing=marketing
+                ).exclude(status='cancelled').distinct('submission').order_by()
+                interview_count = interview_queryset.count()
+
+                project_queryset = Project.objects.filter(consultant=consultant,submission__consultant_marketing=marketing)
+                project_count = project_queryset.count()
+
+                distinct_teams = submission_queryset.values_list('marketing_team__name', flat=True).distinct().order_by('marketing_team__name')
+                distinct_screening_types = interview_queryset.values_list('screening_type', flat=True).distinct().order_by('screening_type')
+                
+                counts_per_team = {team: {
+                    'submission_count': submission_queryset.filter(marketing_team__name=team).count(), 
+                    'interview_count': interview_queryset.filter(submission__marketing_team__name=team).count(),
+                    'interview_details': {
+                        screening: interview_queryset.filter(submission__marketing_team__name=team,screening_type=screening
+                    ).count() for screening in distinct_screening_types},
+                    'project_count': project_queryset.filter(submission__marketing_team__name=team).count(),
+                } for team in distinct_teams}
+                    
+                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                 data.append({
                     'id': consultant.id, 'days': days, 'teams': teams, 'recruiter': recruiter,
-                    'submission_count': submission_count, 'preferred_location': preferred_location,
-                    'email': consultant.email, 'status': consultant.status, 'project_count': project_count,
+                    'submission_count': submission_count, 'preferred_location': preferred_location, 'email': consultant.email, 
+                    'status': dict(Consultant.CONSULTANT_STATUS_CHOICE).get(consultant.status), 
+                    'project_count': project_count,
                     'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
+                    'team': counts_per_team,
                 })
-                col_name = [
-                    {"name": "name", "display_name": "Name"},
-                    {"name": "teams", "display_name": "Teams"},
-                    {"name": "days", "display_name": "Days on Bench"},
-                    {"name": "submission_count", "display_name": "Submission"},
-                    {"name": "interview_count", "display_name": "Interview"},
-                    {"name": "project_count", "display_name": "Project"},
-                    {"name": "status", "display_name": "Status"},
-                ]
+
                 if export:
+                    col_name = [
+                        {"name": "name", "display_name": "Name"},
+                        {"name": "days", "display_name": "Days on Bench"},
+                        {"name": "team", "display_name": "Team Name"},
+                        {"name": "submission_count", "display_name": "Submission"},
+                        {"name": "interview_count", "display_name": "Total Interview"},
+                    ]
+                    col_name.extend(
+                        {'name': choice[0], 'display_name': choice[1]} for choice in Interview.TYPE_CHOICES
+                    )
+                    col_name.extend([
+                        {"name": "project_count", "display_name": "Project"},
+                        {"name": "status", "display_name": "Status"},
+                    ])
+                    modified_data = [
+                        {
+                            'id': entry['id'],
+                            'name': entry['name'],
+                            'days': entry['days'],
+                            'team': team_name,
+                            'submission_count': team_data['submission_count'],
+                            'interview_count': team_data['interview_count'],
+                            **{key: value for key, value in team_data.get('interview_details', {}).items()},
+                            'project_count': team_data['project_count'],
+                            "status": entry['status']
+                        }
+                        for entry in data
+                        for team_name, team_data in entry['team'].items()
+                    ]
                     url = export_to_csv(
-                        data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                        modified_data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                         "Marketing Consultant Report"
                     )
-            return Response({'data': data, "total": total, "file_url": url}, status=status.HTTP_200_OK)
+            return Response({'data': data, "total": total ,"file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
