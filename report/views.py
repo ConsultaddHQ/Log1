@@ -1364,6 +1364,78 @@ class DetailedReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
+class ConsultantDetailReportViewSets(GenericViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset, url = [], ""
+            serializer = None
+            first, last = get_page_limits(request)
+            export = json.loads(request.GET.get('export', 'false'))
+            type = request.GET.get('type')
+            marketing = ConsultantMarketing.objects.get(
+                id=request.GET.get('id')
+            )
+            if type == 'submission':
+                queryset = Submission.objects.filter(
+                    consultant_marketing=marketing
+                ).exclude(status='cancelled')
+                col_name = [
+                    {"name": "consultant", "display_name": "Consultant"},
+                    {"name": "marketer", "display_name": "Marketer"},
+                    {"name": "client", "display_name": "Client"},
+                    {"name": "vendor", "display_name": "Vendor"},
+                    {"name": "rate", "display_name": "Rate"},
+                    {"name": "is_complete", "display_name": "Is completed"},
+                    {"name": "created", "display_name": "Created"},
+                ]
+                serializer = SubmissionInfoSerializer(queryset if export else queryset[first: last], many=True)
+
+            elif type == 'interview' or type == 'screening':
+                queryset = Interview.objects.filter(
+                    submission__consultant_marketing=marketing,
+                    screening_type__in = ['interview'] if type == 'interview' else ['ip_screening', 'vendor_screening']
+                ).exclude(status='cancelled').distinct('submission').order_by()
+                col_name = [
+                    {"name": "consultant", "display_name": "Consultant"},
+                    {"name": "marketer", "display_name": "Marketer"},
+                    {"name": "start_time", "display_name": "Start Time"},
+                    {"name": "round", "display_name": "Round"},
+                    {"name": "supervisor", "display_name": "Supervisor"},
+                    {"name": "interview_mode", "display_name": "Interview Mode"},
+                    {"name": "status", "display_name": "Status"},
+                ]
+                serializer = InterviewInfoSerializer(queryset if export else queryset[first: last], many=True)
+
+            elif type == 'po':
+                queryset = Project.objects.filter(
+                    submission__consultant_marketing=marketing
+                )
+                col_name = [
+                    {"name": "consultant", "display_name": "Consultant"},
+                    {"name": "marketer", "display_name": "Marketer"},
+                    {"name": "rate", "display_name": "Rate"},
+                    {"name": "status", "display_name": "Status"},
+                    {"name": "project_type", "display_name": "Project Type"},
+                    {"name": "is_remote", "display_name": "Is Remote"},
+                    {"name": "start_date", "display_name": "Start Date"},
+                ]
+                serializer = ProjectInfoSerializer(queryset if export else queryset[first: last], many=True)
+
+            if export:
+                url = export_to_csv(
+                    serializer.data if serializer else [], col_name, 
+                    f"consultant_{type}_detail_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                    request, "Marketing Report"
+                )
+            return Response({"data":  serializer.data if serializer else [], "count": len(queryset), "file_url": url}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
 
 # Route - /engineers/
 class EngineerReportXposedViewSets(GenericViewSet):
