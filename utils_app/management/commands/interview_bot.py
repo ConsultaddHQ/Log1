@@ -62,7 +62,12 @@ class Command(BaseCommand):
             'file_url': create_csv_file(data, "interview_scheduled"),
             "data": data, "title": f"{region} Interviews Scheduled for today",
         }
-        res, msg = slack.interview_data_report(payload, config.slack_usa_interview_update_url)
+        if region == 'USA':
+            url = config.slack_usa_interview_update_url
+        else:
+            url = config.slack_canada_interview_update_url
+
+        res, msg = slack.interview_data_report(payload, url)
         if msg == 'error':
             raise Exception(res)
         return res, msg
