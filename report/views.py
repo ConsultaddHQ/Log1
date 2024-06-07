@@ -1069,25 +1069,49 @@ class MarketingReportViewSets(GenericViewSet):
             data = []
 
             for sup in supervisors:
-                interview_count = Interview.objects.filter(supervisor=sup, start_time__gte=start, start_time__lte=end) \
-                    .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).count()
-                pass_count = Interview.objects.filter(
-                    supervisor=sup, start_time__gte=start, start_time__lte=end, status__in=['next_round', 'offer']
+                interview_querySet = Interview.objects.filter(supervisor=sup, start_time__gte=start, start_time__lte=end) \
+                    .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due'])
+                interview_count = interview_querySet.count()
+                otterAi_total = interview_querySet.filter(call_type__display_name='Otter AI').count()
+                otterAi_pass = interview_querySet.filter(call_type__display_name='Otter AI', status__in=['next_round', 'offer']).count()
+                otterAi_fail = interview_querySet.filter(call_type__display_name='Otter AI',  status='failed').count()
+                otterAi_offer = interview_querySet.filter(call_type__display_name='Otter AI',  status='offer').count()
+                supervisor_offer = interview_querySet.filter(call_type__display_name='Supervisor',  status='offer').count()
+                
+                next_round_count = interview_querySet.filter(status='next_round').count()
+                offer_count = interview_querySet.filter(status='offer').count()
+                # pass_count = Interview.objects.filter(
+                #     supervisor=sup, start_time__gte=start, start_time__lte=end, status__in=['next_round', 'offer']
+                # ).count()
+                fail_count = interview_querySet.filter(status='failed').count()
+                feedback_due_count = Interview.objects.filter(
+                    supervisor=sup, start_time__gte=start, start_time__lte=end, status='feedback_due'
                 ).count()
-                fail_count = Interview.objects.filter(
-                    supervisor=sup, start_time__gte=start, start_time__lte=end, status='failed'
-                ).count()
+
                 data.append({
                     "id": sup.id, "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
-                    "pass": pass_count, "technology": sup.technology, "fail": fail_count,
+                    "otterAi_total": otterAi_total, "otterAi_pass": otterAi_pass, "otterAi_fail": otterAi_fail, 
+                    "otterAi_offer": otterAi_offer, "supervisor_offer": supervisor_offer, "feedback_due_count": feedback_due_count,
+                    "next_round_count": next_round_count, "offer_count": offer_count, 
+                    # "pass": pass_count, 
+                    "technology": sup.technology, "fail": fail_count,
                     "team": sup.team.name if sup.team else None
                 })
             col_name = [
                 {"name": "name", "display_name": "Name"},
                 {"name": "technology", "display_name": "Technology"},
+                {"name": "team", "display_name": "Team"},
                 {"name": "interviews", "display_name": "Total Interview Rounds"},
-                {"name": "pass", "display_name": "Total Passed"},
-                {"name": "fail", "display_name": "Total Failed"}
+                {"name": "otterAi_total", "display_name": "Call By OtterAi"},
+                {"name": "otterAi_pass", "display_name": "OtterAi Call Pass"},
+                {"name": "otterAi_fail", "display_name": "OtterAi Call Fail"},
+                {"name": "feedback_due_count", "display_name": "Feedback Due"},
+                {"name": "next_round_count", "display_name": "Next Round"},
+                {"name": "fail", "display_name": "Failed"},
+                {"name": "offer_count", "display_name": "Offer"},
+                {"name": "otterAi_offer", "display_name": "Offer Call By OtterAi"},
+                {"name": "supervisor_offer", "display_name": "Offer Call By Supervisor"},
+                # {"name": "pass", "display_name": "Total Passed"},
             ]
             url = ""
             if export:
@@ -1095,7 +1119,7 @@ class MarketingReportViewSets(GenericViewSet):
                     data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                     "Marketing Supervisor Report"
                 )
-            return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=status.HTTP_200_OK)
+            return Response({'data': data, "total": supervisors.count(), "columns": col_name, "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
