@@ -1006,18 +1006,16 @@ class MarketingReportViewSets(GenericViewSet):
                 recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
 
                 submission_queryset = Submission.objects.filter(
-                    consultant_marketing__consultant=consultant,
                     consultant_marketing=marketing
-                ).exclude(status='cancelled')
+                )
                 submission_count = submission_queryset.count()
 
                 interview_queryset = Interview.objects.filter(
-                    submission__consultant_marketing__consultant=consultant,
                     submission__consultant_marketing=marketing
                 ).exclude(status='cancelled').distinct('submission').order_by()
                 interview_count = interview_queryset.count()
 
-                project_queryset = Project.objects.filter(consultant=consultant,submission__consultant_marketing=marketing)
+                project_queryset = Project.objects.filter(submission__consultant_marketing=marketing)
                 project_count = project_queryset.count()
 
                 distinct_teams = submission_queryset.values_list('marketing_team__name', flat=True).distinct().order_by('marketing_team__name')
@@ -1036,7 +1034,7 @@ class MarketingReportViewSets(GenericViewSet):
                 data.append({
                     'id': consultant.id, 'days': days, 'teams': teams, 'recruiter': recruiter,
                     'submission_count': submission_count, 'preferred_location': preferred_location, 'email': consultant.email, 
-                    'status': dict(Consultant.CONSULTANT_STATUS_CHOICE).get(consultant.status), 
+                    'status': consultant.get_status_display(), 
                     'project_count': project_count,
                     'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
                     'team': counts_per_team,
@@ -1382,7 +1380,7 @@ class ConsultantDetailReportViewSets(GenericViewSet):
             if type == 'submission':
                 queryset = Submission.objects.filter(
                     consultant_marketing=marketing
-                ).exclude(status='cancelled')
+                )
                 col_name = [
                     {"name": "consultant", "display_name": "Consultant"},
                     {"name": "marketer", "display_name": "Marketer"},
