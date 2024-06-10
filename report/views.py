@@ -1039,41 +1039,40 @@ class MarketingReportViewSets(GenericViewSet):
                     'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
                     'team': counts_per_team,
                 })
-
-                if export:
-                    col_name = [
-                        {"name": "name", "display_name": "Name"},
-                        {"name": "days", "display_name": "Days on Bench"},
-                        {"name": "team", "display_name": "Team Name"},
-                        {"name": "submission_count", "display_name": "Submission"},
-                        {"name": "interview_count", "display_name": "Total Interview"},
-                    ]
-                    col_name.extend(
-                        {'name': choice[0], 'display_name': choice[1]} for choice in Interview.TYPE_CHOICES
-                    )
-                    col_name.extend([
-                        {"name": "project_count", "display_name": "Project"},
-                        {"name": "status", "display_name": "Status"},
-                    ])
-                    modified_data = [
-                        {
-                            'id': entry['id'],
-                            'name': entry['name'],
-                            'days': entry['days'],
-                            'team': team_name,
-                            'submission_count': team_data['submission_count'],
-                            'interview_count': team_data['interview_count'],
-                            **{key: value for key, value in team_data.get('interview_details', {}).items()},
-                            'project_count': team_data['project_count'],
-                            "status": entry['status']
-                        }
-                        for entry in data
-                        for team_name, team_data in entry['team'].items()
-                    ]
-                    url = export_to_csv(
-                        modified_data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
-                        "Marketing Consultant Report"
-                    )
+            if export:
+                col_name = [
+                    {"name": "name", "display_name": "Name"},
+                    {"name": "days", "display_name": "Days on Bench"},
+                    {"name": "team", "display_name": "Team Name"},
+                    {"name": "submission_count", "display_name": "Submission"},
+                    {"name": "interview_count", "display_name": "Total Interview"},
+                ]
+                col_name.extend(
+                    {'name': choice[0], 'display_name': choice[1]} for choice in Interview.TYPE_CHOICES
+                )
+                col_name.extend([
+                    {"name": "project_count", "display_name": "Project"},
+                    {"name": "status", "display_name": "Status"},
+                ])
+                modified_data = [
+                    {
+                        'id': entry['id'],
+                        'name': entry['name'],
+                        'days': entry['days'],
+                        'team': team_name,
+                        'submission_count': team_data['submission_count'],
+                        'interview_count': team_data['interview_count'],
+                        **{key: value for key, value in team_data.get('interview_details', {}).items()},
+                        'project_count': team_data['project_count'],
+                        "status": entry['status']
+                    }
+                    for entry in data
+                    for team_name, team_data in entry['team'].items()
+                ]
+                url = export_to_csv(
+                    modified_data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "Marketing Consultant Report"
+                )
             return Response({'data': data, "total": total ,"file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
