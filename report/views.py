@@ -1030,7 +1030,7 @@ class MarketingReportViewSets(GenericViewSet):
                     'project_count': project_queryset.filter(submission__marketing_team__name=team).count(),
                 } for team in distinct_teams}
                     
-                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                days = (date.today() - marketing.start).days + (marketing.previous_marketing_days if marketing.previous_marketing_days else 0) if marketing.start else None
                 data.append({
                     'id': consultant.id, 'days': days, 'teams': teams, 'recruiter': recruiter,
                     'submission_count': submission_count, 'preferred_location': preferred_location, 'email': consultant.email, 
