@@ -6,6 +6,7 @@ from constance import config
 
 from log1.utils import write_info
 from marketing.models import Interview
+from utils_app.utils import get_slack_tag
 from utils_app.slack_notification import MessageCard as slack
 from utils_app.utils import create_cron_error, create_cron_object, generate_s3_url
 
@@ -53,7 +54,7 @@ class Command(BaseCommand):
             "call_type": "otter.ai" if call_type == "Otter Al" else call_type,
             "marketer": interview.marketer.employee_name, "position": position,
             "consultant": interview.consultant.name, "client": interview.submission.client,
-            "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name
+            "ctb": get_slack_tag(supervisor)
         }
 
     @staticmethod

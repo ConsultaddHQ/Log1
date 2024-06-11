@@ -12,6 +12,7 @@ from employee.models import User
 from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
+from utils_app.utils import get_slack_id, get_slack_tag
 from notification.models import Notification, FCMDevice
 from consultant.models import Consultant, ConsultantPOC
 from consultant.utils import send_notification_for_user
@@ -262,7 +263,7 @@ class ProjectUtil:
         else:
             self.employer = self.project.submission.employer
         marketer = self.project.submission.created_by
-        marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
+        marketer_name = get_slack_tag(marketer, request)
         self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
 
     def fetch_project_count(self, project_status, by_team=False):
@@ -354,12 +355,11 @@ class ProjectUtil:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             if recruiter:
-                recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
+                recruiter_name = get_slack_tag(recruiter)
 
             counts, team_name = self.fetch_project_count("received", True)
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
-            supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
-                                     if interview.supervisor.slack_id else interview.supervisor.employee_name
+            supervisors = ", ".join([f"Round {interview.round} - {get_slack_tag(interview.supervisor)}"
                                     if interview.supervisor.employee_id != 9999
                                     else self.project.submission.consultant.name
                                      for interview, count in zip(interviews, range(0, len(interviews)))
@@ -387,7 +387,7 @@ class ProjectUtil:
             recruiter = self.consultant.recruiter
             total, team_count, team = self.fetch_project_termination_count()
             if recruiter:
-                recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
+                recruiter_name = get_slack_tag(recruiter)
 
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
