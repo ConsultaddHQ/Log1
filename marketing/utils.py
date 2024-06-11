@@ -688,24 +688,33 @@ def create_sup_message_slack_payload(obj: any, request: any = None) -> dict:
         return {}
 
 
+def get_reviewers(tst_feedback: any, request: any) -> list:
+    reviewers = []
+
+    for reviewer_info in tst_feedback.answer.split(", "):
+        reviewer_parts = reviewer_info.split(":")
+        if len(reviewer_parts) > 1 and reviewer_parts[-1].isalnum():
+            employee_id = int(reviewer_parts[-1])
+            user_query = User.objects.filter(employee_id=employee_id)
+            if user_query.exists():
+                reviewers.append(get_slack_tag(user_query.first(), request))
+            else:
+                reviewers.append(reviewer_parts[0])
+        else:
+            reviewers.append(reviewer_parts[0])
+    return reviewers
+
+
 def send_slack_message(test_obj, request):
     try:
+        reviewers = list()
         emoji_dict = {'Passed': ':+1:', 'Failed': ':-1:', 'Cancelled': ":x:"}
         coders = [get_slack_tag(eng) for eng in test_obj.engineer.filter()]
         test_type = test_obj.engineer_feedback.filter(question__title='Select type of test').first().answer
         rating = test_obj.engineer_feedback.filter(question__title='Rate your performance').first().answer
         if test_type.capitalize() == 'Offline':
             reviewed_by_obj = test_obj.engineer_feedback.filter(question__title='Reviewed By').first()
-            reviewers = [
-                get_slack_tag(User.objects.filter(employee_id=int(reviewer_info.split(":")[-1])).first(), request)
-                if len(reviewer_info.split(":")) > 1 and reviewer_info.split(":")[-1].isalnum() and
-                   User.objects.filter(employee_id=int(reviewer_info.split(":")[-1])).exists()
-                else reviewer_info.split(":")[0]
-                for reviewer_info in reviewed_by_obj.answer.split(", ")
-            ]
-
-        else:
-            reviewers = list()
+            reviewers = get_reviewers(reviewed_by_obj, request)
 
         payload = {
             'coders': coders,
