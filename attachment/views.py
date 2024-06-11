@@ -45,14 +45,20 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
     def create(self, request, *args, **kwargs):
         try:
-            content_type = ContentType.objects.get(model=request.data['obj_type'])
+            record_activity = False
+            attachment_type = request.data.get('attachment_type')
+            content_type = ContentType.objects.get(model=request.data.get('obj_type'))
             object_id = request.data['object_id']
-            if content_type.model == 'submission' and request.data['obj_type'] == 'resume':
+
+            if content_type.model == 'submission' and attachment_type == 'resume':
                 resume = Attachment.objects.filter(
                     object_id=object_id, content_type=content_type, attachment_type='resume'
                 )
                 if resume:
                     return Response({"message": "You can't attach multiple resumes"}, status=400)
+                record_activity = True
+            elif content_type.model == 'submission' and attachment_type == 'other':
+                record_activity = True
 
             attachment = Attachment.objects.create(
                 object_id=object_id,
@@ -62,6 +68,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 attachment_type=request.data['attachment_type'],
             )
             serializer = self.serializer_class(attachment)
+
+            if record_activity:
+                desc = f"{attachment.filename} {attachment_type} added by {request.user.employee_name}"
+                create_activity(attachment.object_id, 'submission', request.user, desc, 'created')
 
             if content_type.model != 'project':
                 return Response({"data": serializer.data, "message": "Attachment uploaded"}, status=201)
@@ -85,7 +95,13 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             else:
                 attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
 
-            if attachment.content_type.model != 'project':
+            if attachment.content_type.model == 'submission':
+                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
+                create_activity(attachment.object_id, 'submission', request.user, desc, 'deleted')
+                attachment.attachment_file.delete(save=False)
+                attachment.delete()
+                return Response({"message": "Attachment deleted"}, status=202)
+            elif attachment.content_type.model != 'project':
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
