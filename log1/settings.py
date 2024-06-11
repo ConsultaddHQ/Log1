@@ -342,7 +342,6 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_interview_feedback_url', ('URL', 'Slack Interview Feedback')),
     ('slack_exit_interview_url', ('URL', 'Slack Exit Interview Channel')),
     ('slack_engineering_private_url', ('URL', 'Slack Engineering Private')),
-    ('slack_project_termination_url', ('URL', 'Slack Project Terminations')),
     ('slack_usa_offer_url', ('URL', 'Slack USA Offer Announcement Channel')),
     ('slack_candidate_feedback_url', ('URL', 'Slack Candidate Feedback Channel')),
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
