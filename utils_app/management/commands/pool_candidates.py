@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 from constance import config
 from consultant.models import ConsultantMarketing
 from utils_app.slack_notification import MessageCard
-from utils_app.utils import create_cron_error, create_cron_object
+from utils_app.utils import create_cron_error, create_cron_object, get_slack_tag
 
 
 class Command(BaseCommand):
@@ -38,11 +38,9 @@ class Command(BaseCommand):
                     if con.start:
                         days = (date.today() - con.start).days
                     if con.primary_marketer:
-                        marketer = f'<@{con.primary_marketer.slack_id}>' \
-                            if con.primary_marketer.slack_id else con.primary_marketer.employee_name
+                        marketer = get_slack_tag(con.primary_marketer)
                     if con.recruiter:
-                        recruiter = f'<@{con.consultant.recruiter.slack_id}>' \
-                            if con.consultant.recruiter.slack_id else con.consultant.recruiter.employee_name
+                        recruiter = get_slack_tag(con.recruiter)
                     open_offer_count = con.consultant.projects.filter(
                         statuses__is_current=True, statuses__status__in=['on_boarding', 'received']
                     ).count()

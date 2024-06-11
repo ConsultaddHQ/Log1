@@ -169,4 +169,20 @@ def get_slack_id(user_obj: any, request: any = None) -> str:
         return member_id
     except Exception as error:
         write_exception(error, request)
+        return None
+
+
+def get_slack_tag(user_obj: any, request: any = None) -> str:
+    try:
+        if not user_obj:
+            return "Not Available"
+
+        slack_id = user_obj.slack_id if user_obj.slack_id else get_slack_id(user_obj, request)
+
+        if slack_id:
+            return f"<@{slack_id}>"
+
+        return user_obj.employee_name
+    except Exception as error:
+        write_exception(error, request)
         return user_obj.employee_name
