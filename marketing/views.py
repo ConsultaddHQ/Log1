@@ -781,7 +781,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             lead_id = request.data.get('lead', None)
 
-            if request.FILES.get('file_resume', None):
+            if not request.FILES.get('file_resume', None):
                 return Response({"message": "Please add resume"}, status=400)
 
             if not lead_id:
