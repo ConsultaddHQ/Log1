@@ -780,8 +780,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             lead_id = request.data.get('lead', None)
-
-            if request.FILES.get('file_resume', None):
+            if not request.FILES.get('file_resume', None):
                 return Response({"message": "Please add resume"}, status=400)
 
             if not lead_id:
@@ -2693,8 +2692,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     response, error = download_s3_object(doc.attachment_file.name)
                     if not error:
                         path.append(response)
-                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
-                    "%b. %d, %Y") if test.deadline else 'NA'
+
+                deadline = 'NA'
+                if test.deadline:
+                    if isinstance(test.deadline, datetime):
+                        deadline = test.deadline.strftime("%b. %d, %Y")
+                    elif isinstance(test.deadline, str):
+                        deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime("%b. %d, %Y")
                 mail_data = {
                     'subject': subject,
                     'to': to, 'cc': cc, 'bcc': [],
@@ -3013,7 +3017,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res, error = self.send_test_mail(test, data, 'new', request)
             if error == 'error':
-                write_info(message=res, function='create-send_test_mail', request=request)
+                write_exception(message=res, request=request)
                 return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
