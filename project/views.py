@@ -1212,15 +1212,13 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 return Response({"message": "You do not have access to perform this action"}, status=400)
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             supports = ProjectSupport.objects.filter(project=project)
-            count = supports.count()
             supports.delete()
             desc = f"{request.user.employee_name} deleted support details"
             create_activity(project.id, 'projectsupport', request.user, desc, 'deleted')
-            return Response({"message": "Support has been deleted"}, status=status.HTTP_204_NO_CONTENT)
+            return Response({"message": "Support has been deleted"}, status=202)
         except Exception as error:
             write_exception(error, request)
-            # Return an error response
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
     
     @action(methods=['put'], detail=True, url_path="status")
     def status(self, request, project_id, pk):
