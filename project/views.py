@@ -26,9 +26,9 @@ from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from notification.models import Notification, FCMDevice
-from utils_app.utils import delete_temp_file, export_to_csv, add_export_log
 from marketing.utils import date_filter, get_authenticated_users
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
+from utils_app.utils import delete_temp_file, export_to_csv, add_export_log, get_slack_tag
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from notification.utils import push_notification_consultant
@@ -1397,7 +1397,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 desc = f"{emp_name} added {feedback_type} feedback"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'created')
 
-                employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
+                employee_name = get_slack_tag(request.user)
                 payload = {
                     "activity_title": f"Support marked independent by {employee_name} for below mentioned project",
                     "project_id": project_id,

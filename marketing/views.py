@@ -599,6 +599,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+
 # Route - /submission/
 class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = Submission.objects.all()
@@ -779,6 +780,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             lead_id = request.data.get('lead', None)
+
+            if request.FILES.get('file_resume', None):
+                return Response({"message": "Please add resume"}, status=400)
 
             if not lead_id:
                 position_id = request.data.get('position', None)
