@@ -779,10 +779,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             roles = request.user.roles
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
-            lead_id = request.data.get('lead', None)
+
             if not request.FILES.get('file_resume', None):
                 return Response({"message": "Please add resume"}, status=400)
 
+            lead_id = request.data.get('lead', None)
             if not lead_id:
                 position_id = request.data.get('position', None)
                 if not position_id or position_id == 'null':
@@ -1960,6 +1961,15 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
+            
+            interview_link = request.data.get('interviewer_link', None)
+            interview_recording_link = request.data.get('interview_recording_link', None)
+
+            if not interview_link or (interview_link and len(interview_link.strip()) == 0):
+                return Response({"message": "Invalid value of interview link, Please provide a valid link"}, status=400)
+
+            if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
+                    return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
 
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
