@@ -11,8 +11,8 @@ from django.contrib.contenttypes.models import ContentType
 
 from constance import config
 from activity.models import Activity
-from utils_app.utils import get_timezone
 # from utils_app.mailing import send_email
+from utils_app.utils import get_timezone, get_slack_tag
 from utils_app.thred_mail import send_email as send_email_
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
@@ -384,7 +384,7 @@ def new_recruit_notification(consultant, request):
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
-            recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
+            recruiter_name = get_slack_tag(recruiter)
             if recruiter.gender == 'female':
                 recruiter_gender = ':red_haired_woman::skin-tone-2:'
 

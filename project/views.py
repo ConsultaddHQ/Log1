@@ -26,9 +26,9 @@ from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from notification.models import Notification, FCMDevice
-from utils_app.utils import delete_temp_file, export_to_csv, add_export_log
 from marketing.utils import date_filter, get_authenticated_users
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
+from utils_app.utils import delete_temp_file, export_to_csv, add_export_log, get_slack_tag
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from notification.utils import push_notification_consultant
@@ -1206,6 +1206,20 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    def delete(self, request, *args, **kwargs):
+        try:
+            if 'superadmin' not in request.user.roles and not ('admin' in request.user.roles and 'engineer' in request.user.roles):
+                return Response({"message": "You do not have access to perform this action"}, status=400)
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            supports = ProjectSupport.objects.filter(project=project)
+            supports.delete()
+            desc = f"{request.user.employee_name} deleted support details"
+            create_activity(project.id, 'projectsupport', request.user, desc, 'deleted')
+            return Response({"message": "Support has been deleted"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+    
     @action(methods=['put'], detail=True, url_path="status")
     def status(self, request, project_id, pk):
         try:
@@ -1383,7 +1397,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 desc = f"{emp_name} added {feedback_type} feedback"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'created')
 
-                employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
+                employee_name = get_slack_tag(request.user)
                 payload = {
                     "activity_title": f"Support marked independent by {employee_name} for below mentioned project",
                     "project_id": project_id,

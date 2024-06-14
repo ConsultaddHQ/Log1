@@ -130,14 +130,18 @@ def export_to_csv(payload, columns, filename, request=None, report_type=None):
         for data in payload:
             row_elems = []
             for i in range(0, len(column_name)):
-                if data[column_name[i]] and type(data[column_name[i]]) == list:
-                    if None in data[column_name[i]]:
-                        data[column_name[i]].remove(None)
-                    elif not data[column_name[i]]:
-                        data[column_name[i]] = None
-                    row_elems.append(", ".join(elem for elem in data[column_name[i]]))
+                column_value = data.get(column_name[i], None)
+                if column_value:
+                    if data[column_name[i]] and type(data[column_name[i]]) == list:
+                        if None in data[column_name[i]]:
+                            data[column_name[i]].remove(None)
+                        elif not data[column_name[i]]:
+                            data[column_name[i]] = None
+                        row_elems.append(", ".join(elem for elem in data[column_name[i]]))
+                    else:
+                        row_elems.append(data[column_name[i]])
                 else:
-                    row_elems.append(data[column_name[i]])
+                     row_elems.append('')
             writer.writerow(row_elems)
         file.close()
         file_url = generate_s3_url(file.name, request, report_type)
@@ -163,6 +167,22 @@ def get_slack_id(user_obj: any, request: any = None) -> str:
         member_id = response.get('user', {}).get('id')
         set_member_id(user_obj, member_id, request)
         return member_id
+    except Exception as error:
+        write_exception(error, request)
+        return None
+
+
+def get_slack_tag(user_obj: any, request: any = None) -> str:
+    try:
+        if not user_obj:
+            return "Not Available"
+
+        slack_id = user_obj.slack_id if user_obj.slack_id else get_slack_id(user_obj, request)
+
+        if slack_id:
+            return f"<@{slack_id}>"
+
+        return user_obj.employee_name
     except Exception as error:
         write_exception(error, request)
         return user_obj.employee_name
