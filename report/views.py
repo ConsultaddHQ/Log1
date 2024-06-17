@@ -1011,40 +1011,42 @@ class MarketingReportViewSets(GenericViewSet):
                 submission_count = submission_queryset.count()
 
                 interview_queryset = Interview.objects.filter(
-                    submission__consultant_marketing=marketing,
-                    screening_type='interview'
+                    submission__consultant_marketing=marketing, screening_type='interview'
                 ).exclude(status='cancelled').distinct('submission').order_by()
                 interview_count = interview_queryset.count()
 
                 screening_queryset = Interview.objects.filter(
-                    submission__consultant_marketing=marketing,
-                    screening_type__in=['ip_screening', 'vendor_screening']
+                    submission__consultant_marketing=marketing, screening_type__in=['ip_screening', 'vendor_screening']
                 ).exclude(status='cancelled').distinct('submission').order_by()
                 screening_count = screening_queryset.count()
 
                 project_queryset = Project.objects.filter(submission__consultant_marketing=marketing)
                 project_count = project_queryset.count()
 
-                distinct_teams = submission_queryset.values_list('marketing_team__name', flat=True).distinct().order_by('marketing_team__name')
-                distinct_screening_types = interview_queryset.values_list('screening_type', flat=True).distinct().order_by('screening_type')
-                
+                distinct_teams = submission_queryset.values_list(
+                    'marketing_team__name', flat=True).distinct().order_by('marketing_team__name')
+                distinct_screening_types = interview_queryset.values_list(
+                    'screening_type', flat=True).distinct().order_by('screening_type')
+
                 counts_per_team = {team: {
-                    'submission_count': submission_queryset.filter(marketing_team__name=team).count(), 
+                    'submission_count': submission_queryset.filter(marketing_team__name=team).count(),
                     'interview_count': interview_queryset.filter(submission__marketing_team__name=team).count(),
                     'interview_details': {
-                        screening: interview_queryset.filter(submission__marketing_team__name=team,screening_type=screening
-                    ).count() for screening in distinct_screening_types},
+                        screening: interview_queryset.filter(
+                            submission__marketing_team__name=team, screening_type=screening
+                        ).count() for screening in distinct_screening_types},
                     'project_count': project_queryset.filter(submission__marketing_team__name=team).count(),
                 } for team in distinct_teams}
-                    
-                days = (date.today() - marketing.start).days + (marketing.previous_marketing_days if marketing.previous_marketing_days else 0) if marketing.start else None
+
+                days = (date.today() - marketing.start).days + (
+                    marketing.previous_marketing_days if
+                    marketing.previous_marketing_days else 0) if marketing.start else None
                 data.append({
-                    'id': consultant.id, 'days': days, 'teams': teams, 'recruiter': recruiter,
-                    'submission_count': submission_count, 'preferred_location': preferred_location, 'email': consultant.email, 
-                    'status': consultant.get_status_display(), 
-                    'project_count': project_count,
-                    'phone_no': consultant.phone_no, 'interview_count': interview_count, 'screening_count': screening_count, 'name': consultant.name,
-                    'team': counts_per_team,
+                    'id': consultant.id, 'name': consultant.name, 'team': counts_per_team,
+                    'email': consultant.email, 'status': consultant.get_status_display(),
+                    'submission_count': submission_count, 'preferred_location': preferred_location,
+                    'days': days, 'teams': teams, 'recruiter': recruiter, 'screening_count': screening_count,
+                    'phone_no': consultant.phone_no, 'interview_count': interview_count, 'project_count': project_count
                 })
             if export:
                 col_name = [
@@ -1052,7 +1054,7 @@ class MarketingReportViewSets(GenericViewSet):
                     {"name": "days", "display_name": "Days on Bench"},
                     {"name": "team", "display_name": "Team Name"},
                     {"name": "submission_count", "display_name": "Submission"},
-                    {"name": "interview_count", "display_name": "Total Interview"},
+                    {"name": "interview_count", "display_name": "Total Interview"}
                 ]
                 col_name.extend(
                     {'name': choice[0], 'display_name': choice[1]} for choice in Interview.TYPE_CHOICES
@@ -1063,15 +1065,11 @@ class MarketingReportViewSets(GenericViewSet):
                 ])
                 modified_data = [
                     {
-                        'id': entry['id'],
-                        'name': entry['name'],
-                        'days': entry['days'],
-                        'team': team_name,
-                        'submission_count': team_data['submission_count'],
-                        'interview_count': team_data['interview_count'],
+                        'id': entry['id'], 'name': entry['name'],
+                        'project_count': team_data['project_count'], 'days': entry['days'],
+                        'team': team_name, 'submission_count': team_data['submission_count'],
+                        'interview_count': team_data['interview_count'], 'status': entry['status'],
                         **{key: value for key, value in team_data.get('interview_details', {}).items()},
-                        'project_count': team_data['project_count'],
-                        "status": entry['status']
                     }
                     for entry in data
                     for team_name, team_data in entry['team'].items()
@@ -1080,7 +1078,7 @@ class MarketingReportViewSets(GenericViewSet):
                     modified_data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                     "Marketing Consultant Report"
                 )
-            return Response({'data': data, "total": total ,"file_url": url}, status=status.HTTP_200_OK)
+            return Response({'data': data, "total": total, "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
@@ -1116,15 +1114,18 @@ class MarketingReportViewSets(GenericViewSet):
             data = []
 
             for sup in supervisors:
-                interview_querySet = Interview.objects.filter(supervisor=sup, start_time__gte=start, start_time__lte=end) \
+                interview_querySet = Interview.objects.filter(supervisor=sup, start_time__gte=start,
+                                                              start_time__lte=end) \
                     .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due'])
                 interview_count = interview_querySet.count()
                 otterAi_total = interview_querySet.filter(call_type__display_name='Otter AI').count()
-                otterAi_pass = interview_querySet.filter(call_type__display_name='Otter AI', status__in=['next_round', 'offer']).count()
-                otterAi_fail = interview_querySet.filter(call_type__display_name='Otter AI',  status='failed').count()
-                otterAi_offer = interview_querySet.filter(call_type__display_name='Otter AI',  status='offer').count()
-                supervisor_offer = interview_querySet.filter(call_type__display_name='Supervisor',  status='offer').count()
-                
+                otterAi_pass = interview_querySet.filter(call_type__display_name='Otter AI',
+                                                         status__in=['next_round', 'offer']).count()
+                otterAi_fail = interview_querySet.filter(call_type__display_name='Otter AI', status='failed').count()
+                otterAi_offer = interview_querySet.filter(call_type__display_name='Otter AI', status='offer').count()
+                supervisor_offer = interview_querySet.filter(call_type__display_name='Supervisor',
+                                                             status='offer').count()
+
                 next_round_count = interview_querySet.filter(status='next_round').count()
                 offer_count = interview_querySet.filter(status='offer').count()
                 # pass_count = Interview.objects.filter(
@@ -1136,12 +1137,11 @@ class MarketingReportViewSets(GenericViewSet):
                 ).count()
 
                 data.append({
-                    "id": sup.id, "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
-                    "otterAi_total": otterAi_total, "otterAi_pass": otterAi_pass, "otterAi_fail": otterAi_fail, 
-                    "otterAi_offer": otterAi_offer, "supervisor_offer": supervisor_offer, "feedback_due_count": feedback_due_count,
-                    "next_round_count": next_round_count, "offer_count": offer_count, 
-                    # "pass": pass_count, 
-                    "technology": sup.technology, "fail": fail_count,
+                    "id": sup.id, "name": sup.employee_name, "technology": sup.technology,
+                    "next_round_count": next_round_count, "supervisor_offer": supervisor_offer,
+                    "offer_count": offer_count, "interviews": interview_count, "email": sup.email,
+                    "otterAi_total": otterAi_total, "otterAi_pass": otterAi_pass, "otterAi_fail": otterAi_fail,
+                    "otterAi_offer": otterAi_offer, "feedback_due_count": feedback_due_count, "fail": fail_count,
                     "team": sup.team.name if sup.team else None
                 })
             col_name = [
@@ -1166,7 +1166,8 @@ class MarketingReportViewSets(GenericViewSet):
                     data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                     "Marketing Supervisor Report"
                 )
-            return Response({'data': data, "total": supervisors.count(), "columns": col_name, "file_url": url}, status=status.HTTP_200_OK)
+            return Response({'data': data, "total": supervisors.count(), "columns": col_name, "file_url": url},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
@@ -1368,6 +1369,7 @@ class DetailedReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
+
 class ConsultantDetailReportViewSets(GenericViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -1401,7 +1403,7 @@ class ConsultantDetailReportViewSets(GenericViewSet):
             elif type == 'interview' or type == 'screening':
                 queryset = Interview.objects.filter(
                     submission__consultant_marketing=marketing,
-                    screening_type__in = ['interview'] if type == 'interview' else ['ip_screening', 'vendor_screening']
+                    screening_type__in=['interview'] if type == 'interview' else ['ip_screening', 'vendor_screening']
                 ).exclude(status='cancelled').distinct('submission').order_by()
                 col_name = [
                     {"name": "consultant", "display_name": "Consultant"},
@@ -1431,11 +1433,12 @@ class ConsultantDetailReportViewSets(GenericViewSet):
 
             if export:
                 url = export_to_csv(
-                    serializer.data if serializer else [], col_name, 
+                    serializer.data if serializer else [], col_name,
                     f"consultant_{type}_detail_{datetime.now().strftime('%d-%B-%Y')}.csv",
                     request, "Marketing Report"
                 )
-            return Response({"data":  serializer.data if serializer else [], "count": len(queryset), "file_url": url}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data if serializer else [], "count": len(queryset), "file_url": url},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
