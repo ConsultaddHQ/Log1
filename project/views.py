@@ -687,7 +687,7 @@ class ProjectViewSets(ModelViewSet):
             consultant = create_remote_consultant(request)
             if consultant:
                 project.consultant = consultant
-            project.is_remote = request.data.get('is_remote', False)
+            project.is_remote = request.data.get('is_remote', project.is_remote)
             project.save()
 
             if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "Joined":
