@@ -1011,9 +1011,16 @@ class MarketingReportViewSets(GenericViewSet):
                 submission_count = submission_queryset.count()
 
                 interview_queryset = Interview.objects.filter(
-                    submission__consultant_marketing=marketing
+                    submission__consultant_marketing=marketing,
+                    screening_type='interview'
                 ).exclude(status='cancelled').distinct('submission').order_by()
                 interview_count = interview_queryset.count()
+
+                screening_queryset = Interview.objects.filter(
+                    submission__consultant_marketing=marketing,
+                    screening_type__in=['ip_screening', 'vendor_screening']
+                ).exclude(status='cancelled').distinct('submission').order_by()
+                screening_count = screening_queryset.count()
 
                 project_queryset = Project.objects.filter(submission__consultant_marketing=marketing)
                 project_count = project_queryset.count()
@@ -1036,7 +1043,7 @@ class MarketingReportViewSets(GenericViewSet):
                     'submission_count': submission_count, 'preferred_location': preferred_location, 'email': consultant.email, 
                     'status': consultant.get_status_display(), 
                     'project_count': project_count,
-                    'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
+                    'phone_no': consultant.phone_no, 'interview_count': interview_count, 'screening_count': screening_count, 'name': consultant.name,
                     'team': counts_per_team,
                 })
             if export:
