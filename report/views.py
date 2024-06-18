@@ -751,6 +751,7 @@ class MarketingReportViewSets(GenericViewSet):
                     "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
+            if export:
                 col_name = [
                     {"name": "employee_name", "display_name": "Employee Name"},
                     {"name": "team", "display_name": "Team Name"},
@@ -760,11 +761,10 @@ class MarketingReportViewSets(GenericViewSet):
                     {"name": "offer", "display_name": "Offer"},
                     {"name": "consultant_assigned", "display_name": "Consultant Assigned"},
                 ]
-                if export:
-                    url = export_to_csv(
-                        data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv",
-                        request, "Marketing Report"
-                    )
+                url = export_to_csv(
+                    data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                    request, "Marketing Report"
+                )
             return Response({"data": data, "total": total, "file_url": url}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
