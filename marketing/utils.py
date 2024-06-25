@@ -328,7 +328,7 @@ def structure_mail_data(data):
         else:
             if item.get('question') == 'Reviewed By':
                 if item.get('answer', None):
-                    item['answer'] = item.get('answer', None).split(":")[0]
+                    item['answer'] = ", ".join(i.split(":")[0] for i in item.get('answer').split(","))
                 else:
                     continue
             single_questions.append(item)
