@@ -40,7 +40,7 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate, \
-    check_has_active, update_leave_status
+    check_has_active, update_leave_status, share_po_stakeholder_info
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
@@ -729,6 +729,7 @@ class ProjectViewSets(ModelViewSet):
                     activity_created = True
                     project.is_msg_sent = True
                     project.save()
+                    share_po_stakeholder_info(project, request)
 
                 # Project Joined
                 elif new_status == 'joined':

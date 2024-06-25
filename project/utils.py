@@ -1,9 +1,9 @@
 import os
 import json
 
-from django.db.models import Q
 from pytz import timezone
 from django.utils import timezone as tz
+from django.db.models import Q, QuerySet
 from datetime import datetime, timedelta, date
 from django.shortcuts import get_object_or_404
 
@@ -360,14 +360,14 @@ class ProjectUtil:
             counts, team_name = self.fetch_project_count("received", True)
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
             supervisors = ", ".join([f"Round {interview.round} - {get_slack_tag(interview.supervisor)}"
-                                    if interview.supervisor.employee_id != 9999
-                                    else self.project.submission.consultant.name
+                                     if interview.supervisor.employee_id != 9999
+                                     else self.project.submission.consultant.name
                                      for interview, count in zip(interviews, range(0, len(interviews)))
                                      if interview.supervisor])
 
             payload = {
                 "client": self.project.submission.client, "consultant": self.consultant.name,
-                "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
+                "city": self.project.city, "supervisors": supervisors, "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": counts.get('total_count'), "employer": self.employer,
                 "team": team_name, "recruiter_name": recruiter_name, "project_start": self.project_start,
                 "team_count": counts.get('team_count'), "project_type": self.project.submission.get_work_type_display(),
@@ -402,7 +402,7 @@ class ProjectUtil:
                 slack_url = config.slack_canada_joining_termination
 
             payload = {
-                "recruiter_name": recruiter_name, "status": status, "reason": reason,  "team": team,
+                "recruiter_name": recruiter_name, "status": status, "reason": reason, "team": team,
                 "sub_title": activity_sub_title, "activity_text": self.activity_text, "total": total,
                 "months": months, "employer": self.employer, "city": self.project.city, "slack_url": slack_url,
                 "submission_id": self.project.submission.id, "project_id": self.project.id, "team_count": team_count
@@ -836,5 +836,120 @@ def send_leave_expire_notification(consultant, po_obj, request):
                 object_id__in=list(object_ids), content_type__model='consultanttoken'
             ).values_list('device_id', flat=True))
         push_notification_consultant(registration_ids, message_body)
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_user_info(user_obj):
+    if not user_obj:
+        return dict()
+    return {
+        "EmpID": user_obj.employee_id,
+        "EmpTeam": user_obj.team.name,
+        "EmpName": user_obj.employee_name
+    }
+
+
+def get_employee_info(user):
+    if isinstance(user, (list, QuerySet)):
+        user = [v for v in user if v is not None]
+        if all(isinstance(obj, int) for obj in user):
+            user_objs = User.objects.filter(employee_id__in=user)
+            emp_info = [get_user_info(user_obj) for user_obj in user_objs]
+        else:
+            emp_info = [get_user_info(obj) for obj in user]
+        return emp_info
+
+    if isinstance(user, int):
+        user = User.objects.filter(employee_id=user).first()
+        if not user:
+            return None
+
+    return get_user_info(user)
+
+
+def get_timestamp(date_time):
+    if isinstance(date_time, str):
+        date_time = datetime.strptime(date_time, "%Y-%m-%d")
+    elif isinstance(date_time, date):
+        date_time = datetime.combine(date_time, datetime.min.time())
+    elif not date_time:
+        return None
+    return date_time.timestamp()
+
+
+def get_datetime(date_time):
+    if not date_time:
+        return None
+    elif isinstance(date_time, str):
+        date_time = datetime.strptime(date_time, "%Y-%m-%d")
+        return date_time.strftime("%b. %d, %Y")
+    return date_time.strftime("%b. %d, %Y")
+
+
+def get_stakeholders_involved(project):
+    marketing_team = project.submission.marketing_team.name
+    if marketing_team != 'Consultadd Canada':
+        vp = User.objects.filter(employee_id__in=[2572, 2491, 2667])
+    else:
+        vp = get_object_or_404(User, employee_id=2452)
+    recruiter_poc = ConsultantPOC.objects.filter(
+        consultant=project.submission.consultant, poc_type__iexact='Recruiter', end=None
+    ).first()
+    recruiter = recruiter_poc.poc if recruiter_poc else None
+    support_persons = project.support.filter(is_proxy_support=False).values_list('support', flat=True)
+    team_lead = User.objects.filter(
+        role__name='admin', team=project.submission.marketing_team, is_active=True, account_login=True
+    ).first()
+    supervisors = project.submission.screening.exclude(status='cancelled').values_list(
+        'supervisor__employee_id', flat=True
+    )
+    coders = project.submission.screening.exclude(status='cancelled').values_list('guests__user__employee_id',
+                                                                                  flat=True)
+    stakeholders = {
+        "vp": get_employee_info(vp),
+        "coders": get_employee_info(coders),
+        "TeamLead": get_employee_info(team_lead),
+        "Recruiter": get_employee_info(recruiter),
+        "Supervisor": get_employee_info(supervisors),
+        "SupportPerson": get_employee_info(support_persons),
+        "Marketer": get_employee_info(project.submission.created_by)
+    }
+    return stakeholders
+
+
+def share_po_stakeholder_info(project, request=None):
+    try:
+        start_date_timestamp, start_date_datetime = get_timestamp(project.start_date), get_datetime(project.start_date)
+        received_at = project.statuses.filter(status='received').first()
+        received_at_timestamp, received_at_datetime = \
+            (get_timestamp(received_at.created), get_datetime(received_at.created)) \
+                if received_at else (get_timestamp(datetime.now()), get_datetime(datetime.now()))
+        joined_at = project.statuses.filter(status='joined').first()
+        joined_at_timestamp, joined_at_datetime = (get_timestamp(joined_at.created), get_datetime(joined_at.created)) \
+            if joined_at else (None, None)
+
+        stakeholder_data = {
+            "ProjectID": project.id,
+            "JoinedDate": joined_at_timestamp,
+            "JoinedDateStr": joined_at_datetime,
+            "Client": project.submission.client,
+            "POStartDate": start_date_timestamp,
+            "POStartDateStr": start_date_datetime,
+            "SubmissionID": project.submission.id,
+            "ProjectCurrentStatus": project.status,
+            "CreatedAT": datetime.now().timestamp(),
+            "ModifiedAT": datetime.now().timestamp(),
+            "OfferReceivedDate": received_at_timestamp,
+            "OfferReceivedDateStr": received_at_datetime,
+            "ConsultantName": project.submission.consultant.name,
+            "WorkType": project.submission.get_work_type_display(),
+            "MarketingTeam": project.submission.marketing_team.name,
+            "StakeHolderInvolved": get_stakeholders_involved(project),
+            "MarketerEmpID": project.submission.created_by.employee_id,
+            "MarketerName": project.submission.created_by.employee_name,
+            "MarketerTeamName": project.submission.created_by.team.name
+        }
+        return stakeholder_data
     except Exception as error:
         write_exception(error, request)
