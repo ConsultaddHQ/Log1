@@ -326,6 +326,11 @@ def structure_mail_data(data):
             else:
                 parent_questions_data[item['parent_question']].append(item)
         else:
+            if item.get('question') == 'Reviewed By':
+                if item.get('answer', None):
+                    item['answer'] = item.get('answer', None).split(":")[0]
+                else:
+                    continue
             single_questions.append(item)
     return single_questions, parent_questions_data
 
