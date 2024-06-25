@@ -486,6 +486,7 @@ class Interview(TimeStampedModel):
     screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    interview_recording_link = models.TextField(_('Interview Recording Link'), null=True, blank=True)
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
         max_length=80, choices=FAILURE_CHOICES),

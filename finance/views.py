@@ -974,7 +974,8 @@ class LeaveBalanceViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
             for leave in leaves:
                 leave_exit = ConsultantLeave.objects.filter(
-                    consultant_id=consultant_id, year=leave.get('year', date.today().year), leave_type=leave.get('id')
+                    consultant_id=consultant_id, leave_type=leave.get('id'),
+                    year=leave.get('year', date.today().year), on_hold=False
                 )
                 if leave_exit:
                     continue

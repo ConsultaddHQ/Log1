@@ -124,13 +124,12 @@ class ConsultantV2ViewSets(ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            if sort_by in ['name', '-created']:
-                consultants = consultants.order_by(sort_by)
-            data = list()
-            for i in consultants.exclude(status='terminated'):
-                data.append(i)
-            for i in consultants.filter(status='terminated'):
-                data.append(i)
+            order_by = sort_by if sort_by == 'name ' else '-created'
+
+            active_consultants = consultants.exclude(status='terminated').order_by(order_by)
+            terminated_consultants = consultants.filter(status='terminated').order_by(order_by)
+            data = list(active_consultants) + list(terminated_consultants)
+
             serializer = ConsultantV2ListSerializer(data[first:last], many=True)
             return Response({"count": count, "data": serializer.data}, status=200)
         except Exception as error:
