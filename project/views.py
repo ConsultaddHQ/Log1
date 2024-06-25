@@ -438,6 +438,10 @@ class ProjectViewSets(ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                projects = projects.filter(Q(submission__created_by=request.user) | Q(submission__consultant_marketing__consultant__internal_user_profile=request.user))
+
             if filter_json and json.loads(filter_json):
                 filters = json.loads(filter_json)
 
