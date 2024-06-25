@@ -94,6 +94,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         choices=WORK_TYPE_CHOICE,
         default='full_time'
     )
+    internal_user_profile = models.ForeignKey(User,related_name='internal_user_profile', on_delete=models.CASCADE, blank=True, null=True) 
 
     # fields for Legal
     p_is_active = models.BooleanField(default=False)
