@@ -417,6 +417,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
             users = get_authenticated_users(request)
 
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+ 
             if (sub.created_by in users) or (
                     request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
@@ -556,6 +561,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def tests(self, request, pk):
         try:
             submission = get_object_or_404(Submission, id=pk)
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(submission and not (submission.created_by==request.user or submission.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+
             serializer = TestGetSerializer(submission.test.all(), many=True, context={'user': request.user})
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -580,11 +590,27 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def project(self, request, pk):
         try:
             submission = get_object_or_404(Submission, id=pk)
+
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(submission and not (submission.created_by==request.user or submission.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+
             if hasattr(submission, 'project'):
                 serializer = ProjectV2Serializer(submission.project, context={'user': request.user})
                 return Response({"data": serializer.data}, status=200)
             else:
                 return Response({"message": "Project not found"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='call_details')
+    def interview_call_details(self, request, pk):
+        try:
+            submission = get_object_or_404(Submission, id=pk)
+            serializer = self.serializer_class(submission)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -696,6 +722,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                             Q(consultant_marketing__consultant__in=consultant_ids)
                         )
 
+            if "usa_employee" in roles: 
+                queryset = queryset.filter(Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user))
+                
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
@@ -769,8 +798,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             roles = request.user.roles
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
-            lead_id = request.data.get('lead', None)
 
+            if not request.FILES.get('file_resume', None):
+                return Response({"message": "Please add resume"}, status=400)
+
+            lead_id = request.data.get('lead', None)
             if not lead_id:
                 position_id = request.data.get('position', None)
                 if not position_id or position_id == 'null':
@@ -1948,6 +1980,15 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
+            
+            interview_link = request.data.get('interviewer_link', None)
+            interview_recording_link = request.data.get('interview_recording_link', None)
+
+            if not interview_link or (interview_link and len(interview_link.strip()) == 0):
+                return Response({"message": "Invalid value of interview link, Please provide a valid link"}, status=400)
+
+            if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
+                    return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
 
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
@@ -2680,8 +2721,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     response, error = download_s3_object(doc.attachment_file.name)
                     if not error:
                         path.append(response)
-                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
-                    "%b. %d, %Y") if test.deadline else 'NA'
+
+                deadline = 'NA'
+                if test.deadline:
+                    if isinstance(test.deadline, datetime):
+                        deadline = test.deadline.strftime("%b. %d, %Y")
+                    elif isinstance(test.deadline, str):
+                        deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime("%b. %d, %Y")
                 mail_data = {
                     'subject': subject,
                     'to': to, 'cc': cc, 'bcc': [],
@@ -2843,7 +2889,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                       submission__consultant_marketing__in_pool=False) |
                     Q(submission__consultant_marketing__in_pool=True)
                 )
-
+            elif 'usa_employee' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__in_pool=True) |
+                    Q(submission__consultant_marketing__marketer=request.user) |
+                    Q(submission__created_by=request.user)
+                )
             elif 'marketer' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__in_pool=True) |
@@ -3000,7 +3051,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res, error = self.send_test_mail(test, data, 'new', request)
             if error == 'error':
-                write_info(message=res, function='create-send_test_mail', request=request)
+                write_exception(message=res, request=request)
                 return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)

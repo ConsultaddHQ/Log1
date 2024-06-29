@@ -23,7 +23,7 @@ from notification.models import FCMDevice, UserNotification
 from marketing.serializers import InterviewerProfileSerializer
 from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile, GuestInfo
 
-from utils_app.utils import get_slack_id
+from utils_app.utils import get_slack_tag
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from notification.utils import push_notification_consultant, create_notification
@@ -326,6 +326,11 @@ def structure_mail_data(data):
             else:
                 parent_questions_data[item['parent_question']].append(item)
         else:
+            if item.get('question') == 'Reviewed By':
+                if item.get('answer', None):
+                    item['answer'] = ", ".join(i.split(":")[0] for i in item.get('answer').split(","))
+                else:
+                    continue
             single_questions.append(item)
     return single_questions, parent_questions_data
 
@@ -412,8 +417,7 @@ def interview_card_data(obj, request):
                 }
                 supervisor_feedback_data.append(sup_feedback)
             supervisor_feedback_data.insert(
-                0, {"question": "Supervisor Name",
-                    "answer": f"<@{supervisor.slack_id}>" if supervisor.slack_id else f"`{supervisor}`"}
+                0, {"question": "Supervisor Name", "answer": get_slack_tag(supervisor, request)}
             )
             sup_feedback = " \n ".join(
                 f"*{feedback['question']}*:  {feedback['answer']}"
@@ -436,7 +440,7 @@ def interview_card_data(obj, request):
                 }
                 coding_feedback_data.append(coding_feedback)
             guest = " ".join([
-                f"`<@{i.user.slack_id}>`" if i.user.slack_id else f"`{i.user.employee_name}`"
+                f"`{get_slack_tag(i.user)}`"
                 for i in obj.guests.filter(type__in=['Coder', 'Coder & Assistant', 'Assistant'])
             ])
             coding_feedback_data.insert(0, {"question": "Coders Name", "answer": guest if guest else "NA"})
@@ -689,28 +693,33 @@ def create_sup_message_slack_payload(obj: any, request: any = None) -> dict:
         return {}
 
 
+def get_reviewers(tst_feedback: any, request: any) -> list:
+    reviewers = []
+
+    for reviewer_info in tst_feedback.answer.split(", "):
+        reviewer_parts = reviewer_info.split(":")
+        if len(reviewer_parts) > 1 and reviewer_parts[-1].isalnum():
+            employee_id = int(reviewer_parts[-1])
+            user_query = User.objects.filter(employee_id=employee_id)
+            if user_query.exists():
+                reviewers.append(get_slack_tag(user_query.first(), request))
+            else:
+                reviewers.append(reviewer_parts[0])
+        else:
+            reviewers.append(reviewer_parts[0])
+    return reviewers
+
+
 def send_slack_message(test_obj, request):
     try:
+        reviewers = list()
         emoji_dict = {'Passed': ':+1:', 'Failed': ':-1:', 'Cancelled': ":x:"}
+        coders = [get_slack_tag(eng) for eng in test_obj.engineer.filter()]
         test_type = test_obj.engineer_feedback.filter(question__title='Select type of test').first().answer
         rating = test_obj.engineer_feedback.filter(question__title='Rate your performance').first().answer
-        coders = [
-            f'<@{eng.slack_id}>' if eng.slack_id else f'<@{get_slack_id(eng)}>'
-            if not get_slack_id(eng).isalpha() else eng.employee_name
-            for eng in test_obj.engineer.filter()
-        ]
         if test_type.capitalize() == 'Offline':
             reviewed_by_obj = test_obj.engineer_feedback.filter(question__title='Reviewed By').first()
-            reviewers = [
-                f'<@{get_slack_id(User.objects.filter(employee_id=int(reviewer_info.split(":")[-1])).first(), request)}>'
-                if len(reviewer_info.split(":")) > 1 and reviewer_info.split(":")[-1].isalnum() and
-                   User.objects.filter(employee_id=int(reviewer_info.split(":")[-1])).exists()
-                else reviewer_info.split(":")[0]
-                for reviewer_info in reviewed_by_obj.answer.split(", ")
-            ]
-
-        else:
-            reviewers = list()
+            reviewers = get_reviewers(reviewed_by_obj, request)
 
         payload = {
             'coders': coders,
@@ -724,10 +733,10 @@ def send_slack_message(test_obj, request):
             'cancel_reason': test_obj.cancel_reason,
             'coder_remark': test_obj.engineer_remarks,
             'vendor': test_obj.submission.vendor.name,
+            'marketer': get_slack_tag(test_obj.marketer),
             'emoji': emoji_dict.get(test_obj.get_status_display()),
             'consultant_name': test_obj.submission.consultant.name,
-            'test_url': f'{config.APP_URL}#/details/{test_obj.submission.id}/test?id={test_obj.id}',
-            'marketer': f'<@{test_obj.marketer.slack_id}>' if test_obj.marketer.slack_id else test_obj.marketer.employee_name,
+            'test_url': f'{config.APP_URL}#/details/{test_obj.submission.id}/test?id={test_obj.id}'
         }
         res, msg = slack.send_test_feedback(payload, config.slack_test_channel_url)
         return res
