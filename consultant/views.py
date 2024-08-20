@@ -243,16 +243,16 @@ class ConsultantViewSets(ModelViewSet):
                         Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
                         Q(marketing__marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open') |
-                        Q(pocs__poc=request.user)
+                        Q(pocs__poc=request.user, marketing__status='open')
                     )
 
                 elif 'marketer' in request.user.roles:
                     recruits = Consultant.objects.none()
                     if 'recruiter' in roles:
-                        recruits = consultants.filter(pocs__poc=request.user)
+                        recruits = consultants.filter(pocs__poc=request.user, marketing__status='open')
                     consultants = consultants.filter(
-                        Q(marketing__marketer=request.user) |
-                        Q(marketing__primary_marketer=request.user) |
+                        Q(marketing__marketer=request.user, marketing__status='open') |
+                        Q(marketing__primary_marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open')
                     )
                     consultants = (consultants | recruits).distinct()
