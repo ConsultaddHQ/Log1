@@ -127,7 +127,7 @@ class ProjectStatus(models.Model):
         ("cancelled-contract_conflicts", "Contract Conflicts"),
         ("cancelled-candidate_absconded", "Candidate Absconded"),
         ("cancelled-candidate_denied", "Candidate Denied Joining"),
-        ("cancelled_candidate_denied_jd", "Candidate Denied Joining - JD"),
+        ("cancelled-candidate_denied_jd", "Candidate Denied Joining - JD"),
         ("cancelled-candidate_denied_rate", "Candidate Denied Joining - Rate"),
         ("cancelled-candidate_denied_location", "Candidate Denied Joining - Location"),
 
