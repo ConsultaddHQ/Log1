@@ -206,6 +206,9 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                                 "round": interview.round,
                                 "interview_id": interview.id,
                                 "schedule": interview.end_time,
+                                "marketer": {
+                                    "name": interview.submission.created_by.employee_name,
+                                },
                                 "consultant": {
                                     "name": interview.submission.consultant_marketing.consultant.name,
                                 },
