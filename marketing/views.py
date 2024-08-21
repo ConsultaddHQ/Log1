@@ -3454,7 +3454,7 @@ class QuestionViewSets(ModelViewSet):
             value = request.GET.get('value', None)
             if not value:
                 return Response({"message": "value is empty"}, status=400)
-            if int(value) > 10:
+            if int(value) > 15:
                 return Response({"message": "Maximum coding questions limit is 10"}, status=400)
             no_of_questions = int(value)
             cq = question.child_question.first()

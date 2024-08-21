@@ -234,22 +234,25 @@ class ConsultantViewSets(ModelViewSet):
             consultants = Consultant.objects.all()
             roles = request.user.roles
 
-            if 'superadmin' not in roles:
+            if 'usa_employee' in roles:
+                consultants = consultants.filter(internal_user_profile=request.user, marketing__status='open')
+
+            elif 'superadmin' not in roles:
                 if 'admin' in roles or 'proxy' in roles:
                     consultants = consultants.filter(
                         Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
                         Q(marketing__marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open') |
-                        Q(pocs__poc=request.user)
+                        Q(pocs__poc=request.user, marketing__status='open')
                     )
 
                 elif 'marketer' in request.user.roles:
                     recruits = Consultant.objects.none()
                     if 'recruiter' in roles:
-                        recruits = consultants.filter(pocs__poc=request.user)
+                        recruits = consultants.filter(pocs__poc=request.user, marketing__status='open')
                     consultants = consultants.filter(
-                        Q(marketing__marketer=request.user) |
-                        Q(marketing__primary_marketer=request.user) |
+                        Q(marketing__marketer=request.user, marketing__status='open') |
+                        Q(marketing__primary_marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open')
                     )
                     consultants = (consultants | recruits).distinct()
@@ -258,11 +261,11 @@ class ConsultantViewSets(ModelViewSet):
                     recruits = consultants.filter(pocs__poc=request.user)
                     consultants = (consultants | recruits).distinct()
 
+            else:
+                consultants = consultants.filter(marketing__status='open').exclude(status='terminated')
+
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
-            else:
-                consultants = consultants.filter(marketing__status='open').exclude(
-                    status='terminated')
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
