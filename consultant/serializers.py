@@ -477,14 +477,20 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 
 class ConsultantListSerializer(serializers.ModelSerializer):
     profiles = serializers.SerializerMethodField()
+    marketing_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'profiles', 'marketing_status')
 
     @staticmethod
     def get_profiles(obj):
         return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
-    class Meta:
-        model = Consultant
-        fields = ('id', 'name', 'email', 'profiles')
+    @staticmethod
+    def get_marketing_status(obj):
+        marketing_qs = obj.marketing.filter().order_by('-id')
+        return marketing_qs.first().get_status_display() if marketing_qs.first() else "NotActive"
 
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
