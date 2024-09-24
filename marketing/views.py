@@ -18,6 +18,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CR
 
 from marketing.utils import *
 from marketing.serializers import *
+from project.utils import share_po_stakeholder_info
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
@@ -125,12 +126,15 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
+        name = request.data.get('data', None)
         email = request.data.get('email', None)
         company = request.data.get('company', None)
         if not company:
             return Response({"message": "Select company"}, status=400)
 
-        vendor = VendorContact.objects.filter(email__iexact=email, created_by=request.user, company_id=company)
+        vendor = VendorContact.objects.filter(
+            created_by=request.user, company_id=company, email__iexact=email, name__iexact=name
+        )
         if vendor:
             return Response({"message": "Already exists"}, status=400)
         try:
@@ -840,7 +844,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             else:
                 submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by__in=users)
+
+            export_incentive_project_data = False
             prev_work_type = submission.work_type
+            prev_client = submission.client
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -869,6 +876,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 submission.save()
                 project = Project.objects.filter(submission=submission)
                 if project and prev_work_type != serializer.data['work_type']:
+                    export_incentive_project_data = True
                     status = project.first().statuses.filter(is_current=True, status='joined')
                     if status:
                         scrum_master = User.objects.filter(
@@ -884,6 +892,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                                     f"project's project type for to {submission.get_work_type_display()}\n\nThanks\nRegards\nThe Log1 Team"
                         }
                         send_email_without_template(mail_data, request.user.email, request=request)
+                if project and prev_client != serializer.data['client']:
+                    export_incentive_project_data = True
+                if export_incentive_project_data:
+                    share_po_stakeholder_info(project.first(), request)
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
@@ -2189,7 +2201,7 @@ class InterviewViewSets(ModelViewSet):
                 interview.supervisor.employee_id not in [1001, 9999]
             ])
             if sup_condition:
-                return Response({"message": "Please ask supervisor to cancel this round"}, status=404)
+                return Response({"message": "Please ask supervisor to cancel this round"}, status=400)
 
             marketer_condition = all([
                 (interview.status in ['scheduled', 'rescheduled'] or interview.round <= 1),
@@ -3430,7 +3442,7 @@ class QuestionViewSets(ModelViewSet):
             value = request.GET.get('value', None)
             if not value:
                 return Response({"message": "value is empty"}, status=400)
-            if int(value) > 10:
+            if int(value) > 15:
                 return Response({"message": "Maximum coding questions limit is 10"}, status=400)
             no_of_questions = int(value)
             cq = question.child_question.first()

@@ -240,7 +240,7 @@ class ConsultantViewSets(ModelViewSet):
                         Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
                         Q(marketing__marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open') |
-                        Q(pocs__poc=request.user)
+                        Q(pocs__poc=request.user, marketing__status='open')
                     )
 
                 elif 'marketer' in request.user.roles:
@@ -258,11 +258,10 @@ class ConsultantViewSets(ModelViewSet):
                     recruits = consultants.filter(pocs__poc=request.user)
                     consultants = (consultants | recruits).distinct()
 
+            else:
+                consultants = consultants.filter(marketing__status='open').exclude(status='terminated')
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
-            else:
-                consultants = consultants.filter(marketing__status='open').exclude(
-                    status='terminated')
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
