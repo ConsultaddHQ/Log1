@@ -183,7 +183,7 @@ def create_message(from_email, mail_data):
                 message[key] = ','.join(active_users.get(key, []))
 
         else:
-            message['to'] = ','.join(['piyush.y@consultadd.com', 'shreyas.k@consultadd.com', 'gufran.a@consultadd.com'])
+            message['to'] = ','.join(['akshay.s@consultadd.com', 'shreyas.k@consultadd.com', 'snehal.s@consultadd.com'])
             message['cc'] = ''
             message['bcc'] = ''
 
