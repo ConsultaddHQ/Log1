@@ -203,7 +203,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
             for key in email_recipients.keys():
                 obj[key] = ','.join(active_users.get(key, []))
         else:
-            obj['cc'] = ','.join(['gufran.a@consultadd.com'])
+            obj['cc'] = ','.join(['snehal.s@consultadd.com'])
             obj['bcc'] = ','.join(['shivam.k@consultadd.com'])
             obj['to'] = ','.join(['shreyas.k@consultadd.com'])
         return obj, None

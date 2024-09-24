@@ -421,6 +421,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
             users = get_authenticated_users(request)
 
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+ 
             if (sub.created_by in users) or (
                     request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
@@ -560,6 +565,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def tests(self, request, pk):
         try:
             submission = get_object_or_404(Submission, id=pk)
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(submission and not (submission.created_by==request.user or submission.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+
             serializer = TestGetSerializer(submission.test.all(), many=True, context={'user': request.user})
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -584,6 +594,12 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def project(self, request, pk):
         try:
             submission = get_object_or_404(Submission, id=pk)
+
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(submission and not (submission.created_by==request.user or submission.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+
             if hasattr(submission, 'project'):
                 serializer = ProjectV2Serializer(submission.project, context={'user': request.user})
                 return Response({"data": serializer.data}, status=200)
@@ -710,6 +726,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                             Q(consultant_marketing__consultant__in=consultant_ids)
                         )
 
+            if "usa_employee" in roles: 
+                queryset = queryset.filter(Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user))
+                
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
@@ -2882,7 +2901,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                       submission__consultant_marketing__in_pool=False) |
                     Q(submission__consultant_marketing__in_pool=True)
                 )
-
+            elif 'usa_employee' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__in_pool=True) |
+                    Q(submission__consultant_marketing__marketer=request.user) |
+                    Q(submission__created_by=request.user)
+                )
             elif 'marketer' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__in_pool=True) |
