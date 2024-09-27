@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date
 
@@ -1524,3 +1525,138 @@ class MessageCard:
             return card_data, True
         except Exception as error:
             return error, False
+
+    @staticmethod
+    def techtrust_customized_interview_update(payload):
+        card_data = {
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f":clipboard: {payload.get('title')}",
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"`Date : {date.today()}`"
+                    }
+                },
+                {
+                    "type": "divider"
+                }
+            ]
+        }
+
+        # Loop through each interview in the JSON data
+        screening_type_headers = payload['data'].keys()
+        for header in screening_type_headers:
+            if not payload['data'][header]:
+                continue
+            card_data['blocks'].append(
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"{header}",
+                        "emoji": True
+                    }
+                }
+            )
+            sl = 1
+            for screening_data in payload['data'][header]:
+                vendor = screening_data['vendor']
+                client = screening_data['client']
+                position = screening_data['position']
+                consultant = screening_data['consultant']
+                total_rounds = screening_data['total_rounds']
+
+                # Adding Interview info block
+                card_data['blocks'].append({
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*`{sl}.`* *Total round:* `{total_rounds}`\n\t\t*Vendor:* {vendor}\n\t\t*Client:* {client}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Consultant:* {consultant}\n*Position:* {position}"
+                        }
+                    ]
+                })
+
+                # Adding Interviewer info block
+                if not screening_data['interviewers']:
+                    interviewer_info_text = "*Interviewers Info not available*"
+                else:
+                    interviewer_info_text = "*Interviewers Info*"
+                card_data['blocks'].append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": interviewer_info_text
+                    }
+                })
+
+                for i, interviewer in enumerate(screening_data['interviewers']):
+                    interviewer_info = []
+
+                    if interviewer.get('name'):
+                        interviewer_info.append(f"*Name:* {interviewer['name']}")
+
+                    if interviewer.get('email'):
+                        interviewer_info.append(f"*Email:* {interviewer['email']}")
+
+                    if interviewer.get('linkedin'):
+                        interviewer_info.append(f"*Linkedin:* {interviewer['linkedin']}")
+
+                    # If there is no interviewer info to show, skip the entry
+                    if interviewer_info:
+                        card_data['blocks'].append({
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"*•* " + "\n".join(interviewer_info)
+                            }
+                        })
+                    sl += 1
+                # Adding divider between interview entries
+                card_data['blocks'].append({
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"\n\n\n"
+                            }
+                        })
+                card_data['blocks'].append({"type": "divider"})
+                card_data['blocks'].append({
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"\n"
+                            }
+                        })
+
+        # Adding button at the end
+        card_data['blocks'].append({
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Download CSV",
+                        "emoji": True
+                    },
+                    "value": "click_me_123",
+                    "action_id": "actionId-0"
+                }
+            ]
+        })
+        cd = json.dumps(card_data)
+        print(cd)
+        return True, True
