@@ -254,6 +254,7 @@ class ProjectViewSets(ModelViewSet):
                 'subject': f'On Boarding of {consultant.name} :: {project.employer} :: {project_start_date} :: '
                            f'{submission.client} :: {submission.vendor.name}',
                 'context': {
+                    'project_type': submission.get_work_type_display(),
                     'marketer_name': submission.created_by.employee_name, 'employer': employer,
                     'job_title': submission.lead.job_title, 'vendor_number': vendor_contact.number,
                     'client_address': project.client_address, 'vendor_address': project.vendor_address,

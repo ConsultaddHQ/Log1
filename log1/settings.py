@@ -347,6 +347,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
     ('slack_consultadd_compete_url', ('URL', 'Slack Consultadd Compete Channel')),
     ('slack_canada_offer_url', ('URL', 'Slack Canada Offer Announcement Channel')),
+    ('slack_tech_trust_url', ('URL', 'Slack TechTrust Interview Updates Channel ')),
     ('slack_usa_interview_update_url', ('URL', 'Slack USA Interview Update Channel')),
     ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
     ('slack_usa_joining_termination', ('URL', 'Slack USA Joining Termination Channel')),
@@ -378,6 +379,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url', 'slack_recruitment_url',
         'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
         'slack_engineering_private_url', 'slack_consultadd_compete_url', 'slack_test_channel_url',
-        'slack_canada_joining_termination', 'slack_usa_joining_termination'
+        'slack_canada_joining_termination', 'slack_usa_joining_termination', 'slack_tech_trust_url'
     )
 }
+
