@@ -114,7 +114,6 @@ class Command(BaseCommand):
                     ]
 
             # Generate CSV URL
-            breakpoint()
             csv_url = get_csv_file_url(slack_data)
 
             slack.tech_trust_customized_interview_update({
