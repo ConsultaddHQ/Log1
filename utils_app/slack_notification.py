@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date
 
@@ -1332,13 +1333,13 @@ class MessageCard:
 
             if payload.get('type').capitalize() == 'Offline':
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Reviewed By:*   {reviewed_by} \n" \
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                                       f"*Reviewed By:*   {reviewed_by} \n" \
+                                       f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                       f"*Feedback*:  {payload.get('coder_remark')}"
             else:
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                                       f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                       f"*Feedback*:  {payload.get('coder_remark')}"
 
             if payload.get('emoji') == ":x:":
                 block_header = "Reason of Cancellation"
@@ -1524,3 +1525,142 @@ class MessageCard:
             return card_data, True
         except Exception as error:
             return error, False
+
+    @staticmethod
+    def tech_trust_customized_interview_update(payload: dict) -> bool:
+        try:
+            card_data = {}
+            header_title = ""
+            # Pre-defined header block for the card
+            header_block = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": header_title,
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*`Date : {date.today()}`*"
+                    }
+                },
+                {
+                    "type": "divider"
+                }
+            ]
+
+            # Iterate over each interview screening type
+            screening_type_headers = payload.get('data', {}).keys()
+            for header in screening_type_headers:
+                if not payload['data'].get(header):
+                    continue  # Skip if no data for this header
+
+                # Update header title with the current screening type
+                header_block[0]['text'].update({'text': f":clipboard: Today's {header} Report"})
+
+                # Determine portions to split the data
+                content_len = len(payload['data'][header])
+                portions = (content_len + 14) // 15  # Ensure correct rounding for portions
+
+                # Initialize index boundaries
+                first, last = 0, 15
+
+                for portion in range(portions):
+                    # Create a new block for the card
+                    card_data['blocks'] = []
+
+                    # If data is available for this portion, add the header
+                    if payload['data'][header][first: last]:
+                        card_data['blocks'].extend(header_block)
+                    else:
+                        continue  # Skip if no data for this portion
+
+                    # Process each screening data in the current portion
+                    for screening_data in payload['data'][header][first: last]:
+                        vendor = screening_data.get('vendor', 'N/A')
+                        client = screening_data.get('client', 'N/A')
+                        position = screening_data.get('position', 'N/A')
+                        consultant = screening_data.get('consultant', 'N/A')
+                        total_rounds = screening_data.get('total_rounds', 'N/A')
+
+                        # Adding Interview info block
+                        card_data['blocks'].extend([
+                            {
+                                "type": "section",
+                                "fields": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*`Total Rounds: {total_rounds}`*"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "section",
+                                "fields": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*Vendor:* {vendor}\n*Client:* {client}"
+                                    },
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*Consultant:* {consultant}\n*Position:* {position}"
+                                    }
+                                ]
+                            }
+                        ])
+
+                        # Adding Interviewer info block
+                        interviewers = screening_data.get('interviewers', [])
+                        if not interviewers:
+                            interviewer_info_text = ":busts_in_silhouette: *Interviewers information not available*"
+                        else:
+                            interviewer_info_text = ":busts_in_silhouette: *Interviewers Info*"
+                            for idx, profile_info in enumerate(interviewers, start=1):
+                                name = profile_info.get('name', '')
+                                email = f"[{profile_info.get('email')}] " if profile_info.get('email') else ""
+                                linkedin = f":link: <{profile_info.get('linkedin')}|LinkedIn>" if profile_info.get(
+                                    'linkedin') else ""
+                                interviewer_info_text += f"\n *{idx}. * {name} {email}{linkedin}"
+
+                        card_data['blocks'].extend([
+                            {
+                                "type": "section",
+                                "text": {"type": "mrkdwn", "text": interviewer_info_text}
+                            },
+                            {
+                                "type": "divider"
+                            }
+                        ])
+
+                    # Adding Download CSV button at the end
+                    card_data['blocks'].append({
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Download CSV",
+                                    "emoji": True
+                                },
+                                "value": f"Download CSV File",
+                                "url": f"{payload.get('csv_url', '')}",
+                                "action_id": "actionId-0"
+                            }
+                        ]
+                    })
+
+                    # Post the message using webhook
+                    post_msg_using_webhook(config.slack_tech_trust_url, card_data)
+
+                    # Update the range for the next portion
+                    first = last
+                    last = first + 15
+
+            return True
+        except Exception:
+            return False

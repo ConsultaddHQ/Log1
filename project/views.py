@@ -18,6 +18,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
+from cryptography.fernet import Fernet
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -40,7 +41,7 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push, get_country, assign_project_associates, update_project_associate, \
-    check_has_active, update_leave_status
+    check_has_active, update_leave_status, share_po_stakeholder_info
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, ProjectAssociatesSerializer
@@ -254,6 +255,7 @@ class ProjectViewSets(ModelViewSet):
                 'subject': f'On Boarding of {consultant.name} :: {project.employer} :: {project_start_date} :: '
                            f'{submission.client} :: {submission.vendor.name}',
                 'context': {
+                    'project_type': submission.get_work_type_display(),
                     'marketer_name': submission.created_by.employee_name, 'employer': employer,
                     'job_title': submission.lead.job_title, 'vendor_number': vendor_contact.number,
                     'client_address': project.client_address, 'vendor_address': project.vendor_address,
@@ -658,14 +660,14 @@ class ProjectViewSets(ModelViewSet):
         project_id = kwargs.get('pk')
         try:
             err = None
-            is_mail_sent = False
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             util = ProjectUtil(project, request)
             prev_employer = project.employer
             prev_consultant_id = project.consultant.id
             prev_status_obj = project.statuses.get(is_current=True)
-            prev_rate, prev_start_date = project.rate, project.start_date
+            is_mail_sent, export_incentive_project_data = False, False
+            prev_rate, prev_start_date, prev_end_date = project.rate, project.start_date, project.end_date
             all_status, cancellation_status, termination_status = fetch_project_status()
 
             if new_status not in all_status:
@@ -732,10 +734,12 @@ class ProjectViewSets(ModelViewSet):
                     util.send_receive_notification()
                     activity_created = True
                     project.is_msg_sent = True
+                    export_incentive_project_data = True
                     project.save()
 
                 # Project Joined
                 elif new_status == 'joined':
+                    export_incentive_project_data = True
                     project.consultant.status = 'on_project'
                     activity_created = True
                     project.consultant.save()
@@ -769,6 +773,8 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
+                    if 'received' in project.statuses.filter().values_list('status', flat=True):
+                        export_incentive_project_data = True
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
@@ -782,6 +788,7 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
+                    export_incentive_project_data = True
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
@@ -795,6 +802,7 @@ class ProjectViewSets(ModelViewSet):
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
+                    export_incentive_project_data = True
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
@@ -814,14 +822,20 @@ class ProjectViewSets(ModelViewSet):
 
             if str(prev_start_date) != str(project.start_date):
                 activity_created = True
+                export_incentive_project_data = True
                 desc = f"Purchase order start_date is updated form {prev_start_date} to {prev_start_date}"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+
+            if str(prev_end_date) != str(project.end_date):
+                export_incentive_project_data = True
 
             if not activity_created:
                 desc = f"Purchase order is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            serializer = self.serializer_class(project)
 
+            if export_incentive_project_data:
+                share_po_stakeholder_info(project, request)
+            serializer = self.serializer_class(project)
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
