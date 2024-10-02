@@ -1333,13 +1333,13 @@ class MessageCard:
 
             if payload.get('type').capitalize() == 'Offline':
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Reviewed By:*   {reviewed_by} \n" \
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                                       f"*Reviewed By:*   {reviewed_by} \n" \
+                                       f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                       f"*Feedback*:  {payload.get('coder_remark')}"
             else:
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                                       f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                       f"*Feedback*:  {payload.get('coder_remark')}"
 
             if payload.get('emoji') == ":x:":
                 block_header = "Reason of Cancellation"
@@ -1527,14 +1527,17 @@ class MessageCard:
             return error, False
 
     @staticmethod
-    def techtrust_customized_interview_update(payload):
-        card_data = {
-            "blocks": [
+    def tech_trust_customized_interview_update(payload: dict) -> bool:
+        try:
+            card_data = {}
+            header_title = ""
+            # Pre-defined header block for the card
+            header_block = [
                 {
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f":clipboard: {payload.get('title')}",
+                        "text": header_title,
                         "emoji": True
                     }
                 },
@@ -1542,121 +1545,122 @@ class MessageCard:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"`Date : {date.today()}`"
+                        "text": f"*`Date : {date.today()}`*"
                     }
                 },
                 {
                     "type": "divider"
                 }
             ]
-        }
 
-        # Loop through each interview in the JSON data
-        screening_type_headers = payload['data'].keys()
-        for header in screening_type_headers:
-            if not payload['data'][header]:
-                continue
-            card_data['blocks'].append(
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": f"{header}",
-                        "emoji": True
-                    }
-                }
-            )
-            sl = 1
-            for screening_data in payload['data'][header]:
-                vendor = screening_data['vendor']
-                client = screening_data['client']
-                position = screening_data['position']
-                consultant = screening_data['consultant']
-                total_rounds = screening_data['total_rounds']
+            # Iterate over each interview screening type
+            screening_type_headers = payload.get('data', {}).keys()
+            for header in screening_type_headers:
+                if not payload['data'].get(header):
+                    continue  # Skip if no data for this header
 
-                # Adding Interview info block
-                card_data['blocks'].append({
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*`{sl}.`* *Total round:* `{total_rounds}`\n\t\t*Vendor:* {vendor}\n\t\t*Client:* {client}"
-                        },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*Consultant:* {consultant}\n*Position:* {position}"
-                        }
-                    ]
-                })
+                # Update header title with the current screening type
+                header_block[0]['text'].update({'text': f":clipboard: Today's {header} Report"})
 
-                # Adding Interviewer info block
-                if not screening_data['interviewers']:
-                    interviewer_info_text = "*Interviewers Info not available*"
-                else:
-                    interviewer_info_text = "*Interviewers Info*"
-                card_data['blocks'].append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": interviewer_info_text
-                    }
-                })
+                # Determine portions to split the data
+                content_len = len(payload['data'][header])
+                portions = (content_len + 14) // 15  # Ensure correct rounding for portions
 
-                for i, interviewer in enumerate(screening_data['interviewers']):
-                    interviewer_info = []
+                # Initialize index boundaries
+                first, last = 0, 15
 
-                    if interviewer.get('name'):
-                        interviewer_info.append(f"*Name:* {interviewer['name']}")
+                for portion in range(portions):
+                    # Create a new block for the card
+                    card_data['blocks'] = []
 
-                    if interviewer.get('email'):
-                        interviewer_info.append(f"*Email:* {interviewer['email']}")
+                    # If data is available for this portion, add the header
+                    if payload['data'][header][first: last]:
+                        card_data['blocks'].extend(header_block)
+                    else:
+                        continue  # Skip if no data for this portion
 
-                    if interviewer.get('linkedin'):
-                        interviewer_info.append(f"*Linkedin:* {interviewer['linkedin']}")
+                    # Process each screening data in the current portion
+                    for screening_data in payload['data'][header][first: last]:
+                        vendor = screening_data.get('vendor', 'N/A')
+                        client = screening_data.get('client', 'N/A')
+                        position = screening_data.get('position', 'N/A')
+                        consultant = screening_data.get('consultant', 'N/A')
+                        total_rounds = screening_data.get('total_rounds', 'N/A')
 
-                    # If there is no interviewer info to show, skip the entry
-                    if interviewer_info:
-                        card_data['blocks'].append({
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": f"*•* " + "\n".join(interviewer_info)
+                        # Adding Interview info block
+                        card_data['blocks'].extend([
+                            {
+                                "type": "section",
+                                "fields": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*`Total Rounds: {total_rounds}`*"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "section",
+                                "fields": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*Vendor:* {vendor}\n*Client:* {client}"
+                                    },
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": f"*Consultant:* {consultant}\n*Position:* {position}"
+                                    }
+                                ]
                             }
-                        })
-                    sl += 1
-                # Adding divider between interview entries
-                card_data['blocks'].append({
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": f"\n\n\n"
-                            }
-                        })
-                card_data['blocks'].append({"type": "divider"})
-                card_data['blocks'].append({
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": f"\n"
-                            }
-                        })
+                        ])
 
-        # Adding button at the end
-        card_data['blocks'].append({
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Download CSV",
-                        "emoji": True
-                    },
-                    "value": "click_me_123",
-                    "action_id": "actionId-0"
-                }
-            ]
-        })
-        cd = json.dumps(card_data)
-        print(cd)
-        return True, True
+                        # Adding Interviewer info block
+                        interviewers = screening_data.get('interviewers', [])
+                        if not interviewers:
+                            interviewer_info_text = ":busts_in_silhouette: *Interviewers information not available*"
+                        else:
+                            interviewer_info_text = ":busts_in_silhouette: *Interviewers Info*"
+                            for idx, profile_info in enumerate(interviewers, start=1):
+                                name = profile_info.get('name', '')
+                                email = f"[{profile_info.get('email')}] " if profile_info.get('email') else ""
+                                linkedin = f":link: <{profile_info.get('linkedin')}|LinkedIn>" if profile_info.get(
+                                    'linkedin') else ""
+                                interviewer_info_text += f"\n *{idx}. * {name} {email}{linkedin}"
+
+                        card_data['blocks'].extend([
+                            {
+                                "type": "section",
+                                "text": {"type": "mrkdwn", "text": interviewer_info_text}
+                            },
+                            {
+                                "type": "divider"
+                            }
+                        ])
+
+                    # Adding Download CSV button at the end
+                    card_data['blocks'].append({
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Download CSV",
+                                    "emoji": True
+                                },
+                                "value": f"Download CSV File",
+                                "url": f"{payload.get('csv_url', '')}",
+                                "action_id": "actionId-0"
+                            }
+                        ]
+                    })
+
+                    # Post the message using webhook
+                    post_msg_using_webhook(config.slack_tech_trust_url, card_data)
+
+                    # Update the range for the next portion
+                    first = last
+                    last = first + 15
+
+            return True
+        except Exception:
+            return False

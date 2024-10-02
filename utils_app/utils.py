@@ -47,6 +47,7 @@ def generate_s3_url(filename, request=None, export_type=None):
         s3.put_object(Body=file, Key=f'{file.name}', ContentType='application/csv',
                       Bucket=f'{os.getenv("AWS_REPORT_STORAGE_BUCKET_NAME")}')
         file_url = f"https://{os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME')}.s3.ap-south-1.amazonaws.com/{file.name}"
+
         delete_temp_file([file.name])
         return file_url
     except Exception as error:
