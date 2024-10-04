@@ -1529,14 +1529,14 @@ class MessageCard:
     def tech_trust_customized_interview_update(payload: dict) -> bool:
         try:
             card_data = {}
-            header_title = ""
+            message_card_sent = False
             # Pre-defined header block for the card
             header_block = [
                 {
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": header_title,
+                        "text": f":clipboard: Today's Interview Report",
                         "emoji": True
                     }
                 },
@@ -1559,7 +1559,7 @@ class MessageCard:
                     continue  # Skip if no data for this header
 
                 # Update header title with the current screening type
-                header_block[0]['text'].update({'text': f":clipboard: Today's {header} Report"})
+                # header_block[0]['text'].update({'text': f":clipboard: Today's {header} Report"})
 
                 # Determine portions to split the data
                 content_len = len(payload['data'][header])
@@ -1580,10 +1580,10 @@ class MessageCard:
 
                     # Process each screening data in the current portion
                     for screening_data in payload['data'][header][first: last]:
-                        vendor = screening_data.get('vendor', 'N/A')
+                        end = screening_data.get('end_time', 'N/A')
                         client = screening_data.get('client', 'N/A')
+                        start = screening_data.get('start_time', 'N/A')
                         position = screening_data.get('position', 'N/A')
-                        consultant = screening_data.get('consultant', 'N/A')
                         total_rounds = screening_data.get('total_rounds', 'N/A')
 
                         # Adding Interview info block
@@ -1593,20 +1593,11 @@ class MessageCard:
                                 "fields": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"*`Total Rounds: {total_rounds}`*"
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "section",
-                                "fields": [
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": f"*Vendor:* {vendor}\n*Client:* {client}"
+                                        "text": f"*`Total Rounds: {total_rounds}`*\n*Client:* {client}"
                                     },
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"*Consultant:* {consultant}\n*Position:* {position}"
+                                        "text": f"*`{start} - {end}`*\n*Position:* {position}"
                                     }
                                 ]
                             }
@@ -1652,14 +1643,18 @@ class MessageCard:
                             }
                         ]
                     })
-
                     # Post the message using webhook
                     post_msg_using_webhook(config.slack_tech_trust_url, card_data)
-
-                    # Update the range for the next portion
+                    message_card_sent = True
                     first = last
                     last = first + 15
 
+            if not message_card_sent:
+                header_block.append(
+                    {"type": "section", "text": {"type": "mrkdwn", "text": "*No Interviews Scheduled.*"}}
+                )
+                card_data.update({'blocks': header_block})
+                post_msg_using_webhook(config.slack_tech_trust_url, card_data)
             return True
-        except Exception:
+        except Exception as e:
             return False

@@ -50,7 +50,7 @@ def get_csv_file_url(slack_data):
                         'Screening Type': interview_type, 'Client': interview['client'],
                         'Total Rounds': interview['total_rounds'], 'Vendor': interview['vendor'],
                         'Position': interview['position'], 'Consultant': interview['consultant'],
-                        'Start Date': interview['start_date'], 'End Date': interview['end_time'],
+                        'Start Date': interview['start_time'], 'End Date': interview['end_time'],
                         'Interviewers': interviewer_info_text
                     })
 
@@ -78,8 +78,8 @@ class Command(BaseCommand):
                 "vendor": interview.submission.vendor.name,
                 "position": position,
                 "consultant": interview.consultant.name,
-                "start_date": interview.start_time,
-                "end_time": interview.end_time,
+                "start_time": interview.start_time.strftime("%I:%M %p"),
+                "end_time": interview.end_time.strftime("%I:%M %p"),
                 "client": interview.submission.client
             }
         except Exception as e:
@@ -94,24 +94,27 @@ class Command(BaseCommand):
             today_date = tz.localize(datetime.now()).date()
 
             # Define the screening types we are processing
-            screening_types = [
-                ('interview', 'Interview'),
-                ('ip_screening', 'IP Screening'),
-                ('vendor_screening', 'Vendor Tech Screening')
-            ]
+            # screening_types = [
+            #     ('interview', 'Interview'),
+            #     ('ip_screening', 'IP Screening'),
+            #     ('vendor_screening', 'Vendor Tech Screening')
+            # ]
 
             # Query to fetch interviews scheduled for today (customize date for dynamic filtering)
-            interviews = Interview.objects.filter(
-                start_time__date=today_date, status__in=['scheduled', 'rescheduled']
+            interview_qs = Interview.objects.filter(
+                start_time__date=today_date, status__in=['scheduled', 'rescheduled'], screening_type='interview'
             ).order_by('start_time')
 
             # Iterate over each screening type and extract interviews
-            for screening_type_key, screening_type_value in screening_types:
-                interviews_by_type = interviews.filter(screening_type=screening_type_key)
-                if interviews_by_type.exists():
-                    slack_data[screening_type_value] = [
-                        self.get_slack_message_card_data(interview) for interview in interviews_by_type
-                    ]
+            # for screening_type_key, screening_type_value in screening_types:
+            #     interviews_by_type = interviews.filter(screening_type=screening_type_key)
+            #     if interviews_by_type.exists():
+            #         slack_data[screening_type_value] = [
+            #             self.get_slack_message_card_data(interview) for interview in interviews_by_type
+            #         ]
+            slack_data["Interview"] = [
+                self.get_slack_message_card_data(interview) for interview in interview_qs
+            ]
 
             # Generate CSV URL
             csv_url = get_csv_file_url(slack_data)
