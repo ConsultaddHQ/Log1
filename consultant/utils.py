@@ -2,6 +2,8 @@ import os
 import json
 from operator import or_
 from functools import reduce
+
+import requests
 from django.db.models import Q
 from django.utils import timezone
 from datetime import date, datetime, timedelta
@@ -835,4 +837,22 @@ def create_and_send_notification(consultant, feedback, title, user_list, request
         return False
     except Exception as error:
         write_exception(message=error, request=request)
+        return str(error)
+
+
+def add_recruiter_incentive_info(obj):
+    try:
+        qs = ConsultantPOC.objects.filter(consultant=obj, poc_type='recruiter')
+        if qs:
+            recruiter_emp_id = qs.first().poc.employee_id
+            candidate_name = obj.name
+            candidate_email = obj.email
+            recruiter_data = {
+                "emp_id": recruiter_emp_id, "candidate_name": candidate_name, "candidate_email": candidate_email
+            }
+            requests.post(f"{config.INCENTIVE_URL}/trigger/recruiter_info", json=recruiter_data)
+        else:
+            return False
+    except Exception as error:
+        write_exception(message=error)
         return str(error)

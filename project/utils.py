@@ -54,6 +54,7 @@ def create_remote_consultant(request):
                 consultant.is_active = True
                 consultant.remote_only = True
                 consultant.gender = user.gender
+                consultant.internal_employee = True
                 consultant.name = user.employee_name
                 consultant.save()
             else:
@@ -1012,7 +1013,7 @@ def share_po_stakeholder_info(project, request=None):
             "MarketingTeamQueryName": get_query_name(project.submission.created_by.team.name),
             "WorkType": "W2" if project.submission.get_work_type_display() != "C2C" else "C2C"
         }
-        requests.post(config.INCENTIVE_URL, json=stakeholder_data)
+        requests.post(f"{config.INCENTIVE_URL}/trigger/project", json=stakeholder_data)
         return stakeholder_data
     except Exception as error:
         write_exception(error, request)
