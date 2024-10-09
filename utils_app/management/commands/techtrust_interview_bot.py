@@ -1,6 +1,6 @@
 import os
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.management import BaseCommand
 
@@ -26,10 +26,10 @@ def get_csv_file_url(slack_data):
     """Generate a CSV file for interview data and return its S3 URL."""
     header = [
         'Screening Type', 'Client', 'Total Rounds', 'Vendor', 'Position',
-        'Consultant', 'Start Date', 'End Date', 'Interviewers'
+        'Consultant', 'Start Time', 'End Time', 'Interviewers'
     ]
 
-    file_name = f"TechTrustInterviewReport_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    file_name = f"TechTrustInterviewReport_{(datetime.now().date()-timedelta(days=1)).strftime('%Y-%m-%d')}.csv"
     try:
         with open(f"{file_name}", mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=header)
@@ -50,7 +50,7 @@ def get_csv_file_url(slack_data):
                         'Screening Type': interview_type, 'Client': interview['client'],
                         'Total Rounds': interview['total_rounds'], 'Vendor': interview['vendor'],
                         'Position': interview['position'], 'Consultant': interview['consultant'],
-                        'Start Date': interview['start_time'], 'End Date': interview['end_time'],
+                        'Start Time': interview['start_time'], 'End Time': interview['end_time'],
                         'Interviewers': interviewer_info_text
                     })
 
@@ -72,7 +72,7 @@ class Command(BaseCommand):
             position = interview.submission.lead.position.display_name \
                 if interview.submission.lead.position else interview.submission.lead.job_title
             return {
-                "total_rounds": interview.submission.screening.order_by('round').first().round,
+                "total_rounds": interview.round,
                 "interviewers": get_interviewers_details(interview),
                 "type": interview.get_screening_type_display(),
                 "vendor": interview.submission.vendor.name,
@@ -91,7 +91,7 @@ class Command(BaseCommand):
         try:
             from pytz import timezone
             tz = timezone('EST')
-            today_date = tz.localize(datetime.now()).date()
+            prev_date = tz.localize(datetime.now()).date() - timedelta(days=1)
 
             # Define the screening types we are processing
             # screening_types = [
@@ -102,7 +102,7 @@ class Command(BaseCommand):
 
             # Query to fetch interviews scheduled for today (customize date for dynamic filtering)
             interview_qs = Interview.objects.filter(
-                start_time__date=today_date, status__in=['scheduled', 'rescheduled'], screening_type='interview'
+                start_time__date=prev_date, status__in=['scheduled', 'rescheduled'], screening_type='interview'
             ).order_by('start_time')
 
             # Iterate over each screening type and extract interviews

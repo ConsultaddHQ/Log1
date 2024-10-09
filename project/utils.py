@@ -53,6 +53,7 @@ def create_remote_consultant(request):
                 consultant.is_active = True
                 consultant.remote_only = True
                 consultant.gender = user.gender
+                consultant.internal_employee = True
                 consultant.name = user.employee_name
                 consultant.save()
             else:
