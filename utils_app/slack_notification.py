@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, timedelta
 
 from constance import config
 from marketing.models import Interview
@@ -1536,7 +1536,7 @@ class MessageCard:
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f":clipboard: Today's Interview Report",
+                        "text": f":clipboard: Yesterday's Interview Report",
                         "emoji": True
                     }
                 },
@@ -1544,7 +1544,7 @@ class MessageCard:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"*`Date : {date.today()}`*"
+                        "text": f"*`Date : {date.today()-timedelta(days=1)}`*"
                     }
                 },
                 {
