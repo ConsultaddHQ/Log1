@@ -1,5 +1,6 @@
 import os
 import csv
+from pytz import timezone
 from datetime import datetime, timedelta
 
 from django.core.management import BaseCommand
@@ -26,7 +27,7 @@ def get_csv_file_url(slack_data):
     """Generate a CSV file for interview data and return its S3 URL."""
     header = [
         'Screening Type', 'Client', 'Total Rounds', 'Vendor', 'Position',
-        'Consultant', 'Start Time', 'End Time', 'Interviewers'
+        'Consultant', 'Start Time', 'End Time', 'Job Location', 'Interviewers'
     ]
 
     file_name = f"TechTrustInterviewReport_{(datetime.now().date()-timedelta(days=1)).strftime('%Y-%m-%d')}.csv"
@@ -51,7 +52,7 @@ def get_csv_file_url(slack_data):
                         'Total Rounds': interview['total_rounds'], 'Vendor': interview['vendor'],
                         'Position': interview['position'], 'Consultant': interview['consultant'],
                         'Start Time': interview['start_time'], 'End Time': interview['end_time'],
-                        'Interviewers': interviewer_info_text
+                        'Job Location': interview['job_location'], 'Interviewers': interviewer_info_text
                     })
 
         # Generate and return the S3 URL for the CSV file
@@ -80,7 +81,8 @@ class Command(BaseCommand):
                 "consultant": interview.consultant.name,
                 "start_time": interview.start_time.strftime("%I:%M %p"),
                 "end_time": interview.end_time.strftime("%I:%M %p"),
-                "client": interview.submission.client
+                "client": interview.submission.client,
+                "job_location": interview.submission.lead.city
             }
         except Exception as e:
             print(f"Error fetching interview data: {e}")
@@ -89,10 +91,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         slack_data = {}
         try:
-            from pytz import timezone
             tz = timezone('EST')
             prev_date = tz.localize(datetime.now()).date() - timedelta(days=1)
-
+            if prev_date.weekday() == 6:
+                prev_date -= timedelta(days=2)
             # Define the screening types we are processing
             # screening_types = [
             #     ('interview', 'Interview'),
