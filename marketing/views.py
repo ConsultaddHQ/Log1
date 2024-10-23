@@ -1593,6 +1593,11 @@ class InterviewViewSets(ModelViewSet):
             if request.data.get('start_time') < datetime.strftime(est_now, '%Y-%m-%dT%H:%M:%SZ'):
                 return Response({"message": "Interview can not be scheduled for past times"}, status=400)
 
+            if request.data.get("screening_type") == 'interview':
+                if not (profiles := request.data.get('interviewer_profiles', [])) or any(
+                        not profile.get("name", "").strip() for profile in profiles):
+                    return Response({"message": "Interviewer name cannot be null"}, status=status.HTTP_400_BAD_REQUEST)
+
             # Change status of past Interview to feedback due
             change_to_feedback_due()
             users = get_authenticated_users(request)
