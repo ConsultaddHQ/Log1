@@ -1,5 +1,6 @@
 import os
-from datetime import date, timedelta
+from pytz import timezone
+from datetime import datetime, timedelta, date
 
 from constance import config
 from marketing.models import Interview
@@ -1531,6 +1532,11 @@ class MessageCard:
             card_data = {}
             message_card_sent = False
             # Pre-defined header block for the card
+            tz = timezone('EST')
+            prev_date = tz.localize(datetime.now()).date() - timedelta(days=1)
+            if prev_date.weekday() == 6:
+                prev_date -= timedelta(days=2)
+
             header_block = [
                 {
                     "type": "header",
@@ -1585,6 +1591,7 @@ class MessageCard:
                         start = screening_data.get('start_time', 'N/A')
                         position = screening_data.get('position', 'N/A')
                         total_rounds = screening_data.get('total_rounds', 'N/A')
+                        location = screening_data.get('job_location', 'N/A')
 
                         # Adding Interview info block
                         card_data['blocks'].extend([
@@ -1593,7 +1600,7 @@ class MessageCard:
                                 "fields": [
                                     {
                                         "type": "mrkdwn",
-                                        "text": f"*`Total Rounds: {total_rounds}`*\n*Client:* {client}"
+                                        "text": f"*`Total Rounds: {total_rounds}`*\n*Client:* {client}\n*Location:* {location}"
                                     },
                                     {
                                         "type": "mrkdwn",
