@@ -10,6 +10,22 @@ from utils_app.utils import generate_s3_url
 from utils_app.slack_notification import MessageCard as slack
 
 
+def get_prev_date(date_str=None):
+    tz = timezone('EST')
+    if date_str:
+        input_date = datetime.strptime(date_str, '%Y-%m-%d')  # Parse the input date string
+        input_date = tz.localize(input_date).date()  # Localize to EST and get the date
+    else:
+        input_date = tz.localize(datetime.now()).date()  # Use current date in EST if no date_str
+
+    if input_date.weekday() == 0:  # Monday
+        previous_date = input_date - timedelta(days=3)
+    else:
+        previous_date = input_date - timedelta(days=1)
+
+    return previous_date
+
+
 def get_interviewers_details(obj):
     """Retrieve interviewers details including name, email, and LinkedIn."""
     details = [
@@ -91,21 +107,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         slack_data = {}
         try:
-            tz = timezone('EST')
-            prev_date = tz.localize(datetime.now()).date() - timedelta(days=1)
-            if prev_date.weekday() == 6:
-                prev_date -= timedelta(days=2)
-            # Define the screening types we are processing
-            # screening_types = [
-            #     ('interview', 'Interview'),
-            #     ('ip_screening', 'IP Screening'),
-            #     ('vendor_screening', 'Vendor Tech Screening')
-            # ]
-
+            prev_date = get_prev_date()
             # Query to fetch interviews scheduled for today (customize date for dynamic filtering)
             interview_qs = Interview.objects.filter(
-                start_time__date=prev_date, status__in=['scheduled', 'rescheduled'], screening_type='interview'
-            ).order_by('start_time')
+                start_time__date=prev_date, screening_type='interview'
+            ).exclude(status='cancelled').order_by('start_time')
 
             # Iterate over each screening type and extract interviews
             # for screening_type_key, screening_type_value in screening_types:
