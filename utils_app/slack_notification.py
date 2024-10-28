@@ -1550,7 +1550,7 @@ class MessageCard:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"*`Date : {date.today()-timedelta(days=1)}`*"
+                        "text": f"*`Date : {prev_date}`*"
                     }
                 },
                 {
