@@ -18,6 +18,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CR
 
 from marketing.utils import *
 from marketing.serializers import *
+from utils_app.attio import attio_trigger
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
@@ -1688,6 +1689,9 @@ class InterviewViewSets(ModelViewSet):
                 "description": interview.description, "call_details": interview.call_details,
             }
 
+            data_recorded = attio_trigger(submission, "log1_vendor_company", request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
             # Booking Calendar
             try:
                 # Booking Google calendar

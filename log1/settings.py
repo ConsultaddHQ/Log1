@@ -291,9 +291,11 @@ CONSTANCE_CONFIG = OrderedDict([
     ('APP_VERSION', ('2.0.6', 'APP Version')),
     ('EMAIL_MAX_RETRY', ('4', 'Email Max Retry')),
     ('APP_URL', ('https://log1.com/', 'Log1 URL')),
+    ('ATTIO_URL', ('attio url', 'Attio Api URL')),
     ('MAIL_LOGGER', ('mail_delivery_status.csv', 'MAIL LOGGER')),
     ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
     ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
+    ('ATTIO_API_KEY', ('attio api key', 'Attio Service Account API Key')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
@@ -360,7 +362,7 @@ CONSTANCE_CONFIG = OrderedDict([
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
         'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL', 'EMAIL_MAX_RETRY',
-        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN'
+        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN', 'ATTIO_URL', 'ATTIO_API_KEY'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
