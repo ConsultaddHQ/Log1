@@ -790,10 +790,13 @@ class MessageCard:
                                 "type": "mrkdwn",
                                 "text": f"*Role:* {payload.get('job_title', 'NA')}"
                             },
-
                             {
                                 "type": "mrkdwn",
                                 "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Vendor:* {payload.get('vendor', 'NA')}"
                             },
                         ]
                     },
@@ -838,7 +841,15 @@ class MessageCard:
                             {
                                 "type": "mrkdwn",
                                 "text": f"{project_count}    *`Total`* - *{payload.get('total', 'NA')}*"
-                            }
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f":triangular_flag_on_post: *`Vendor Company Count`*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*`{payload.get('vendor')}`* - {payload.get('vendor_count')} " if payload.get('vendor') != "N/A" else "N/A"
+                            },
                         ]
                     },
                     {
@@ -1050,7 +1061,8 @@ class MessageCard:
                                     "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
                                             f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
                                             f"   *Time:* {data.get('start', None).split('::')[1]}\n\t   "
-                                            f"*Project Type:* {data.get('project_type')}"
+                                            f"*Project Type:* {data.get('project_type')}\n\t   "
+                                            f"*Vendor Company:* {data.get('vendor')}"
                                 },
                                 {
                                     "type": "mrkdwn",

@@ -359,6 +359,14 @@ class ProjectUtil:
                 recruiter_name = get_slack_tag(recruiter)
 
             counts, team_name = self.fetch_project_count("received", True)
+            vendor = self.project.submission.vendor.name if self.project.submission.vendor else "N/A"
+            if vendor != "N/A":
+                vendor_count = Project.objects.filter(
+                    statuses__status='received', submission__lead__vendor_company__name=vendor,
+                    statuses__created__gte=datetime.today().replace(day=1, hour=0, minute=0)
+                ).exclude(submission__status='archive').count()
+            else:
+                vendor_count = "N/A"
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
             supervisors = ", ".join([f"Round {interview.round} - {get_slack_tag(interview.supervisor)}"
                                     if interview.supervisor.employee_id != 9999
@@ -373,7 +381,8 @@ class ProjectUtil:
                 "team": team_name, "recruiter_name": recruiter_name, "project_start": self.project_start,
                 "team_count": counts.get('team_count'), "project_type": self.project.submission.get_work_type_display(),
                 "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
-                "w2_count": counts.get('w2_count'), "c2c_count": counts.get('c2c_count')
+                "w2_count": counts.get('w2_count'), "c2c_count": counts.get('c2c_count'), "vendor_count": vendor_count,
+                "vendor": self.project.submission.vendor.name if self.project.submission.vendor else "N/A"
             }
             slack.po_receive_message_card(payload, self.request)
 
