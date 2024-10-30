@@ -22,6 +22,7 @@ from utils_app.attio import attio_trigger
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
+from utils_app.attio import attio_trigger
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from utils_app.calendar import GoogleCalendar
