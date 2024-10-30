@@ -19,13 +19,13 @@ def create_csv_file(payload, report_name):
         file = open(f'{filename}.csv', 'w')
         writer = csv.writer(file)
         writer.writerow(['Consultant', 'Marketer', 'Supervisor', 'Screening Type', 'Type',
-                         'Round', 'Client', 'Time', 'Job Title', 'Project Type'])
+                         'Round', 'Client', 'Vendor Company', 'Time', 'Job Title', 'Project Type'])
         for key in payload.keys():
             for data in payload[key]:
                 writer.writerow([
                     data.get('consultant'), data.get('marketer'), data.get('ctb_name'), data.get('screening_type'),
-                    data.get('type'), data.get('round'), data.get('client'), data.get('start'), data.get('position'),
-                    data.get('project_type')
+                    data.get('type'), data.get('round'), data.get('client'), data.get('vendor'), data.get('start'),
+                    data.get('position'), data.get('project_type')
                 ])
         file.close()
         file_url = generate_s3_url(file.name)
@@ -52,9 +52,9 @@ class Command(BaseCommand):
             "round": interview.round, "ctb_name": supervisor.employee_name,
             "start": interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST'),
             "call_type": "otter.ai" if call_type == "Otter Al" else call_type,
-            "marketer": interview.marketer.employee_name, "position": position,
             "consultant": interview.consultant.name, "client": interview.submission.client,
-            "ctb": get_slack_tag(supervisor)
+            "vendor": interview.submission.vendor.name if interview.submission.vendor else "NA",
+            "ctb": get_slack_tag(supervisor), "marketer": interview.marketer.employee_name, "position": position,
         }
 
     @staticmethod
