@@ -1594,6 +1594,11 @@ class InterviewViewSets(ModelViewSet):
             if request.data.get('start_time') < datetime.strftime(est_now, '%Y-%m-%dT%H:%M:%SZ'):
                 return Response({"message": "Interview can not be scheduled for past times"}, status=400)
 
+            if request.data.get("screening_type") == 'interview':
+                if not (profiles := request.data.get('interviewer_profiles', [])) or any(
+                        not profile.get("name", "").strip() for profile in profiles):
+                    return Response({"message": "Interviewer name cannot be null"}, status=status.HTTP_400_BAD_REQUEST)
+
             # Change status of past Interview to feedback due
             change_to_feedback_due()
             users = get_authenticated_users(request)
@@ -1761,6 +1766,12 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled."}, status=400)
+
+            if request.data.get("screening_type") == 'interview':
+                if not (profiles := request.data.get('interviewer_profiles', [])) or any(
+                        not profile.get("name", "").strip() for profile in profiles):
+                    return Response({"message": "Interviewer name cannot be null"}, status=status.HTTP_400_BAD_REQUEST)
+
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             prev_interview_data = InterviewV2Serializer(queryset.first()).data
@@ -1984,7 +1995,7 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
-            
+
             interview_link = request.data.get('interviewer_link', None)
             interview_recording_link = request.data.get('interview_recording_link', None)
 
@@ -1992,7 +2003,7 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "Invalid value of interview link, Please provide a valid link"}, status=400)
 
             if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
-                    return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
+                return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
 
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
