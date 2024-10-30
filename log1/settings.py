@@ -291,9 +291,11 @@ CONSTANCE_CONFIG = OrderedDict([
     ('APP_VERSION', ('2.0.6', 'APP Version')),
     ('EMAIL_MAX_RETRY', ('4', 'Email Max Retry')),
     ('APP_URL', ('https://log1.com/', 'Log1 URL')),
+    ('ATTIO_URL', ('attio url', 'Attio Api URL')),
     ('MAIL_LOGGER', ('mail_delivery_status.csv', 'MAIL LOGGER')),
     ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
     ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
+    ('ATTIO_API_KEY', ('attio api key', 'Attio Service Account API Key')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
@@ -347,6 +349,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
     ('slack_consultadd_compete_url', ('URL', 'Slack Consultadd Compete Channel')),
     ('slack_canada_offer_url', ('URL', 'Slack Canada Offer Announcement Channel')),
+    ('slack_tech_trust_url', ('URL', 'Slack TechTrust Interview Updates Channel ')),
     ('slack_usa_interview_update_url', ('URL', 'Slack USA Interview Update Channel')),
     ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
     ('slack_usa_joining_termination', ('URL', 'Slack USA Joining Termination Channel')),
@@ -359,7 +362,7 @@ CONSTANCE_CONFIG = OrderedDict([
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
         'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL', 'EMAIL_MAX_RETRY',
-        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN'
+        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN', 'ATTIO_URL', 'ATTIO_API_KEY'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
@@ -378,6 +381,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url', 'slack_recruitment_url',
         'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
         'slack_engineering_private_url', 'slack_consultadd_compete_url', 'slack_test_channel_url',
-        'slack_canada_joining_termination', 'slack_usa_joining_termination'
+        'slack_canada_joining_termination', 'slack_usa_joining_termination', 'slack_tech_trust_url'
     )
 }
+
