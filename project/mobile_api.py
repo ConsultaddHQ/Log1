@@ -545,7 +545,11 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             data = request.data
             consultant = request.user
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
-            # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
+
+            current_year = datetime.now().year
+            if data.get('from_date') > f"{current_year}-12-31":
+                return Response({"message": "Leave application for future years is not allowed."}, status=400)
+
             leave = Leave.objects.create(
                 leave_type=leave_type,
                 consultant=consultant,
@@ -591,9 +595,6 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                     except Exception as error:
                         write_exception(error, request)
 
-                project_obj = consultant.projects.filter(statuses__status='joined', statuses__is_current=True).order_by('-id')
-                if not project_obj.first():
-                    project_obj = consultant.projects.filter(statuses__status='joined').order_by('-id')
                 mail_data = {
                     "template": "../templates/leave_request.html", "attachments": path,
                     "subject": f"Leave Requested from {consultant.name}",

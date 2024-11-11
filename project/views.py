@@ -701,7 +701,8 @@ class ProjectViewSets(ModelViewSet):
                 resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
                 if resp_message == "ok":
                     is_mail_sent = True
-                util.assign_leave()
+                if project.submission.get_work_type_display() == 'C2C':
+                    util.assign_leave()
 
             activity_created = False
 
@@ -762,7 +763,8 @@ class ProjectViewSets(ModelViewSet):
                     if not is_mail_sent:
                         password, new_user = set_consultant_password(project.consultant)
                         resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
-                        util.assign_leave()
+                        if project.submission.get_work_type_display() == 'C2C':
+                            util.assign_leave()
 
                     util.send_join_notification()
                     assign_project_associates(project, request)
