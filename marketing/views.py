@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytz
 import difflib
@@ -1179,6 +1180,16 @@ class InterviewViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def invalid_interviewer_profiles(profiles: list) -> bool:
+        if not profiles or any(
+                not profile.get("name", "").strip() or not re.search(r'[A-Za-z]', profile.get("name")) or
+                re.fullmatch(r'[^A-Za-z]*', profile.get("name"))
+                for profile in profiles
+        ):
+            return True
+        return False
+
+    @staticmethod
     def notify_on_slack(interview: any, title: str, request: any) -> None:
         try:
             slack_data = {interview.get_screening_type_display(): []}
@@ -1596,9 +1607,8 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "Interview can not be scheduled for past times"}, status=400)
 
             if request.data.get("screening_type") == 'interview':
-                if not (profiles := request.data.get('interviewer_profiles', [])) or any(
-                        not profile.get("name", "").strip() for profile in profiles):
-                    return Response({"message": "Interviewer name cannot be null"}, status=status.HTTP_400_BAD_REQUEST)
+                if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
+                    return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             # Change status of past Interview to feedback due
             change_to_feedback_due()
@@ -1769,9 +1779,8 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "Interview can't be cancelled."}, status=400)
 
             if request.data.get("screening_type") == 'interview':
-                if not (profiles := request.data.get('interviewer_profiles', [])) or any(
-                        not profile.get("name", "").strip() for profile in profiles):
-                    return Response({"message": "Interviewer name cannot be null"}, status=status.HTTP_400_BAD_REQUEST)
+                if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
+                    return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
@@ -2013,7 +2022,8 @@ class InterviewViewSets(ModelViewSet):
 
             if queryset.first().get_screening_type_display() == 'Interview' and \
                     ('interviewer_profiles' not in request.data or request.data.get('interviewer_profiles', []) is None):
-                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
+                if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
+                    return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             interview = queryset.first()
             prev_status = interview.get_status_display()

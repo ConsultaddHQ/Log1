@@ -477,7 +477,7 @@ class ProjectUtil:
 
     def assign_leave(self):
         try:
-            consultant = self.project.consultant
+            consultant = self.project.submission.consultant
             leave_choices = Choice.objects.filter(content_type__model='consultantleave', field='leave').exclude(
                 name='covid_emergency_sick_leave'
             )
