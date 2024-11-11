@@ -3,11 +3,11 @@ name: CI-Log1-Backend-Staging
 on:
   push:
     branches:
-      - staging
+      - '*'
 
 jobs:
   production-deploy:
-    if: startsWith(github.ref, 'refs/heads/main')  # Only run for main branch
+    if: startsWith(github.ref, 'refs/heads/master')  # Only run for main branch
     runs-on: [log1-backend-prod]
 
     steps:
