@@ -836,20 +836,16 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f":triangular_flag_on_post: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*"
+                                "text": f"*`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*`Vendor Count`* - {payload.get('vendor_count')}"
                             },
                             {
                                 "type": "mrkdwn",
                                 "text": f"{project_count}    *`Total`* - *{payload.get('total', 'NA')}*"
-                            },
-                            {
-                                "type": "mrkdwn",
-                                "text": f":triangular_flag_on_post: *`Vendor Company Count`*"
-                            },
-                            {
-                                "type": "mrkdwn",
-                                "text": f"*`{payload.get('vendor')}`* - {payload.get('vendor_count')} " if payload.get('vendor') != "N/A" else "N/A"
-                            },
+                            }
                         ]
                     },
                     {
