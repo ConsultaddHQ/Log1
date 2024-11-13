@@ -3,7 +3,8 @@ name: CI-Log1-Backend-Staging
 on:
   push:
     branches:
-      - '*'
+      - 'master'
+      - 'staging'
 
 jobs:
   production-deploy:
@@ -48,7 +49,7 @@ jobs:
           sudo systemctl restart gunicorn
 
   staging-deploy:
-    if: startsWith(github.ref, 'refs/heads/staging')  # Only run for main branch
+    if: startsWith(github.ref, 'refs/heads/staging')  # Only run for staging branch
     runs-on: [log1-backend-staging]
 
     steps:
