@@ -836,7 +836,11 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f":triangular_flag_on_post: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*"
+                                "text": f"*`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*`Vendor Count`* - {payload.get('vendor_count')}"
                             },
                             {
                                 "type": "mrkdwn",
@@ -1562,7 +1566,7 @@ class MessageCard:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"*`Date : {date.today()-timedelta(days=1)}`*"
+                        "text": f"*`Date : {prev_date}`*"
                     }
                 },
                 {
