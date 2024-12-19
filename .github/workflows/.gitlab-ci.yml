@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "Run Test Cases"
           cd /home/ubuntu/log1
-  #          python manage.py test
+#          python manage.py test
 
       - name: Deploy to Log1 Server
         run: |
