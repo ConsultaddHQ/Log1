@@ -12,6 +12,7 @@ from employee.models import User
 from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
+from utils_app.utils import get_slack_id, get_slack_tag
 from notification.models import Notification, FCMDevice
 from consultant.models import Consultant, ConsultantPOC
 from consultant.utils import send_notification_for_user
@@ -52,6 +53,7 @@ def create_remote_consultant(request):
                 consultant.is_active = True
                 consultant.remote_only = True
                 consultant.gender = user.gender
+                consultant.internal_employee = True
                 consultant.name = user.employee_name
                 consultant.save()
             else:
@@ -262,52 +264,53 @@ class ProjectUtil:
         else:
             self.employer = self.project.submission.employer
         marketer = self.project.submission.created_by
-        marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
+        marketer_name = get_slack_tag(marketer, request)
         self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
 
-    def fetch_project_count(self, project_status):
+    def fetch_project_count(self, project_status, by_team=False):
         try:
-            team = self.project.submission.marketing_team
+            counts = {}
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).count()
-            w2_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type__in=["w2", "full_time"]
-            ).count()
-            c2c_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type="c2c"
-            ).count()
-            us_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).exclude(submission__marketing_team__name='Consultadd Canada').count()
-            cn_count = Project.objects.filter(
-                statuses__status=project_status, statuses__created__gte=day_one
-            ).filter(submission__marketing_team__name='Consultadd Canada').count()
-            team_count = Project.objects.filter(
-                statuses__status=project_status,
-                statuses__created__gte=day_one,
-                submission__marketing_team=team,
-            ).count()
+            po_qs = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one).exclude(
+                submission__status='archive'
+            )
+            team_name = self.project.submission.marketing_team.name
 
-            return total_count, team_count, team.name, w2_count, c2c_count, us_count, cn_count
+            if by_team:
+                if team_name == 'Consultadd Canada':
+                    po_qs = po_qs.filter(submission__marketing_team__name='Consultadd Canada')
+                else:
+                    po_qs = po_qs.exclude(submission__marketing_team__name='Consultadd Canada')
+
+                counts.update({'total_count': po_qs.count()})
+                counts.update({'w2_count': po_qs.filter(submission__work_type__in=['w2', 'full_time']).count()})
+                counts.update({'c2c_count': po_qs.filter(submission__work_type='c2c').count()})
+                counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
+            else:
+                counts.update({'total_count': po_qs.count()})
+                counts.update({'team_count': po_qs.filter(submission__marketing_team__name=team_name).count()})
+
+            return counts, team_name
         except Exception as error:
             write_exception(message=error, request=self.request)
+            return {}, None
 
     def fetch_project_termination_count(self):
         try:
-            team = self.project.submission.marketing_team
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_count = Project.objects.filter(
-                statuses__status__istartswith="terminated", statuses__created__gte=day_one
-            ).count()
-            team_count = Project.objects.filter(
-                statuses__created__gte=day_one,
-                submission__marketing_team=team,
-                statuses__status__istartswith="terminated"
-            ).count()
+            team = self.project.submission.marketing_team
+            if team == 'Consultadd Canada':
+                po_qs = Project.objects.filter(
+                    submission__marketing_team__name='Consultadd Canada',
+                    statuses__status__istartswith="terminated", statuses__created__gte=day_one
+                )
+            else:
+                po_qs = Project.objects.filter(
+                    statuses__status__istartswith="terminated", statuses__created__gte=day_one
+                ).exclude(submission__marketing_team__name='Consultadd Canada')
+
+            total_count = po_qs.count()
+            team_count = po_qs.filter(submission__marketing_team=team).count()
             return total_count, team_count, team.name
         except Exception as error:
             write_exception(message=error, request=self.request)
@@ -316,8 +319,12 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("joined")
-            # team_name = self.project.submission.created_by.team.name
+            counts, team_name = self.fetch_project_count("joined", True)
+            if self.project.submission.marketing_team.name != 'Consultadd Canada':
+                slack_url = config.slack_usa_joining_termination
+            else:
+                slack_url = config.slack_canada_joining_termination
+
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -331,11 +338,12 @@ class ProjectUtil:
                                  f"*{self.project.submission.lead.job_title.strip()}*"
 
             payload = {
-                "submission_id": self.project.submission.id, "project_id": self.project.id,
-                "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
-                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team, "team": team_count,
+                "recruiter_name": recruiter_name, "project_id": self.project.id,
+                "team": counts.get('team_count'), "total": counts.get('total_count'),
+                "slack_url": slack_url, "activity_title": activity_title, "activity_text": self.activity_text,
+                "employer": self.employer, "submission_id": self.project.submission.id, "team_name": team_name,
                 "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0],
-                                                  '%Y-%m-%d').strftime('%a, %d %B %Y'),
+                                                  '%Y-%m-%d').strftime('%a, %d %B %Y')
             }
             slack.consultant_joined_message_card(payload, self.request)
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
@@ -348,12 +356,19 @@ class ProjectUtil:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             if recruiter:
-                recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
+                recruiter_name = get_slack_tag(recruiter)
 
-            total, team_count, team, w2_count, c2c_count, us_count, cn_count = self.fetch_project_count("received")
+            counts, team_name = self.fetch_project_count("received", True)
+            vendor = self.project.submission.vendor.name if self.project.submission.vendor else "N/A"
+            if vendor != "N/A":
+                vendor_count = Project.objects.filter(
+                    statuses__status='received', submission__lead__vendor_company__name=vendor,
+                    statuses__created__gte=datetime.today().replace(day=1, hour=0, minute=0)
+                ).exclude(submission__status='archive').count()
+            else:
+                vendor_count = "N/A"
             interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
-            supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
-                                     if interview.supervisor.slack_id else interview.supervisor.employee_name
+            supervisors = ", ".join([f"Round {interview.round} - {get_slack_tag(interview.supervisor)}"
                                     if interview.supervisor.employee_id != 9999
                                     else self.project.submission.consultant.name
                                      for interview, count in zip(interviews, range(0, len(interviews)))
@@ -362,11 +377,12 @@ class ProjectUtil:
             payload = {
                 "client": self.project.submission.client, "consultant": self.consultant.name,
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
-                "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
-                "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "project_type": self.project.submission.get_work_type_display(),
+                "activity_text": self.activity_text, "total": counts.get('total_count'), "employer": self.employer,
+                "team": team_name, "recruiter_name": recruiter_name, "project_start": self.project_start,
+                "team_count": counts.get('team_count'), "project_type": self.project.submission.get_work_type_display(),
                 "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
-                "w2_count": w2_count, "c2c_count": c2c_count, "cn": cn_count, "us": us_count
+                "w2_count": counts.get('w2_count'), "c2c_count": counts.get('c2c_count'), "vendor_count": vendor_count,
+                "vendor": self.project.submission.vendor.name if self.project.submission.vendor else "N/A"
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -381,7 +397,7 @@ class ProjectUtil:
             recruiter = self.consultant.recruiter
             total, team_count, team = self.fetch_project_termination_count()
             if recruiter:
-                recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
+                recruiter_name = get_slack_tag(recruiter)
 
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
@@ -390,10 +406,15 @@ class ProjectUtil:
                                  f"*{self.project.submission.client}* with the end date of * " \
                                  f"{datetime.strptime(str(self.project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')}*"
 
+            if self.project.submission.marketing_team.name != 'Consultadd Canada':
+                slack_url = config.slack_usa_joining_termination
+            else:
+                slack_url = config.slack_canada_joining_termination
+
             payload = {
-                "recruiter_name": recruiter_name, "status": status, "reason": reason,
-                "sub_title": activity_sub_title, "activity_text": self.activity_text, "team": team,
-                "months": months, "employer": self.employer, "city": self.project.city, "total": total,
+                "recruiter_name": recruiter_name, "status": status, "reason": reason,  "team": team,
+                "sub_title": activity_sub_title, "activity_text": self.activity_text, "total": total,
+                "months": months, "employer": self.employer, "city": self.project.city, "slack_url": slack_url,
                 "submission_id": self.project.submission.id, "project_id": self.project.id, "team_count": team_count
             }
             slack.po_termination_message_card(payload, self.request)
@@ -456,7 +477,7 @@ class ProjectUtil:
 
     def assign_leave(self):
         try:
-            consultant = self.project.consultant
+            consultant = self.project.submission.consultant
             leave_choices = Choice.objects.filter(content_type__model='consultantleave', field='leave').exclude(
                 name='covid_emergency_sick_leave'
             )

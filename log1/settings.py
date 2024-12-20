@@ -290,10 +290,12 @@ CONSTANCE_CONFIG = OrderedDict([
     ('VERSION', ('R2022.10.2', 'Version')),
     ('APP_VERSION', ('2.0.6', 'APP Version')),
     ('EMAIL_MAX_RETRY', ('4', 'Email Max Retry')),
-    ('APP_URL', ('https://app.log1.com/', 'Log1 URL')),
+    ('APP_URL', ('https://log1.com/', 'Log1 URL')),
+    ('ATTIO_URL', ('attio url', 'Attio Api URL')),
     ('MAIL_LOGGER', ('mail_delivery_status.csv', 'MAIL LOGGER')),
     ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
     ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
+    ('ATTIO_API_KEY', ('attio api key', 'Attio Service Account API Key')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
@@ -336,20 +338,23 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_engineering_url', ('URL', 'Slack Engineering channel')),
     ('slack_recruitment_url', ('URL', 'Slack Recruitment Channel')),
     ('slack_pool_channel_url', ('URL', 'Slack 45dayslimit Channel')),
-    ('slack_offer_url', ('URL', 'Slack Offer Announcement Channel')),
     ('slack_loud_speakers_url', ('URL', 'Slack Loudspeaker Channel')),
-    ('slack_announcement_url', ('URL', 'Slack Announcement Channel')),
     ('slack_marketing_report_url', ('URL', 'Slack Marketing Report')),
-    ('slack_joined_url', ('URL', 'Slack Joining Announcement Channel')),
     ('slack_offer_failure_url', ('URL', 'Slack Offer Failure Channel')),
     ('slack_interview_feedback_url', ('URL', 'Slack Interview Feedback')),
     ('slack_exit_interview_url', ('URL', 'Slack Exit Interview Channel')),
     ('slack_engineering_private_url', ('URL', 'Slack Engineering Private')),
-    ('slack_project_termination_url', ('URL', 'Slack Project Terminations')),
+    ('slack_usa_offer_url', ('URL', 'Slack USA Offer Announcement Channel')),
     ('slack_candidate_feedback_url', ('URL', 'Slack Candidate Feedback Channel')),
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
-    ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
     ('slack_consultadd_compete_url', ('URL', 'Slack Consultadd Compete Channel')),
+    ('slack_canada_offer_url', ('URL', 'Slack Canada Offer Announcement Channel')),
+    ('slack_tech_trust_url', ('URL', 'Slack TechTrust Interview Updates Channel ')),
+    ('slack_usa_interview_update_url', ('URL', 'Slack USA Interview Update Channel')),
+    ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
+    ('slack_usa_joining_termination', ('URL', 'Slack USA Joining Termination Channel')),
+    ('slack_canada_interview_update_url', ('URL', 'Slack Canada Interview Update Channel')),
+    ('slack_canada_joining_termination', ('URL', 'Slack Canada Joining Termination Channel')),
     ('slack_test_channel_url', ('URL', 'Slack Test Channel')),
     ('OKR_URL', ('https://dlwngz4tmfcbh.cloudfront.net/login', 'OKR URL')),
 ])
@@ -357,22 +362,26 @@ CONSTANCE_CONFIG = OrderedDict([
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
         'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL', 'EMAIL_MAX_RETRY',
-        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN'
+        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN', 'ATTIO_URL', 'ATTIO_API_KEY'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
         'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN', 'DEVELOPER'
     ),
-    'Web-Hooks': (
+    'Teams-Web-Hooks-URL': (
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
         'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
         'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
         'products_dev', 'new_recruit_on_bench', 'pre_joining_feedback_url', 'candidate_feedback_url',
-        'slack_engineering_url', 'slack_test_team_url', 'slack_offer_url', 'slack_announcement_url',
-        'slack_interview_feedback_url', 'slack_project_termination_url', 'slack_loud_speakers_url',
-        'slack_joined_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
-        'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url',
-        'slack_recruitment_url', 'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
-        'slack_engineering_private_url', 'slack_consultadd_compete_url', 'slack_test_channel_url'
     ),
+    'Slack-Web-Hooks-URL': (
+        'slack_engineering_url', 'slack_test_team_url', 'slack_usa_offer_url', 'slack_canada_offer_url',
+        'slack_canada_interview_update_url', 'slack_usa_interview_update_url', 'slack_interview_feedback_url',
+        'slack_loud_speakers_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
+        'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url', 'slack_recruitment_url',
+        'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
+        'slack_engineering_private_url', 'slack_consultadd_compete_url', 'slack_test_channel_url',
+        'slack_canada_joining_termination', 'slack_usa_joining_termination', 'slack_tech_trust_url'
+    )
 }
+

@@ -124,13 +124,12 @@ class ConsultantV2ViewSets(ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            if sort_by in ['name', '-created']:
-                consultants = consultants.order_by(sort_by)
-            data = list()
-            for i in consultants.exclude(status='terminated'):
-                data.append(i)
-            for i in consultants.filter(status='terminated'):
-                data.append(i)
+            order_by = sort_by if sort_by == 'name ' else '-created'
+
+            active_consultants = consultants.exclude(status='terminated').order_by(order_by)
+            terminated_consultants = consultants.filter(status='terminated').order_by(order_by)
+            data = list(active_consultants) + list(terminated_consultants)
+
             serializer = ConsultantV2ListSerializer(data[first:last], many=True)
             return Response({"count": count, "data": serializer.data}, status=200)
         except Exception as error:
@@ -235,22 +234,25 @@ class ConsultantViewSets(ModelViewSet):
             consultants = Consultant.objects.all()
             roles = request.user.roles
 
-            if 'superadmin' not in roles:
+            if 'usa_employee' in roles:
+                consultants = consultants.filter(internal_user_profile=request.user, marketing__status='open')
+
+            elif 'superadmin' not in roles:
                 if 'admin' in roles or 'proxy' in roles:
                     consultants = consultants.filter(
                         Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
                         Q(marketing__marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open') |
-                        Q(pocs__poc=request.user)
+                        Q(pocs__poc=request.user, marketing__status='open')
                     )
 
                 elif 'marketer' in request.user.roles:
                     recruits = Consultant.objects.none()
                     if 'recruiter' in roles:
-                        recruits = consultants.filter(pocs__poc=request.user)
+                        recruits = consultants.filter(pocs__poc=request.user, marketing__status='open')
                     consultants = consultants.filter(
-                        Q(marketing__marketer=request.user) |
-                        Q(marketing__primary_marketer=request.user) |
+                        Q(marketing__marketer=request.user, marketing__status='open') |
+                        Q(marketing__primary_marketer=request.user, marketing__status='open') |
                         Q(marketing__in_pool=True, marketing__status='open')
                     )
                     consultants = (consultants | recruits).distinct()
@@ -259,11 +261,11 @@ class ConsultantViewSets(ModelViewSet):
                     recruits = consultants.filter(pocs__poc=request.user)
                     consultants = (consultants | recruits).distinct()
 
+            else:
+                consultants = consultants.filter(marketing__status='open').exclude(status='terminated')
+
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
-            else:
-                consultants = consultants.filter(marketing__status='open').exclude(
-                    status='terminated')
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
@@ -1657,7 +1659,12 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
+
+            if not request.data.get('last_date', None) or not request.data.get('resign_date', None):
+                return Response(
+                    {"message": "Last date or Resignation date not provided"}, status=status.HTTP_400_BAD_REQUEST
+                )
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
             con_exit = ConsultantExit.objects.create(

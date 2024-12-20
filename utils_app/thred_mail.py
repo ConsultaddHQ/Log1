@@ -90,6 +90,9 @@ def create_service(mail_id):
             filename=config.GOOGLE_SERVICE_FILE, subject=mail_id, scopes=SCOPES
         )
         service = build('gmail', 'v1', credentials=credentials)
+
+        if mail_id == config.DEVELOPER:
+            mail_id = config.APP_ADMIN
         return service, mail_id
     except Exception as e:
         return False, str(e)
@@ -102,6 +105,20 @@ def get_field(email, field_name):
             return m.get('value')
 
 
+def read_consumer_data(consumer, file, sub_type):
+    try:
+        try:
+            with open(file, 'rb') as source:
+                data = consumer(source.read(), _subtype=sub_type)
+        except AttributeError:
+            with open(file, 'rb') as source:
+                data = consumer(source.read().decode('UTF-8'), _subtype=sub_type)
+        return data
+    except Exception as e:
+        write_exception(str(e), request=None)
+        return None
+
+
 def add_attachments(email, attachments, max_size=int(25)):
     count = 0
     try:
@@ -109,12 +126,12 @@ def add_attachments(email, attachments, max_size=int(25)):
             'text': text.MIMEText, 'image': image.MIMEImage, 'audio': audio.MIMEAudio
         }
         sz = len(bytes(email))
-        for f in attachments:
+        for file in attachments:
             margin = max_size * 1024 * 1024 - sz
             if margin <= 100000:
                 # Message size limit reached. Added first {count} of {len(attachments)}'
                 return True
-            mimetype, encoding = mimetypes.guess_type(f)
+            mimetype, encoding = mimetypes.guess_type(file)
             if mimetype is None or encoding is not None:
                 mimetype = 'application/octet-stream'
             main_type, sub_type = mimetype.split('/', 1)
@@ -124,25 +141,21 @@ def add_attachments(email, attachments, max_size=int(25)):
             )
             if consumer is None:
                 # Use the base mimetype
-                attachment = base.MIMEBase(main_type, sub_type)
-                with open(f, 'rb') as source:
-                    attachment.set_payload(source.read())
+                attachment_data = base.MIMEBase(main_type, sub_type)
+                with open(file, 'rb') as source:
+                    attachment_data.set_payload(source.read())
             else:
-                with open(f, 'rb') as source:
-                    if sub_type == 'csv':
-                        attachment = consumer(source.read().decode('UTF-8'), _subtype=sub_type)
-                    else:
-                        attachment = consumer(source.read(), _subtype=sub_type)
+                attachment_data = read_consumer_data(consumer, file, sub_type)
 
             # encoders.encode_base64(attachment)
-            attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(f))
-            if len(bytes(attachment)) >= margin:
+            attachment_data.add_header('Content-Disposition', 'attachment', filename=os.path.basename(file))
+            if len(bytes(attachment_data)) >= margin:
                 continue
             else:
-                added = len(bytes(attachment))
+                added = len(bytes(attachment_data))
                 sz += added
                 count += 1
-                email.attach(attachment)
+                email.attach(attachment_data)
         return False
     except Exception as e:
         return str(e)
@@ -190,7 +203,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
             for key in email_recipients.keys():
                 obj[key] = ','.join(active_users.get(key, []))
         else:
-            obj['cc'] = ','.join(['gufran.a@consultadd.com'])
+            obj['cc'] = ','.join(['snehal.s@consultadd.com'])
             obj['bcc'] = ','.join(['shivam.k@consultadd.com'])
             obj['to'] = ','.join(['shreyas.k@consultadd.com'])
         return obj, None

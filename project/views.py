@@ -26,9 +26,9 @@ from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from notification.models import Notification, FCMDevice
-from utils_app.utils import delete_temp_file, export_to_csv, add_export_log
 from marketing.utils import date_filter, get_authenticated_users
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
+from utils_app.utils import delete_temp_file, export_to_csv, add_export_log, get_slack_tag
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from notification.utils import push_notification_consultant
@@ -254,6 +254,7 @@ class ProjectViewSets(ModelViewSet):
                 'subject': f'On Boarding of {consultant.name} :: {project.employer} :: {project_start_date} :: '
                            f'{submission.client} :: {submission.vendor.name}',
                 'context': {
+                    'project_type': submission.get_work_type_display(),
                     'marketer_name': submission.created_by.employee_name, 'employer': employer,
                     'job_title': submission.lead.job_title, 'vendor_number': vendor_contact.number,
                     'client_address': project.client_address, 'vendor_address': project.vendor_address,
@@ -438,6 +439,10 @@ class ProjectViewSets(ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                projects = projects.filter(Q(submission__created_by=request.user) | Q(submission__consultant_marketing__consultant__internal_user_profile=request.user))
+
             if filter_json and json.loads(filter_json):
                 filters = json.loads(filter_json)
 
@@ -499,7 +504,7 @@ class ProjectViewSets(ModelViewSet):
                         )
                     if filters['status']:
                         projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-                        projects = (projects | not_joined | cancelled | terminated).distinct('id')
+                        projects = (projects | not_joined | cancelled | terminated).order_by('id').distinct('id')
 
             if filter_by_lead:
                 projects = projects.filter(submission__work_type=filter_by_lead)
@@ -687,7 +692,7 @@ class ProjectViewSets(ModelViewSet):
             consultant = create_remote_consultant(request)
             if consultant:
                 project.consultant = consultant
-            project.is_remote = request.data.get('is_remote', False)
+            project.is_remote = request.data.get('is_remote', project.is_remote)
             project.save()
 
             if prev_consultant_id != remote_consultant_id and remote_consultant_id is not None and project.status == "Joined":
@@ -696,7 +701,8 @@ class ProjectViewSets(ModelViewSet):
                 resp, resp_message = self.consultant_mail_on_joining(project, password, new_user, request)
                 if resp_message == "ok":
                     is_mail_sent = True
-                util.assign_leave()
+                if project.submission.get_work_type_display() == 'C2C':
+                    util.assign_leave()
 
             activity_created = False
 
@@ -757,7 +763,8 @@ class ProjectViewSets(ModelViewSet):
                     if not is_mail_sent:
                         password, new_user = set_consultant_password(project.consultant)
                         resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
-                        util.assign_leave()
+                        if project.submission.get_work_type_display() == 'C2C':
+                            util.assign_leave()
 
                     util.send_join_notification()
                     assign_project_associates(project, request)
@@ -1206,6 +1213,20 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    def delete(self, request, *args, **kwargs):
+        try:
+            if 'superadmin' not in request.user.roles and not ('admin' in request.user.roles and 'engineer' in request.user.roles):
+                return Response({"message": "You do not have access to perform this action"}, status=400)
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            supports = ProjectSupport.objects.filter(project=project)
+            supports.delete()
+            desc = f"{request.user.employee_name} deleted support details"
+            create_activity(project.id, 'projectsupport', request.user, desc, 'deleted')
+            return Response({"message": "Support has been deleted"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+    
     @action(methods=['put'], detail=True, url_path="status")
     def status(self, request, project_id, pk):
         try:
@@ -1383,7 +1404,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 desc = f"{emp_name} added {feedback_type} feedback"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'created')
 
-                employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
+                employee_name = get_slack_tag(request.user)
                 payload = {
                     "activity_title": f"Support marked independent by {employee_name} for below mentioned project",
                     "project_id": project_id,
@@ -2289,7 +2310,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
-            margin = request.GET.get('margin', {})
+            margin = json.loads(request.GET.get('margin', '{}'))
             export = json.loads(request.GET.get('export', 'false'))
 
             if start:

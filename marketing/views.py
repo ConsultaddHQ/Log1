@@ -1,3 +1,6 @@
+import json
+import re
+
 import pytz
 import difflib
 from datetime import date
@@ -16,9 +19,11 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CR
 
 from marketing.utils import *
 from marketing.serializers import *
+from utils_app.attio import attio_trigger
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
+from utils_app.attio import attio_trigger
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from utils_app.calendar import GoogleCalendar
@@ -415,6 +420,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
             users = get_authenticated_users(request)
 
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+ 
             if (sub.created_by in users) or (
                     request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
@@ -554,6 +564,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def tests(self, request, pk):
         try:
             submission = get_object_or_404(Submission, id=pk)
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(submission and not (submission.created_by==request.user or submission.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+
             serializer = TestGetSerializer(submission.test.all(), many=True, context={'user': request.user})
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -578,11 +593,27 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def project(self, request, pk):
         try:
             submission = get_object_or_404(Submission, id=pk)
+
+            roles = request.user.roles
+            if "usa_employee" in roles:
+                if(submission and not (submission.created_by==request.user or submission.consultant_marketing.consultant.internal_user_profile==request.user)):
+                    return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
+
             if hasattr(submission, 'project'):
                 serializer = ProjectV2Serializer(submission.project, context={'user': request.user})
                 return Response({"data": serializer.data}, status=200)
             else:
                 return Response({"message": "Project not found"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='call_details')
+    def interview_call_details(self, request, pk):
+        try:
+            submission = get_object_or_404(Submission, id=pk)
+            serializer = self.serializer_class(submission)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -694,6 +725,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                             Q(consultant_marketing__consultant__in=consultant_ids)
                         )
 
+            if "usa_employee" in roles: 
+                queryset = queryset.filter(Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user))
+                
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
@@ -767,8 +801,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             roles = request.user.roles
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
-            lead_id = request.data.get('lead', None)
 
+            if not request.FILES.get('file_resume', None):
+                return Response({"message": "Please add resume"}, status=400)
+
+            lead_id = request.data.get('lead', None)
             if not lead_id:
                 position_id = request.data.get('position', None)
                 if not position_id or position_id == 'null':
@@ -881,21 +918,22 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     @action(methods=['get'], detail=False, url_path='feedback_due')
     def marketer_feedback_due(self, request):
+        check_after = "2022-01-01"
         try:
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             pending_before = date.today() - timedelta(days=25)
             test_lst = Test.objects.filter(
-                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
             interview_lst = Interview.objects.filter(
-                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+                status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:
-                return Response({"marketer_feedback_due": True}, status=202)
-            return Response({"marketer_feedback_due": False}, status=202)
+                return Response({"marketer_feedback_due": True}, status=status.HTTP_200_OK)
+            return Response({"marketer_feedback_due": False}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1142,6 +1180,16 @@ class InterviewViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def invalid_interviewer_profiles(profiles: list) -> bool:
+        if not profiles or any(
+                not profile.get("name", "").strip() or not re.search(r'[A-Za-z]', profile.get("name")) or
+                re.fullmatch(r'[^A-Za-z]*', profile.get("name"))
+                for profile in profiles
+        ):
+            return True
+        return False
+
+    @staticmethod
     def notify_on_slack(interview: any, title: str, request: any) -> None:
         try:
             slack_data = {interview.get_screening_type_display(): []}
@@ -1225,10 +1273,19 @@ class InterviewViewSets(ModelViewSet):
             return error
 
     @staticmethod
-    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last, filter_by_call_type=None):
+    def get_count_and_queryset(queryset, sort_by, first, last, count_filters):
         try:
             # Interview counts by status
+            filter_by_status = count_filters.get("filter_by_status")
+            filter_by_region = count_filters.get("filter_by_region")
+            filter_by_call_type = count_filters.get("filter_by_call_type")
+
             queryset = queryset.order_by('id').distinct('id')
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             status_count_qs = queryset
             if filter_by_call_type:
@@ -1254,6 +1311,9 @@ class InterviewViewSets(ModelViewSet):
 
             if filter_by_call_type and len(filter_by_call_type) > 0:
                 queryset = queryset.filter(call_type__display_name__in=filter_by_call_type)
+
+            data_counts['USA'] = queryset.exclude(submission__marketing_team__name='Consultadd Canada').count()
+            data_counts['Canada'] = queryset.filter(submission__marketing_team__name='Consultadd Canada').count()
 
             if sort_by in ['created', 'modified', 'start_time']:
                 order_by = f"-{sort_by}"
@@ -1402,9 +1462,12 @@ class InterviewViewSets(ModelViewSet):
                 if 'call_type' in filters and len(filters["call_type"]) > 0:
                     filter_call_type = filters["call_type"]
 
-            data, screen_data = self.get_count_and_queryset(
-                queryset, filter_by_status, sort_by, first, last, filter_call_type
-            )
+            filter_counts = {
+                "filter_by_status": filter_by_status,
+                "filter_by_call_type": filter_call_type,
+                "filter_by_region": request.GET.get('by_region', None)
+            }
+            data, screen_data = self.get_count_and_queryset(queryset, sort_by, first, last, filter_counts)
             if screen_data == 'error':
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 
@@ -1418,13 +1481,24 @@ class InterviewViewSets(ModelViewSet):
         query = request.GET.get('query', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        filter_by_region = request.GET.get('by_region', None)
 
         try:
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
@@ -1483,15 +1557,26 @@ class InterviewViewSets(ModelViewSet):
         query = request.GET.get('query', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        filter_by_region = request.GET.get('by_region', None)
 
         try:
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
             queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+                if 'call_type' in filters and len(filters["call_type"]) > 0:
+                    queryset = queryset.filter(call_type__display_name__in=filters["call_type"])
+
+            if filter_by_region == "canada":
+                queryset = queryset.filter(submission__marketing_team__name='Consultadd Canada')
+            elif filter_by_region == "usa":
+                queryset = queryset.exclude(submission__marketing_team__name='Consultadd Canada')
 
             queryset = queryset.order_by('id').distinct('id')
             response = HttpResponse()
@@ -1520,6 +1605,10 @@ class InterviewViewSets(ModelViewSet):
             est_now = datetime.now(pytz.timezone('US/Eastern')).replace(tzinfo=pytz.timezone('UTC'))
             if request.data.get('start_time') < datetime.strftime(est_now, '%Y-%m-%dT%H:%M:%SZ'):
                 return Response({"message": "Interview can not be scheduled for past times"}, status=400)
+
+            if request.data.get("screening_type") == 'interview':
+                if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
+                    return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             # Change status of past Interview to feedback due
             change_to_feedback_due()
@@ -1566,6 +1655,17 @@ class InterviewViewSets(ModelViewSet):
             if not assigned:
                 return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
+            required_default_guest_ids = [2667, 2688]
+            required_salesforce_interview_guests_qs = User.objects.filter(employee_id__in=required_default_guest_ids)
+            guests_list = set(interview.guests.filter().values_list('user__employee_id', flat=True))
+            if interview.submission.marketing_team.name == 'Salesforce Squad':
+                guests_to_add = [
+                    GuestInfo.objects.get_or_create(type='other', user=obj)[0]
+                    for obj in required_salesforce_interview_guests_qs if obj.employee_id not in guests_list
+                ]
+                interview.guests.add(*guests_to_add)
+                interview.save()
+
             # Activity
             end = interview.end_time.strftime("%Y-%m-%d %H-%M")
             start = interview.start_time.strftime("%Y-%m-%d %H-%M")
@@ -1600,6 +1700,9 @@ class InterviewViewSets(ModelViewSet):
                 "description": interview.description, "call_details": interview.call_details,
             }
 
+            data_recorded = attio_trigger(submission, "log1_vendor_company", request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
             # Booking Calendar
             try:
                 # Booking Google calendar
@@ -1674,6 +1777,11 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled."}, status=400)
+
+            if request.data.get("screening_type") == 'interview':
+                if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
+                    return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
+
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             prev_interview_data = InterviewV2Serializer(queryset.first()).data
@@ -1898,6 +2006,15 @@ class InterviewViewSets(ModelViewSet):
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
 
+            interview_link = request.data.get('interviewer_link', None)
+            interview_recording_link = request.data.get('interview_recording_link', None)
+
+            if not interview_link or (interview_link and len(interview_link.strip()) == 0):
+                return Response({"message": "Invalid value of interview link, Please provide a valid link"}, status=400)
+
+            if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
+                return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
+
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
@@ -1905,7 +2022,8 @@ class InterviewViewSets(ModelViewSet):
 
             if queryset.first().get_screening_type_display() == 'Interview' and \
                     ('interviewer_profiles' not in request.data or request.data.get('interviewer_profiles', []) is None):
-                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
+                if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
+                    return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             interview = queryset.first()
             prev_status = interview.get_status_display()
@@ -2629,8 +2747,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     response, error = download_s3_object(doc.attachment_file.name)
                     if not error:
                         path.append(response)
-                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
-                    "%b. %d, %Y") if test.deadline else 'NA'
+
+                deadline = 'NA'
+                if test.deadline:
+                    if isinstance(test.deadline, datetime):
+                        deadline = test.deadline.strftime("%b. %d, %Y")
+                    elif isinstance(test.deadline, str):
+                        deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime("%b. %d, %Y")
                 mail_data = {
                     'subject': subject,
                     'to': to, 'cc': cc, 'bcc': [],
@@ -2792,7 +2915,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                       submission__consultant_marketing__in_pool=False) |
                     Q(submission__consultant_marketing__in_pool=True)
                 )
-
+            elif 'usa_employee' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__in_pool=True) |
+                    Q(submission__consultant_marketing__marketer=request.user) |
+                    Q(submission__created_by=request.user)
+                )
             elif 'marketer' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__in_pool=True) |
@@ -2949,7 +3077,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res, error = self.send_test_mail(test, data, 'new', request)
             if error == 'error':
-                write_info(message=res, function='create-send_test_mail', request=request)
+                write_exception(message=res, request=request)
                 return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
@@ -3214,7 +3342,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
+                "click_action": "https://log1.com",
                 "data": {
                     'target': 'test',
                     'is_read': False,
@@ -3352,7 +3480,7 @@ class QuestionViewSets(ModelViewSet):
             value = request.GET.get('value', None)
             if not value:
                 return Response({"message": "value is empty"}, status=400)
-            if int(value) > 10:
+            if int(value) > 15:
                 return Response({"message": "Maximum coding questions limit is 10"}, status=400)
             no_of_questions = int(value)
             cq = question.child_question.first()

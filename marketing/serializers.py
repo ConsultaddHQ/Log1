@@ -428,17 +428,10 @@ class TestCreateSerializer(serializers.ModelSerializer):
 
 
 class TestUpdateSerializer(serializers.ModelSerializer):
-    deadline = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
         fields = '__all__'
-
-    @staticmethod
-    def get_deadline(obj):
-        if isinstance(obj.deadline, datetime):
-            return obj.deadline.date()
-        return obj.deadline
 
 
 class SubmissionV2Serializer(serializers.ModelSerializer):
@@ -662,9 +655,13 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_question_answer(obj):
-        if obj.answer and ": " in obj.answer and obj.question.answer_type in ["yes_attachment", "no_attachment",
-                                                                              "yes_remark", "no_remark"]:
+        if obj.answer and ": " in obj.answer and obj.question.answer_type in [
+            "yes_attachment", "no_attachment", "yes_remark", "no_remark"
+        ]:
             answer = obj.answer.split(": ")
+        elif obj.question.title == 'Reviewed By' and obj.answer:
+            reviewed_by = [reviewer.split(":")[0] for reviewer in obj.answer.split(", ")]
+            answer = [", ".join(reviewed_by), None]
         else:
             answer = [obj.answer, None]
         data = {

@@ -4,17 +4,16 @@ import ssl
 
 import boto3
 import certifi
-from constance import config
 from pytz import timezone
+from constance import config
 from datetime import datetime
-from geopy.geocoders import Nominatim
 from slack_sdk import WebClient
+from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 
 from utils_app.models import CronJob, CronError
 from tracking.models import ExportData, Devices
 from log1.utils import write_exception, write_info
-from utils_app.mailing import send_email_without_template
 from utils_app.thred_mail import send_email_without_template as _send_email_without_template
 
 TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
@@ -131,14 +130,18 @@ def export_to_csv(payload, columns, filename, request=None, report_type=None):
         for data in payload:
             row_elems = []
             for i in range(0, len(column_name)):
-                if data[column_name[i]] and type(data[column_name[i]]) == list:
-                    if None in data[column_name[i]]:
-                        data[column_name[i]].remove(None)
-                    elif not data[column_name[i]]:
-                        data[column_name[i]] = None
-                    row_elems.append(", ".join(elem for elem in data[column_name[i]]))
+                column_value = data.get(column_name[i], None)
+                if column_value:
+                    if data[column_name[i]] and type(data[column_name[i]]) == list:
+                        if None in data[column_name[i]]:
+                            data[column_name[i]].remove(None)
+                        elif not data[column_name[i]]:
+                            data[column_name[i]] = None
+                        row_elems.append(", ".join(elem for elem in data[column_name[i]]))
+                    else:
+                        row_elems.append(data[column_name[i]])
                 else:
-                    row_elems.append(data[column_name[i]])
+                     row_elems.append('')
             writer.writerow(row_elems)
         file.close()
         file_url = generate_s3_url(file.name, request, report_type)
@@ -148,13 +151,38 @@ def export_to_csv(payload, columns, filename, request=None, report_type=None):
         return ""
 
 
+def set_member_id(user_obj: any, member_id: int, request: any = None) -> str:
+    try:
+        user_obj.slack_id = member_id
+        user_obj.save()
+    except Exception as error:
+        write_exception(error, request)
+
+
 def get_slack_id(user_obj: any, request: any = None) -> str:
     try:
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         client = WebClient(token=config.SLACK_TOKEN, ssl=ssl_context)
         response = client.users_lookupByEmail(email=user_obj.email)
         member_id = response.get('user', {}).get('id')
+        set_member_id(user_obj, member_id, request)
         return member_id
     except Exception as error:
         write_exception(error, request)
-        return ""
+        return None
+
+
+def get_slack_tag(user_obj: any, request: any = None) -> str:
+    try:
+        if not user_obj:
+            return "Not Available"
+
+        slack_id = user_obj.slack_id if user_obj.slack_id else get_slack_id(user_obj, request)
+
+        if slack_id:
+            return f"<@{slack_id}>"
+
+        return user_obj.employee_name
+    except Exception as error:
+        write_exception(error, request)
+        return user_obj.employee_name
