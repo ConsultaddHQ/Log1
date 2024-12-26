@@ -123,6 +123,8 @@ def _prepare_vendor_list_data(obj: Any, submission_obj: Any, vendor_record_id: s
             "client": submission_obj.client,
             "submission_id": str(submission_obj.id),
             "job_title": submission_obj.lead.job_title,
+            "consultant_name": submission_obj.consultant.name,
+            "consultant_email": submission_obj.consultant.email,
             "final_status": obj.get_status_display()
             if obj.get_status_display() in ["Offer", "Cancelled", "Failed"] else "In Process"
         }
