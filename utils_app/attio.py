@@ -79,7 +79,7 @@ def _get_or_update_vendor_record(object_slug: str, vendor_data: Dict, request: A
         existing_record = response_data[0].get("values")
         vendor_record_id = existing_record.get("record_id", [{}])[0].get("value")
 
-        if object_needs_update(existing_record, vendor_data):
+        if record_needs_update(existing_record, vendor_data):
             update_url = f"{ATTIO_URL}/objects/{object_slug}/records/{vendor_record_id}"
             update_payload = {
                 "data": {
@@ -103,7 +103,7 @@ def _get_or_update_vendor_record(object_slug: str, vendor_data: Dict, request: A
     return create_response.json().get("data", {}).get("id").get('record_id')
 
 
-def object_needs_update(existing_record: Dict, vendor_data: Dict) -> bool:
+def record_needs_update(existing_record: Dict, vendor_data: Dict) -> bool:
     """Check if the vendor record needs to be updated."""
     existing_email = existing_record.get("vendor_email", [{}])[0].get("value", "")
     existing_number = existing_record.get("vendor_number", [{}])[0].get("value", "")
