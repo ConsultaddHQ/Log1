@@ -5,6 +5,14 @@ from celery import shared_task
 from constance import config
 from log1.utils import write_exception
 
+ATTIO_URL = config.ATTIO_URL
+API_KEY = config.ATTIO_API_KEY
+HEADERS = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {API_KEY}"
+}
+
 
 @shared_task
 def attio_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
@@ -15,26 +23,18 @@ def attio_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
     return: Boolean indicating success or failure.
     """
     try:
-        ATTIO_URL = config.ATTIO_URL
-        API_KEY = config.ATTIO_API_KEY
-
         submission_obj = obj.submission
         vendor_data = _extract_vendor_data(submission_obj)
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}"
-        }
 
         # Check for existing vendor record
-        vendor_record_id = _get_or_update_vendor_record(ATTIO_URL, headers, object_slug, vendor_data)
+        vendor_record_id = _get_or_update_vendor_record(object_slug, vendor_data)
         if not vendor_record_id:
             write_exception("Failed to get or create vendor record.", request)
             return False
 
         # Update or create list entry
         vendor_list_data = _prepare_vendor_list_data(obj, submission_obj, vendor_record_id, object_slug)
-        if not _update_or_create_list_entry(ATTIO_URL, headers, vendor_list_data):
+        if not _update_or_create_list_entry(vendor_list_data):
             write_exception("Failed to update or create vendor list entry.", request)
             return False
 
@@ -57,10 +57,9 @@ def _extract_vendor_data(submission_obj: Any) -> Dict:
     }
 
 
-def _get_or_update_vendor_record(
-        attio_url: str, headers: Dict, object_slug: str, vendor_data: Dict, request: Any = None) -> Any:
+def _get_or_update_vendor_record(object_slug: str, vendor_data: Dict, request: Any = None) -> Any:
     """Query, update, or create a vendor record in Attio."""
-    get_record_url = f"{attio_url}/objects/{object_slug}/records/query"
+    get_record_url = f"{ATTIO_URL}/objects/{object_slug}/records/query"
     filter_payload = {
         "filter": {
             "$or": [
@@ -70,7 +69,7 @@ def _get_or_update_vendor_record(
         }
     }
 
-    response = requests.post(get_record_url, headers=headers, json=filter_payload)
+    response = requests.post(get_record_url, headers=HEADERS, json=filter_payload)
     if response.status_code != 200:
         write_exception("Error fetching vendor record from Attio.", request)
         return None
@@ -80,15 +79,15 @@ def _get_or_update_vendor_record(
         existing_record = response_data[0].get("values")
         vendor_record_id = existing_record.get("record_id", [{}])[0].get("value")
 
-        if _needs_update(existing_record, vendor_data):
-            update_url = f"{attio_url}/objects/{object_slug}/records/{vendor_record_id}"
+        if record_needs_update(existing_record, vendor_data):
+            update_url = f"{ATTIO_URL}/objects/{object_slug}/records/{vendor_record_id}"
             update_payload = {
                 "data": {
                     "vendor_email": vendor_data["vendor_email"],
                     "vendor_number": vendor_data["vendor_number"]
                 }
             }
-            update_response = requests.patch(update_url, headers=headers, json=update_payload)
+            update_response = requests.patch(update_url, headers=HEADERS, json=update_payload)
             if update_response.status_code != 200:
                 write_exception("Error updating vendor record.", request)
                 return None
@@ -96,15 +95,15 @@ def _get_or_update_vendor_record(
 
     # Create a new record if none exists
     create_payload = {"data": {"values": vendor_data}}
-    create_record_url = f"{attio_url}/objects/{object_slug}/records"
-    create_response = requests.post(create_record_url, headers=headers, json=create_payload)
+    create_record_url = f"{ATTIO_URL}/objects/{object_slug}/records"
+    create_response = requests.post(create_record_url, headers=HEADERS, json=create_payload)
     if create_response.status_code != 200:
         write_exception("Error creating vendor record.", request)
         return None
     return create_response.json().get("data", {}).get("id").get('record_id')
 
 
-def _needs_update(existing_record: Dict, vendor_data: Dict) -> bool:
+def record_needs_update(existing_record: Dict, vendor_data: Dict) -> bool:
     """Check if the vendor record needs to be updated."""
     existing_email = existing_record.get("vendor_email", [{}])[0].get("value", "")
     existing_number = existing_record.get("vendor_number", [{}])[0].get("value", "")
@@ -131,13 +130,13 @@ def _prepare_vendor_list_data(obj: Any, submission_obj: Any, vendor_record_id: s
     }
 
 
-def _update_or_create_list_entry(attio_url: str, headers: Dict, vendor_list_data: Dict, request: Any = None) -> bool:
+def _update_or_create_list_entry(vendor_list_data: Dict, request: Any = None) -> bool:
     """Update or create a vendor list entry in Attio."""
     VENDOR_LIST_NAME = "teksystems"
-    get_entry_url = f"{attio_url}/lists/{VENDOR_LIST_NAME}/entries/query"
+    get_entry_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/query"
     filter_payload = {"filter": {"submission_id": vendor_list_data["entry_values"]["submission_id"]}}
 
-    response = requests.post(get_entry_url, headers=headers, json=filter_payload)
+    response = requests.post(get_entry_url, headers=HEADERS, json=filter_payload)
     if response.status_code != 200:
         write_exception("Error fetching vendor list entry from Attio.", request)
         return False
@@ -149,16 +148,43 @@ def _update_or_create_list_entry(attio_url: str, headers: Dict, vendor_list_data
         entry_id = list_data[0].get('id').get('entry_id')
         list_payload.get("data").pop("parent_object")
         list_payload.get("data").pop("parent_record_id")
-        update_url = f"{attio_url}/lists/{VENDOR_LIST_NAME}/entries/{entry_id}"
-        update_response = requests.put(update_url, headers=headers, json=list_payload)
+        update_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/{entry_id}"
+        update_response = requests.put(update_url, headers=HEADERS, json=list_payload)
         if update_response.status_code != 200:
             write_exception("Error updating vendor list entry.", request)
             return False
     else:
-        create_url = f"{attio_url}/lists/{VENDOR_LIST_NAME}/entries"
-        create_response = requests.post(create_url, headers=headers, json=list_payload)
+        create_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries"
+        create_response = requests.post(create_url, headers=HEADERS, json=list_payload)
         if create_response.status_code != 200:
             write_exception("Error creating vendor list entry.", request)
             return False
 
     return True
+
+
+@shared_task
+def _remove_list_entry(obj_id: int, request: Any = None) -> bool:
+    try:
+        VENDOR_LIST_NAME = "teksystems"
+        get_entry_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/query"
+        filter_payload = {"filter": {"submission_id": obj_id}}
+        response = requests.post(get_entry_url, headers=HEADERS, json=filter_payload)
+        if response.status_code != 200:
+            write_exception("Error fetching vendor list entry from Attio.", request)
+            return False
+
+        list_data = response.json().get("data", [])
+        if list_data:
+            entry_id = list_data[0].get('id').get('entry_id')
+            remove_entry_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/{entry_id}"
+            response = requests.delete(remove_entry_url, headers=HEADERS)
+            if response.status_code != 200:
+                write_exception("Error removing list entry from Attio.", request)
+                return False
+            return True
+        else:
+            return True
+    except Exception as error:
+        write_exception(str(error), request)
+        return False
