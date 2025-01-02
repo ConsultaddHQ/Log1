@@ -910,7 +910,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 if submission.status in ['project', 'interview', 'in-offer']:
                     interview_obj = submission.screening.exclude(status='cancelled').first()
                     if interview_obj:
-                        attio_trigger(interview_obj, request)
+                        attio_trigger(interview_obj, "log1_vendor_company", request)
 
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
