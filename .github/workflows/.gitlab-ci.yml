@@ -80,7 +80,7 @@ jobs:
       - name: Run Test
         run: |
           echo "Run Test Cases"
-          cd /home/ubuntu/log1
+          cd /home/ubuntu/Log1
 
       - name: Deploy to Log1 Server
         run: |
