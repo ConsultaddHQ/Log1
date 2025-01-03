@@ -132,8 +132,8 @@ def _prepare_vendor_list_data(obj: Any, submission_obj: Any, vendor_record_id: s
 
 def _update_or_create_list_entry(vendor_list_data: Dict, request: Any = None) -> bool:
     """Update or create a vendor list entry in Attio."""
-    VENDOR_LIST_NAME = "teksystems"
-    get_entry_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/query"
+    vendor_list_name = config.VENDOR_LIST_NAME
+    get_entry_url = f"{ATTIO_URL}/lists/{vendor_list_name}/entries/query"
     filter_payload = {"filter": {"submission_id": vendor_list_data["entry_values"]["submission_id"]}}
 
     response = requests.post(get_entry_url, headers=HEADERS, json=filter_payload)
@@ -148,13 +148,13 @@ def _update_or_create_list_entry(vendor_list_data: Dict, request: Any = None) ->
         entry_id = list_data[0].get('id').get('entry_id')
         list_payload.get("data").pop("parent_object")
         list_payload.get("data").pop("parent_record_id")
-        update_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/{entry_id}"
+        update_url = f"{ATTIO_URL}/lists/{vendor_list_name}/entries/{entry_id}"
         update_response = requests.put(update_url, headers=HEADERS, json=list_payload)
         if update_response.status_code != 200:
             write_exception("Error updating vendor list entry.", request)
             return False
     else:
-        create_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries"
+        create_url = f"{ATTIO_URL}/lists/{vendor_list_name}/entries"
         create_response = requests.post(create_url, headers=HEADERS, json=list_payload)
         if create_response.status_code != 200:
             write_exception("Error creating vendor list entry.", request)
@@ -166,8 +166,8 @@ def _update_or_create_list_entry(vendor_list_data: Dict, request: Any = None) ->
 @shared_task
 def _remove_list_entry(obj_id: int, request: Any = None) -> bool:
     try:
-        VENDOR_LIST_NAME = "teksystems"
-        get_entry_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/query"
+        vendor_list_name = config.VENDOR_LIST_NAME
+        get_entry_url = f"{ATTIO_URL}/lists/{vendor_list_name}/entries/query"
         filter_payload = {"filter": {"submission_id": obj_id}}
         response = requests.post(get_entry_url, headers=HEADERS, json=filter_payload)
         if response.status_code != 200:
@@ -177,7 +177,7 @@ def _remove_list_entry(obj_id: int, request: Any = None) -> bool:
         list_data = response.json().get("data", [])
         if list_data:
             entry_id = list_data[0].get('id').get('entry_id')
-            remove_entry_url = f"{ATTIO_URL}/lists/{VENDOR_LIST_NAME}/entries/{entry_id}"
+            remove_entry_url = f"{ATTIO_URL}/lists/{vendor_list_name}/entries/{entry_id}"
             response = requests.delete(remove_entry_url, headers=HEADERS)
             if response.status_code != 200:
                 write_exception("Error removing list entry from Attio.", request)

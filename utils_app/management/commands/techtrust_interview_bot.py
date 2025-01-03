@@ -11,19 +11,22 @@ from utils_app.slack_notification import MessageCard as slack
 
 
 def get_prev_date(date_str=None):
-    tz = timezone('EST')
-    if date_str:
-        input_date = datetime.strptime(date_str, '%Y-%m-%d')  # Parse the input date string
-        input_date = tz.localize(input_date).date()  # Localize to EST and get the date
-    else:
-        input_date = tz.localize(datetime.now()).date()  # Use current date in EST if no date_str
+    try:
+        tz = timezone('EST')
+        if date_str:
+            input_date = datetime.strptime(date_str, '%Y-%m-%d')  # Parse the input date string
+            input_date = tz.localize(input_date).date()  # Localize to EST and get the date
+        else:
+            input_date = tz.localize(datetime.now()).date()  # Use current date in EST if no date_str
 
-    if input_date.weekday() == 0:  # Monday
-        previous_date = input_date - timedelta(days=3)
-    else:
-        previous_date = input_date - timedelta(days=1)
+        if input_date.weekday() == 0:  # Monday
+            previous_date = input_date - timedelta(days=3)
+        else:
+            previous_date = input_date - timedelta(days=1)
 
-    return previous_date
+        return previous_date
+    except Exception as e:
+        raise Exception
 
 
 def get_interviewers_details(obj):
