@@ -83,8 +83,10 @@ def _get_or_update_vendor_record(object_slug: str, vendor_data: Dict, request: A
             update_url = f"{ATTIO_URL}/objects/{object_slug}/records/{vendor_record_id}"
             update_payload = {
                 "data": {
-                    "vendor_email": vendor_data["vendor_email"],
-                    "vendor_number": vendor_data["vendor_number"]
+                    "values": {
+                        "vendor_email": vendor_data["vendor_email"],
+                        "vendor_number": vendor_data["vendor_number"]
+                    }
                 }
             }
             update_response = requests.patch(update_url, headers=HEADERS, json=update_payload)
