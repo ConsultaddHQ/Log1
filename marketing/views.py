@@ -175,11 +175,22 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             )
 
             serializer = VendorContactSerializer(vendor_contact)
-            if updated_keys:
-                desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
-                create_activity(submission_id, 'submission', request.user, desc, 'updated')
-                return Response({"data": serializer.data, "message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
-            return Response({"data": serializer.data, "message": "No change provided"}, status=HTTP_200_OK)
+            if not updated_keys:
+                return Response({"data": serializer.data, "message": "No change provided"}, status=HTTP_200_OK)
+            #Attio Trigger
+            submission = Submission.objects.filter(
+                id=int(submission_id), status__in=['project', 'interview', 'in-offer']
+            ).first()
+            if submission:
+                interview_obj = submission.screening.exclude(status='cancelled').first()
+                if interview_obj:
+                    attio_trigger(interview_obj, "log1_vendor_company", request)
+
+            #Create Activity
+            desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
+            create_activity(submission_id, 'submission', request.user, desc, 'updated')
+
+            return Response({"data": serializer.data, "message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=HTTP_400_BAD_REQUEST)
