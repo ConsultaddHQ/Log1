@@ -526,6 +526,51 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
+    DURATION_TYPES = {'hourly': 'hours', 'half': 4, 'full': 8}
+
+    @staticmethod
+    def validate_dates(data, current_year):
+        from_date = data.get('from_date')
+        if from_date > f"{current_year}-12-31":
+            return "Leave application for future years is not allowed.", 400
+        if from_date < f"{current_year}-01-15":
+            return None  # Signal to check for previous year's leave
+        return None
+
+    @staticmethod
+    def send_leave_email(consultant, leave, attachment):
+        path = []
+        if attachment:
+            try:
+                response, _ = download_s3_object(attachment.attachment_file.name)
+                path.append(response)
+            except Exception as error:
+                write_exception(error)
+
+        mail_data = {
+            "template": "../templates/leave_request.html",
+            "attachments": path,
+            "subject": f"Leave Requested from {consultant.name}",
+            "to": ["siddharth.g@consultadd.com"],
+            "cc": ["finance@consultadd.com"],
+            "bcc": [],
+            "context": {
+                "end_date": leave.to_date,
+                "start_date": leave.from_date,
+                "consultant_name": consultant.name,
+                "hours": leave.total_hours,
+                "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}"
+            }
+        }
+        return send_email(mail_data, consultant.email)
+
+    def calculate_leave_hours(self, data, start_date, end_date, request):
+        duration_type = data.get('duration_type')
+        if duration_type in self.DURATION_TYPES:
+            return float(data.get(self.DURATION_TYPES[duration_type], 0))
+        total_days = check_days(start_date, end_date, request)
+        return total_days * 8
+
     @action(methods=['GET'], detail=True, url_path='balance')
     def balance(self, request, pk):
         try:
@@ -541,74 +586,69 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['POST'], detail=True, url_path='apply')
     def apply(self, request, pk, *args, **kwargs):
         try:
-            attachment = None
             data = request.data
             consultant = request.user
-            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
-
             current_year = datetime.now().year
-            if data.get('from_date') > f"{current_year}-12-31":
-                return Response({"message": "Leave application for future years is not allowed."}, status=400)
 
+            # Validate leave type and dates
+            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
+            validation_error = self.validate_dates(data, current_year)
+            if validation_error:
+                message, status = validation_error
+                return Response({"message": message}, status=status)
+
+            # Check for previous year's leave balance
+            if validation_error is None:
+                prev_year_leave_type = ConsultantLeave.objects.filter(
+                    consultant=consultant, year=current_year - 1, leave_type=leave_type.leave_type
+                ).first()
+                if not prev_year_leave_type or (prev_year_leave_type and prev_year_leave_type.balance == 0):
+                    return Response({"message": "Previous year leave balance is not available."})
+                leave_type = prev_year_leave_type
+
+            # Calculate leave hours
+            from_date = datetime.strptime(data['from_date'], "%Y-%m-%d").date()
+            to_date = datetime.strptime(data['to_date'], "%Y-%m-%d").date()
+            leave_hours = self.calculate_leave_hours(data, from_date, to_date, request)
+
+            if leave_type.balance < leave_hours:
+                return Response({"message": "Insufficient leave balance available."})
+
+            # Create leave entry
             leave = Leave.objects.create(
                 leave_type=leave_type,
                 consultant=consultant,
                 applied_on=date.today(),
+                total_hours=leave_hours,
                 to_date=data.get('to_date'),
                 from_date=data.get('from_date'),
-                description=data.get('description', None)
+                description=data.get('description', None),
+                status='applied' if not consultant.approval_required else 'pending'
             )
 
-            if data['duration_type'] == 'hourly':
-                leave.total_hours = float(data.get("hours"))
-            elif data['duration_type'] == 'half':
-                leave.total_hours = 4
-            elif data['duration_type'] == 'full':
-                leave.total_hours = 8
-            else:
-                end = datetime.strptime(leave.to_date, "%Y-%m-%d").date()
-                start = datetime.strptime(leave.from_date, "%Y-%m-%d").date()
-                total_days = check_days(start, end, request)
-                leave.total_hours = total_days * 8
-
-            leave.status = 'applied' if not consultant.approval_required else 'pending'
-            leave.save()
-            leave_type.balance = leave_type.balance - leave.total_hours
+            # Update leave balance
+            leave_type.balance -= leave_hours
             leave_type.save()
 
-            content_type = ContentType.objects.get(model='leave')
+            # Handle attachment
+            attachment = None
             if request.FILES.get('attachment', None):
                 attachment = Attachment.objects.create(
                     creator_id=1,
                     object_id=leave.id,
-                    content_type=content_type,
+                    content_type=ContentType.objects.get(model='leave'),
                     attachment_type='consultant_leave',
                     attachment_file=request.FILES.get('attachment'),
                 )
 
+            # Send email if approval is required
             if consultant.approval_required:
-                path = []
-                if attachment:
-                    try:
-                        response, error = download_s3_object(attachment.attachment_file.name)
-                        path.append(response)
-                    except Exception as error:
-                        write_exception(error, request)
+                email_response, _, _ = self.send_leave_email(consultant, leave, attachment)
+                if not email_response:
+                    write_exception(email_response)
 
-                mail_data = {
-                    "template": "../templates/leave_request.html", "attachments": path,
-                    "subject": f"Leave Requested from {consultant.name}",
-                    "to": ["siddharth.g@consultadd.com"], "cc": ["finance@consultadd.com"], "bcc": [],
-                    "context": {
-                        "end_date": leave.to_date, "start_date": leave.from_date,
-                        "consultant_name": consultant.name, "hours": leave.total_hours,
-                        "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}"
-                    }
-                }
-                cal_id, res, _ = send_email(mail_data, consultant.email, request)
-                if not res:
-                    write_exception(cal_id, request)
-            return Response({"message": "leave applied successfully"}, status=201)
+            return Response({"message": "Leave applied successfully."}, status=201)
+
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
