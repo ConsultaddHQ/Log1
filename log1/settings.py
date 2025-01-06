@@ -292,6 +292,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('EMAIL_MAX_RETRY', ('4', 'Email Max Retry')),
     ('APP_URL', ('https://log1.com/', 'Log1 URL')),
     ('ATTIO_URL', ('attio url', 'Attio Api URL')),
+    ('VENDOR_LIST_NAME', ('attio vendor list name', 'Attio Vendor List Name')),
     ('MAIL_LOGGER', ('mail_delivery_status.csv', 'MAIL LOGGER')),
     ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
     ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
@@ -362,7 +363,7 @@ CONSTANCE_CONFIG = OrderedDict([
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
         'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL', 'EMAIL_MAX_RETRY',
-        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN', 'ATTIO_URL', 'ATTIO_API_KEY'
+        'MAIL_LOGGER', 'GOOGLE_SERVICE_FILE', 'SLACK_TOKEN', 'ATTIO_URL', 'ATTIO_API_KEY', 'VENDOR_LIST_NAME'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
