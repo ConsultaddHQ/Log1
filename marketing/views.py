@@ -175,11 +175,22 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             )
 
             serializer = VendorContactSerializer(vendor_contact)
-            if updated_keys:
-                desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
-                create_activity(submission_id, 'submission', request.user, desc, 'updated')
-                return Response({"data": serializer.data, "message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
-            return Response({"data": serializer.data, "message": "No change provided"}, status=HTTP_200_OK)
+            if not updated_keys:
+                return Response({"data": serializer.data, "message": "No change provided"}, status=HTTP_200_OK)
+            #Attio Trigger
+            submission = Submission.objects.filter(
+                id=int(submission_id), status__in=['project', 'interview', 'in-offer']
+            ).first()
+            if submission:
+                interview_obj = submission.screening.exclude(status='cancelled').first()
+                if interview_obj:
+                    attio_trigger(interview_obj, "log1_vendor_company", request)
+
+            #Create Activity
+            desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
+            create_activity(submission_id, 'submission', request.user, desc, 'updated')
+
+            return Response({"data": serializer.data, "message": "Vendor contact details updated"}, status=HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=HTTP_400_BAD_REQUEST)
@@ -905,6 +916,13 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                                     f"project's project type for to {submission.get_work_type_display()}\n\nThanks\nRegards\nThe Log1 Team"
                         }
                         send_email_without_template(mail_data, request.user.email, request=request)
+
+                #Attio Trigger
+                if submission.status in ['project', 'interview', 'in-offer']:
+                    interview_obj = submission.screening.exclude(status='cancelled').first()
+                    if interview_obj:
+                        attio_trigger(interview_obj, "log1_vendor_company", request)
+
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
@@ -1682,6 +1700,10 @@ class InterviewViewSets(ModelViewSet):
             if interview.round == 1:
                 interview = self.rank_interviews(interview, 'create')
 
+            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
+
             # Calendar attendees and User for sending notification
             title = get_interview_title(interview)
             # interview.submission.created_by.email
@@ -1699,9 +1721,6 @@ class InterviewViewSets(ModelViewSet):
                 "description": interview.description, "call_details": interview.call_details,
             }
 
-            data_recorded = attio_trigger(submission, "log1_vendor_company", request)
-            if not data_recorded:
-                write_exception("Issue while adding vendor data to attio", request)
             # Booking Calendar
             try:
                 # Booking Google calendar
@@ -1905,6 +1924,10 @@ class InterviewViewSets(ModelViewSet):
 
             interview.save()
 
+            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
+
             # Activity
             updated_fields = self.check_activity(prev=prev_interview_data, obj=interview, request=request)
             desc = f"{request.user.employee_name} updated {updated_fields}"
@@ -2058,6 +2081,11 @@ class InterviewViewSets(ModelViewSet):
                 slack_card_json = interview_feedback_card(interview, request)
                 post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
 
+            # Update Attio Entry
+            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
+
             # Activity
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
@@ -2206,6 +2234,10 @@ class InterviewViewSets(ModelViewSet):
                          'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
                          'company_name', 'screening_type', 'interview_mode')
 
+                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
+
                 notification_data = {
                     'parent_id': submission.id, 'sender_user_type': 'user', 'target_type': 'interview',
                     'parent_type': 'submission', 'title': 'Interview Updated', 'sender_id': request.user.id,
@@ -2258,6 +2290,10 @@ class InterviewViewSets(ModelViewSet):
             interview.save()
 
             submission = interview.submission
+
+            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
 
             # Activity
             desc = f"Interview round {interview.round} is cancelled"
