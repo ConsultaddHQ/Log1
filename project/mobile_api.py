@@ -531,11 +531,17 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @staticmethod
     def validate_dates(data, current_year):
         from_date = data.get('from_date')
-        if from_date > f"{current_year}-12-31":
-            return "Leave application for future years is not allowed.", 400
-        if from_date < f"{current_year}-01-15":
-            return None  # Signal to check for previous year's leave
-        return None
+        if date.today().strftime("%Y-%m-%d") > f"{current_year}-01-15":
+            if from_date < f"{current_year}-12-01":
+                return f"{current_year-1} year leaves have been expired.", 400
+            else:
+                return True, 200
+        else:
+            if from_date > f"{current_year}-01-15":
+                return True, 200
+            else:
+                return False, 200
+
 
     @staticmethod
     def send_leave_email(consultant, leave, attachment):
@@ -592,13 +598,12 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
 
             # Validate leave type and dates
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
-            validation_error = self.validate_dates(data, current_year)
-            if validation_error:
-                message, status = validation_error
-                return Response({"message": message}, status=status)
+            validation_msg, status = self.validate_dates(data, current_year)
+            if status is 400:
+                return Response({"message": validation_msg}, status=status)
 
             # Check for previous year's leave balance
-            if validation_error is None:
+            if validation_msg is False:
                 prev_year_leave_type = ConsultantLeave.objects.filter(
                     consultant=consultant, year=current_year - 1, leave_type=leave_type.leave_type
                 ).first()
