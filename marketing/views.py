@@ -941,10 +941,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             pending_before = date.today() - timedelta(days=25)
-            test_lst = Test.objects.filter(
+            test_lst = Test.objects.exclude(submission__created_by__employee_id=3136).filter(
                 status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
-            interview_lst = Interview.objects.filter(
+            interview_lst = Interview.objects.exclude(submission__created_by__employee_id=3136).filter(
                 status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
 

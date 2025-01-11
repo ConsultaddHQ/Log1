@@ -531,13 +531,13 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @staticmethod
     def validate_dates(data, current_year):
         from_date = data.get('from_date')
-        if date.today().strftime("%Y-%m-%d") > f"{current_year}-01-15":
+        if date.today().strftime("%Y-%m-%d") > f"{current_year}-01-20":
             if from_date < f"{current_year}-12-01":
                 return f"{current_year-1} year leaves have been expired.", 400
             else:
                 return True, 200
         else:
-            if from_date > f"{current_year}-01-15":
+            if from_date > f"{current_year}-01-20":
                 return True, 200
             else:
                 return False, 200
