@@ -529,18 +529,45 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     DURATION_TYPES = {'hourly': 'hours', 'half': 4, 'full': 8}
 
     @staticmethod
-    def validate_dates(data, current_year):
-        from_date = data.get('from_date')
-        if date.today().strftime("%Y-%m-%d") > f"{current_year}-01-20":
-            if from_date < f"{current_year}-12-01":
-                return f"{current_year-1} year leaves have been expired.", 400
-            else:
-                return True, 200
-        else:
-            if from_date > f"{current_year}-01-20":
-                return True, 200
-            else:
-                return False, 200
+    def validate_dates(from_date, to_date, current_date):
+        try:
+            from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+            to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
+            current_date_obj = datetime.strptime(current_date, "%Y-%m-%d").date()
+        except ValueError:
+            return False, 400
+
+        # Ensure 'from_date' is before or equal to 'to_date'
+        if from_date_obj > to_date_obj:
+            return False, 400
+
+        # Determine the leave year and the cutoff date for previous year's leave
+        leave_year = from_date_obj.year
+        cutoff_date = date(leave_year + 1, 1, 20)
+
+        # Validation conditions
+        if from_date_obj.year != to_date_obj.year:
+            return False, 400
+
+        if current_date_obj <= cutoff_date and leave_year == current_date_obj.year - 1:
+            return True, 200
+
+        if leave_year == current_date_obj.year:
+            return True, 200
+
+        return False, 400
+    # def validate_dates(data, current_year):
+    #     from_date = data.get('from_date')
+    #     if date.today().strftime("%Y-%m-%d") > f"{current_year}-01-20":
+    #         if from_date < f"{current_year}-12-01":
+    #             return f"{current_year-1} year leaves have been expired.", 400
+    #         else:
+    #             return True, 200
+    #     else:
+    #         if from_date > f"{current_year}-01-20":
+    #             return True, 200
+    #         else:
+    #             return False, 200
 
 
     @staticmethod
@@ -577,6 +604,13 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         total_days = check_days(start_date, end_date, request)
         return total_days * 8
 
+    def is_prev_year_leave(self, from_date, to_date):
+        from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+        to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
+
+        current_year = datetime.now().year
+        return from_date_obj.year == current_year - 1 and to_date_obj.year == current_year - 1
+
     @action(methods=['GET'], detail=True, url_path='balance')
     def balance(self, request, pk):
         try:
@@ -598,12 +632,13 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
 
             # Validate leave type and dates
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
-            validation_msg, status = self.validate_dates(data, current_year)
+            validation_msg, status = self.validate_dates(from_date=data.get('from_date'), to_date=data.get('to_date'),
+                                                         current_date=str(datetime.now().date()))
             if status is 400:
                 return Response({"message": validation_msg}, status=status)
 
             # Check for previous year's leave balance
-            if validation_msg is False:
+            if validation_msg is True and self.is_prev_year_leave(from_date=data.get('from_date'), to_date=data.get('to_date')):
                 prev_year_leave_type = ConsultantLeave.objects.filter(
                     consultant=consultant, year=current_year - 1, leave_type=leave_type.leave_type
                 ).first()
