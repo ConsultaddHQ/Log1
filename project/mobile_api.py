@@ -637,6 +637,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
             validation_msg, status = self.validate_dates(from_date=data.get('from_date'), to_date=data.get('to_date'),
                                                          current_date=str(datetime.now().date()))
+            print("adding log message")
 
             if status is 400:
                 return Response({"message": validation_msg}, status=status)
