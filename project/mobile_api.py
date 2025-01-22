@@ -639,7 +639,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                                                          current_date=str(datetime.now().date()))
             print("adding log message")
 
-            if status is 400:
+            if status == 400:
                 return Response({"message": validation_msg}, status=status)
 
             # Check for previous year's leave balance
@@ -648,7 +648,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                     consultant=consultant, year=current_year - 1, leave_type=leave_type.leave_type
                 ).first()
                 if not prev_year_leave_type or (prev_year_leave_type and prev_year_leave_type.balance == 0):
-                    return Response({"message": "Previous year leave balance is not available."},status=400)
+                    return Response({"message": "Previous year leave balance is not available."}, status=400)
                 leave_type = prev_year_leave_type
 
             # Calculate leave hours
