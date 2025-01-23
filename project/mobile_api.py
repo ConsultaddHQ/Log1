@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
+from rest_framework import status
 
 from constance import config
 
@@ -530,6 +531,10 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
 
     @staticmethod
     def validate_dates(from_date, to_date, current_date):
+        """
+
+        :rtype: object
+        """
         try:
             from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
             to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
@@ -543,7 +548,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
 
         # Determine the leave year and the cutoff date for previous year's leave
         leave_year = from_date_obj.year
-        cutoff_date = date(leave_year + 1, 1, 20)
+        cutoff_date = date(leave_year + 1, 1, 30)
 
         # Validation conditions
         if from_date_obj.year != to_date_obj.year:
@@ -632,12 +637,17 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             data = request.data
             consultant = request.user
             current_year = datetime.now().year
+            leave_type_id = data.get('leave_type')
+            try:
+                leave_type = ConsultantLeave.objects.get(id=leave_type_id, is_expired=False, on_hold=False)
+            except ConsultantLeave.DoesNotExist:
+                return Response({"message": "Leaves are not available or expired "}, status=404)
+
+            # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
 
             # Validate leave type and dates
-            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
             validation_msg, status = self.validate_dates(from_date=data.get('from_date'), to_date=data.get('to_date'),
                                                          current_date=str(datetime.now().date()))
-            print("adding log message")
 
             if status == 400:
                 return Response({"message": validation_msg}, status=status)
