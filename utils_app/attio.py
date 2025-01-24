@@ -58,22 +58,22 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
 @shared_task
 def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
     try:
-        get_company = _fetch_record("companies", {"name": obj.vendor.name}, request)
+        company_obj = _fetch_record("companies", {"name": obj.vendor.name}, request)
         associated_company_id = (
-            get_company.get("record_id")[0].get("value")
-            if get_company and "record_id" in get_company and get_company["record_id"]
+            company_obj.get("record_id")[0].get("value")
+            if company_obj and "record_id" in company_obj and company_obj["record_id"]
             else None
         )
-        get_person = _fetch_record("people", {"name": obj.vendor_contact.name}, request)
+        person_obj = _fetch_record("people", {"name": obj.vendor_contact.name}, request)
         associated_person_id = (
-            get_person.get("record_id")[0].get("value")
-            if get_person and "record_id" in get_person and get_person["record_id"]
+            person_obj.get("record_id")[0].get("value")
+            if person_obj and "record_id" in person_obj and person_obj["record_id"]
             else None
         )
-        get_creator = _fetch_record("people", {"email": obj.created_by.email}, request)
+        creator_obj = _fetch_record("people", {"email": obj.created_by.email}, request)
         associated_creator_id = (
-            get_creator.get("record_id")[0].get("value")
-            if get_creator and "record_id" in get_creator and get_creator["record_id"]
+            creator_obj.get("record_id")[0].get("value")
+            if creator_obj and "record_id" in creator_obj and creator_obj["record_id"]
             else None
         )
         if obj.rate and obj.consultant.rate:
