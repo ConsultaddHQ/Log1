@@ -56,6 +56,7 @@ class VendorContact(TimeStampedModel):
     source_link = models.TextField(_('Source Link'), null=True, blank=True)
     email = models.EmailField(_('Email'), max_length=100, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=100, null=True, blank=True)
+    region = models.CharField(_('Vendor Region'), max_length=50, null=True, blank=True)
     company = models.ForeignKey(
         VendorCompany, on_delete=models.CASCADE,
         related_name='vendors',
