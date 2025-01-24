@@ -70,9 +70,15 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
             if get_person and "record_id" in get_person and get_person["record_id"]
             else None
         )
+        get_creator = _fetch_record("people", {"email": obj.created_by.email}, request)
+        associated_creator_id = (
+            get_creator.get("record_id")[0].get("value")
+            if get_creator and "record_id" in get_creator and get_creator["record_id"]
+            else None
+        )
         if obj.rate and obj.consultant.rate:
             rate = (obj.rate - obj.consultant.rate)
-            deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id)
+            deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id, associated_creator_id)
             _update_or_create_deal(deal_data, object_slug, request)
         
         return True
@@ -91,7 +97,7 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
         start_date = datetime.strptime(obj.start_date, '%Y-%m-%d')
         total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
         rate = (obj.rate - obj.consultant.rate) * 40 * 4 * total_months
-        deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None)
+        deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
         note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate - submission.consultant.rate} - {total_months} months - Received offer, starting {obj.start_date}"
@@ -118,7 +124,7 @@ def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, reques
         write_exception(str(error), request)
 
 
-def _extract_deal_data(submission_obj: Any, rate: int, company_id: Optional[str], person_id: Optional[str]) -> Dict:
+def _extract_deal_data(submission_obj: Any, rate: int, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
     deal_data = {
         "vendor_company": f"{submission_obj.vendor.name}",
         "deal_rate": rate,
@@ -132,6 +138,8 @@ def _extract_deal_data(submission_obj: Any, rate: int, company_id: Optional[str]
         deal_data["associated_company"] = [company_id]
     if person_id:
         deal_data["associated_people"] = [person_id]
+    if creator_id:
+        deal_data["lead_source"] = [creator_id]
 
     return deal_data
 
