@@ -25,6 +25,7 @@ from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
+from utils_app.attio import attio_deal_won_trigger
 from notification.models import Notification, FCMDevice
 from marketing.utils import date_filter, get_authenticated_users
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
@@ -769,6 +770,9 @@ class ProjectViewSets(ModelViewSet):
                     util.send_join_notification()
                     assign_project_associates(project, request)
                     project.save()
+
+                    #send attio Trigger
+                    attio_deal_won_trigger("log1_deals", project)
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
