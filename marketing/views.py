@@ -907,7 +907,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
                  #Attio Create Deal Trigger
                 if submission.rate and submission.employer == 'Consultadd' and submission.vendor_contact and submission.client:
-                   attio_create_deal_trigger(submission, "log1_deals", request)
+                   attio_create_deal_trigger(submission, "deals_2025", request)
                    
                 project = Project.objects.filter(submission=submission)
                 if project and prev_work_type != serializer.data['work_type']:
