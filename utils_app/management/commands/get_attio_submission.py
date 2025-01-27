@@ -53,7 +53,7 @@ class Command(BaseCommand):
                     deal_data["lead_owner"] = [associated_creator.get("record_id", [{}])[0].get("value")]
 
                 if _update_or_create_deal(deal_data, "deal_2025"):
-                    if submission.status in ['interview', 'in-offer']:
+                    if submission.status in ['interview', 'in-offer', 'project']:
                         deal_data["deal_stage"] = "In Process"
 
                         # Add notes for interviews
@@ -70,18 +70,19 @@ class Command(BaseCommand):
                                 note_title=title,
                                 note=note_content
                             )
-                    project = Project.objects.filter(submission=submission)
-                    if project.status == 'joined':
-                        end_date = datetime.strptime(project.end_date, '%Y-%m-%d')
-                        start_date = datetime.strptime(project.start_date, '%Y-%m-%d')
-                        total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-                        rate = (project.rate - project.consultant.rate) * 40 * 4 * total_months
-                        deal_data['deal_rate'] = rate
-                        deal_data["deal_stage"] = "Won"
-                        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate - submission.consultant.rate} - {total_months} months - Received offer, starting {project.start_date}"
-                        _update_or_create_note("deals_2025", submission.id, "Project Details", note)
+                        if submission.status == 'project':       
+                            project = Project.objects.filter(submission=submission)
+                            if project.status == 'joined':
+                                end_date = datetime.strptime(project.end_date, '%Y-%m-%d')
+                                start_date = datetime.strptime(project.start_date, '%Y-%m-%d')
+                                total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+                                rate = (project.rate - project.consultant.rate) * 40 * 4 * total_months
+                                deal_data['deal_rate'] = rate
+                                deal_data["deal_stage"] = "Won"
+                                note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate - submission.consultant.rate} - {total_months} months - Received offer, starting {project.start_date}"
+                                _update_or_create_note("deals_2025", submission.id, "Project Details", note)
 
-                    _update_or_create_deal(deal_data, "deal_2025")
+                        _update_or_create_deal(deal_data, "deal_2025")
 
         except Exception as error:
             print(f"An error occurred: {error}")
