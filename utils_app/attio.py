@@ -71,7 +71,7 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
             if person_obj and "record_id" in person_obj and person_obj["record_id"]
             else None
         )
-        creator_obj = _fetch_record("people", {"email": obj.created_by.email}, request)
+        creator_obj = _fetch_record("people", {"email_addresses": obj.created_by.email}, request)
         associated_creator_id = (
             creator_obj.get("record_id")[0].get("value")
             if creator_obj and "record_id" in creator_obj and creator_obj["record_id"]
