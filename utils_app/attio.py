@@ -30,13 +30,13 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
         # deal stage change
         if submission_obj.status in ['interview',"in_offer"]: 
             stage = "Failed" if obj.get_status_display() in ["Failed", "Cancelled"] else "In Process"
-            update_deal_stage_trigger("ATTIO_DEAL_NAME", submission_obj.id, stage)
+            update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj.id, stage)
         
         # add note for interview status update with feedback
         if obj.get_status_display() in ["Next Round", "Offer", "Failed", "Cancelled"] and status_change:
             note = f"Interview Date - {obj.start_time.strftime('%Y-%m-%d')}, Feedback: {obj.feedback}"
             title = f"Interview Details - R{obj.round}"
-            _update_or_create_note("ATTIO_DEAL_NAME", submission_obj.id, title, note, request)
+            _update_or_create_note(ATTIO_DEAL_NAME, submission_obj.id, title, note, request)
 
         # Check for existing vendor record
         vendor_record_id = _get_or_update_vendor_record(object_slug, vendor_data)
