@@ -297,7 +297,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
     ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
     ('ATTIO_API_KEY', ('attio api key', 'Attio Service Account API Key')),
-    ('ATTIO_DEAL_NAME', ('attio deal name', 'Attio Service Account Deal Name'))
+    ('ATTIO_DEAL_NAME', ('attio deal name', 'Attio Service Account Deal Name')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
