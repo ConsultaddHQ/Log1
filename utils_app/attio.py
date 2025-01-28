@@ -33,8 +33,8 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
             update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj.id, stage)
         
         # add note for interview status update with feedback
-        if obj.get_status_display() in ["Next Round", "Offer", "Failed", "Cancelled"] and status_change:
-            note = f"Interview Date - {obj.start_time.strftime('%Y-%m-%d')}, Feedback: {obj.feedback}"
+        if obj.get_status_display() in ["Next Round", "offer", "Failed", "Cancelled"] and status_change:
+            note = f"Interview Date - {obj.start_time.strftime('%Y-%m-%d')},\nFeedback: {obj.feedback}"
             title = f"Interview Details - R{obj.round}"
             _update_or_create_note(ATTIO_DEAL_NAME, submission_obj.id, title, note, request)
 
@@ -78,7 +78,7 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
             else None
         )
         if obj.rate and obj.consultant.rate:
-            rate = (obj.rate - obj.consultant.rate)
+            rate = float(obj.rate) - float(obj.consultant.rate)
             deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id, associated_creator_id)
             _update_or_create_deal(deal_data, object_slug, request)
         
@@ -97,7 +97,7 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
         end_date = datetime.strptime(obj.end_date, '%Y-%m-%d')
         start_date = datetime.strptime(obj.start_date, '%Y-%m-%d')
         total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-        rate = (obj.rate - obj.consultant.rate) * 40 * 4 * total_months
+        rate = (float(obj.rate) - float(obj.consultant.rate)) * 40 * 4 * total_months
         deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
@@ -117,7 +117,7 @@ def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, reques
 
         deal_record_id = record.get("record_id", [{}])[0].get("value")
         update_url = f"{ATTIO_URL}/objects/{object_slug}/records/{deal_record_id}"
-        payload = {"data": {"values": {"stage": stage}}}
+        payload = {"data": {"values": {"deal_stage": stage}}}
         response = requests.patch(update_url, headers=HEADERS, json=payload)
         if response.status_code != 200:
             write_exception("Error updating deal stage in Attio.", request)
@@ -125,7 +125,7 @@ def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, reques
         write_exception(str(error), request)
 
 
-def _extract_deal_data(submission_obj: Any, rate: int, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
+def _extract_deal_data(submission_obj: Any, rate: float, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
     deal_data = {
         "vendor_company": f"{submission_obj.vendor.name}",
         "deal_rate": rate,
@@ -133,6 +133,7 @@ def _extract_deal_data(submission_obj: Any, rate: int, company_id: Optional[str]
         "consultant_name": submission_obj.consultant.name,
         "unique_key": f"{submission_obj.vendor.name} {submission_obj.vendor_contact.region or ''} - {submission_obj.client} - {submission_obj.consultant.name}",
         "deal_id": submission_obj.id,
+        "vendor_region": submission_obj.vendor_contact.region or ''
     }
 
     if company_id:
