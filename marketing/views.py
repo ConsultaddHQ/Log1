@@ -1714,6 +1714,7 @@ class InterviewViewSets(ModelViewSet):
             if interview.round == 1:
                 interview = self.rank_interviews(interview, 'create')
 
+            #Attio Trigger
             data_recorded = attio_trigger(interview, "log1_vendor_company", request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
@@ -1878,6 +1879,12 @@ class InterviewViewSets(ModelViewSet):
                     "summary": title, "call_details": request.data["call_details"],
                 }
 
+                #Attio Trigger
+                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
+
+
                 # Updating calendar Booking
                 calendar_id = interview.calendar_id
                 calendar = GoogleCalendar()
@@ -1937,10 +1944,6 @@ class InterviewViewSets(ModelViewSet):
                 interview.guest_type = guest_type
 
             interview.save()
-
-            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
-            if not data_recorded:
-                write_exception("Issue while adding vendor data to attio", request)
 
             # Activity
             updated_fields = self.check_activity(prev=prev_interview_data, obj=interview, request=request)
@@ -2176,6 +2179,12 @@ class InterviewViewSets(ModelViewSet):
                     "end": end_time, "description": request.data["description"], "start": start_time, "summary": title,
                 }
 
+                #Attio Trigger
+                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
+
+
                 # Updating calendar Booking
                 calendar_id = interview.calendar_id
                 calendar = GoogleCalendar()
@@ -2249,10 +2258,6 @@ class InterviewViewSets(ModelViewSet):
                          'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
                          'company_name', 'screening_type', 'interview_mode')
 
-                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
-                if not data_recorded:
-                    write_exception("Issue while adding vendor data to attio", request)
-
                 notification_data = {
                     'parent_id': submission.id, 'sender_user_type': 'user', 'target_type': 'interview',
                     'parent_type': 'submission', 'title': 'Interview Updated', 'sender_id': request.user.id,
@@ -2306,6 +2311,7 @@ class InterviewViewSets(ModelViewSet):
 
             submission = interview.submission
 
+            #Attio Trigger
             data_recorded = attio_trigger(interview, "log1_vendor_company", request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
