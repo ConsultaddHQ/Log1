@@ -178,19 +178,25 @@ def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note
             return False
 
         deal_record_id = record.get("record_id", [{}])[0].get("value")
-        # list_note_url = f"{ATTIO_URL}/notes"
-        # query_params = {
-        #     "parent_object": object_slug,
-        #     "parent_record_id": deal_record_id
-        # }
-        # response = requests.get(list_note_url, headers=HEADERS, params=query_params)
-        # if response.status_code != 200:
-        #     write_exception("Error fetching notes from Attio.", request)
-        #     return None
-
-        # data = response.json().get("data", [])
-        # note_exist = next((note for note in data if note.get("title") == "Interview Details"), None)
         note_url = f"{ATTIO_URL}/notes"
+        query_params = {
+            "parent_object": object_slug,
+            "parent_record_id": deal_record_id
+        }
+        response = requests.get(note_url, headers=HEADERS, params=query_params)
+        if response.status_code != 200:
+            write_exception("Error fetching notes from Attio.", request)
+            return None
+
+        data = response.json().get("data", [])
+        note_exist = next((note for note in data if note.get("title") == note_title), None)
+        if note_exist:
+            note_id = note_exist['id']['note_id']
+            response = requests.delete(f"{note_url}/{note_id}", headers=HEADERS)
+            if response.status_code != 200:
+                write_exception("Error fetching notes from Attio.", request)
+                return None
+
         payload = {
             "data": {
                 "parent_object": object_slug,
