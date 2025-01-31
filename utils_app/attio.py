@@ -4,6 +4,7 @@ from celery import shared_task
 from datetime import datetime
 from constance import config
 from log1.utils import write_exception
+from django.utils import timezone
 
 ATTIO_URL = config.ATTIO_URL
 API_KEY = config.ATTIO_API_KEY
@@ -78,7 +79,10 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
             else None
         )
         if obj.rate and obj.consultant.rate:
-            rate = float(obj.rate) - float(obj.consultant.rate)
+            if obj.work_type == "Full Time":
+                rate = float(obj.rate)
+            else:
+                rate = float(obj.rate) - float(obj.consultant.rate)
             deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id, associated_creator_id)
             _update_or_create_deal(deal_data, object_slug, request)
         
@@ -94,20 +98,31 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
         submission = obj.submission
         update_deal_stage_trigger(object_slug, submission.id, "Won", request)
 
-        end_date = datetime.strptime(obj.end_date, '%Y-%m-%d')
-        start_date = datetime.strptime(obj.start_date, '%Y-%m-%d')
-        total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-        rate = (float(obj.rate) - float(obj.consultant.rate)) * 40 * 4 * total_months
+        rate = get_rate(obj)
         deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
-        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate - submission.consultant.rate} - {total_months} months - Received offer, starting {obj.start_date}"
+        if obj.work_type == "Full Time":
+            note_rate = float(obj.rate)
+        else:
+            note_rate = float(obj.rate) - float(obj.consultant.rate)
+        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${note_rate} - {obj.duration} months - Received offer, starting {obj.start_date}"
         _update_or_create_note(object_slug, submission.id, "Project Details", note, request)
         return True
     except Exception as error:
         write_exception(str(error), request)
         return False
-
+    
+def get_rate(obj: Any) -> float:
+    submission = obj.submission
+    if submission.work_type != "Full Time":
+        if int(obj.duration) % 3 == 0:
+            rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(obj.duration) / 3) 
+        else:
+            rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(obj.duration)
+    else:
+        rate = float(submission.rate)
+    return rate
 
 def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, request: Any = None) -> None:
     try:

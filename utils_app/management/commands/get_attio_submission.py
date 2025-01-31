@@ -4,6 +4,7 @@ from marketing.models import Submission
 from constance import config
 import requests
 from typing import Optional, Dict, Any
+from django.utils import timezone
 from datetime import datetime
 from project.models import Project
 
@@ -20,8 +21,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
+            start_date = timezone.make_aware(datetime(2025, 1, 1))
             submissions = Submission.objects.filter(
-                created__gte='2025-01-01',
+                created__gte=start_date,
                 rate__gt=0,
                 employer='Consultadd',
             ).exclude(
@@ -31,9 +33,13 @@ class Command(BaseCommand):
             ).order_by('created')
 
             for submission in submissions:
+                if submission.work_type == "Full Time":
+                    rate = float(submission.rate)
+                else:
+                    rate = float(submission.rate) - float(submission.consultant.rate)
                 deal_data = {
                     "vendor_company": submission.vendor.name,
-                    "deal_rate": (submission.rate - submission.consultant.rate),
+                    "deal_rate": rate,
                     "client_name": submission.client,
                     "consultant_name": submission.consultant.name,
                     "unique_key": f"{submission.vendor.name} {submission.vendor_contact.region or ''} - {submission.client} - {submission.consultant.name}",
@@ -82,13 +88,20 @@ class Command(BaseCommand):
                                 # end_date = datetime.strptime(project.end_date, '%Y-%m-%d')
                                 # start_date = datetime.strptime(project.start_date, '%Y-%m-%d')
                                 # total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-                                end_date = project.end_date
-                                start_date = project.start_date
-                                total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-                                rate = (submission.rate - submission.consultant.rate) * 40 * 4 * total_months
+                                if submission.work_type == "Full Time":
+                                    rate = float(submission.rate)
+                                    note_rate = rate
+                                else:
+                                    if int(project.duration) % 3 == 0:
+                                        rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(project.duration) / 3) 
+                                    else:
+                                        rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(project.duration)
+                                    note_rate = (float(submission.rate) - float(submission.consultant.rate))
+
                                 deal_data['deal_rate'] = rate
                                 deal_data["deal_stage"] = "Won"
-                                note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate - submission.consultant.rate} - {total_months} months - Received offer, starting {project.start_date}"
+
+                                note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${note_rate} - {project.duration} months - Received offer, starting {project.start_date}"
                                 _update_or_create_note("deals_2025", submission.id, "Project Details", note)
 
                         _update_or_create_deal(deal_data, "deals_2025")
@@ -156,7 +169,6 @@ def _update_or_create_deal(deal_data: Dict, object_slug: str) -> Optional[bool]:
         # Create a new record if not found
         create_url = f"{ATTIO_URL}/objects/{object_slug}/records"
         payload = {"data": {"values": deal_data}}
-        print(payload, create_url)
         response = requests.post(create_url, headers=HEADERS, json=payload)
         if response.status_code != 200:
             print("Error creating deal record in Attio.")
