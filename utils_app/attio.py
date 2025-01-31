@@ -1,12 +1,14 @@
 import requests
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from celery import shared_task
-
+from datetime import datetime
 from constance import config
 from log1.utils import write_exception
+from django.utils import timezone
 
 ATTIO_URL = config.ATTIO_URL
 API_KEY = config.ATTIO_API_KEY
+ATTIO_DEAL_NAME = config.ATTIO_DEAL_NAME
 HEADERS = {
     "Accept": "application/json",
     "Content-Type": "application/json",
@@ -15,7 +17,7 @@ HEADERS = {
 
 
 @shared_task
-def attio_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
+def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], request: Any = None) -> bool:
     """
     Trigger the process to synchronize vendor and interview data with Attio.
     param obj: Object containing the submission and other related details.
@@ -25,6 +27,17 @@ def attio_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
     try:
         submission_obj = obj.submission
         vendor_data = _extract_vendor_data(submission_obj)
+
+        # deal stage change
+        if submission_obj.status in ['interview',"in_offer"]: 
+            stage = "Failed" if obj.get_status_display() in ["Failed", "Cancelled"] else "In Process"
+            update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj.id, stage)
+        
+        # add note for interview status update with feedback
+        if obj.get_status_display() in ["Next Round", "offer", "Failed", "Cancelled"] and status_change:
+            note = f"Interview Date - {obj.start_time.strftime('%Y-%m-%d')},\nFeedback: {obj.feedback}"
+            title = f"Interview Details - R{obj.round}"
+            _update_or_create_note(ATTIO_DEAL_NAME, submission_obj.id, title, note, request)
 
         # Check for existing vendor record
         vendor_record_id = _get_or_update_vendor_record(object_slug, vendor_data)
@@ -43,7 +56,196 @@ def attio_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
     except Exception as error:
         write_exception(str(error), request)
         return False
+    
+@shared_task
+def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
+    try:
+        company_obj = _fetch_record("companies", {"name": obj.vendor.name}, request)
+        associated_company_id = (
+            company_obj.get("record_id")[0].get("value")
+            if company_obj and "record_id" in company_obj and company_obj["record_id"]
+            else None
+        )
+        person_obj = _fetch_record("people", {"name": obj.vendor_contact.name}, request)
+        associated_person_id = (
+            person_obj.get("record_id")[0].get("value")
+            if person_obj and "record_id" in person_obj and person_obj["record_id"]
+            else None
+        )
+        creator_obj = _fetch_record("people", {"email_addresses": obj.created_by.email}, request)
+        associated_creator_id = (
+            creator_obj.get("record_id")[0].get("value")
+            if creator_obj and "record_id" in creator_obj and creator_obj["record_id"]
+            else None
+        )
+        if obj.rate and obj.consultant.rate:
+            if obj.work_type == "Full Time":
+                rate = float(obj.rate)
+            else:
+                rate = float(obj.rate) - float(obj.consultant.rate)
+            deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id, associated_creator_id)
+            _update_or_create_deal(deal_data, object_slug, request)
+        
+        return True
+    except Exception as error:
+        write_exception(f"Error in attio_create_deal_trigger: {str(error)}", request)
+        return False
 
+
+@shared_task
+def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> bool:
+    try:
+        submission = obj.submission
+        update_deal_stage_trigger(object_slug, submission.id, "Won", request)
+
+        rate = get_rate(obj)
+        deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None, creator_id=None)
+        _update_or_create_deal(deal_data, object_slug, request)
+
+        if obj.work_type == "Full Time":
+            note_rate = float(obj.rate)
+        else:
+            note_rate = float(obj.rate) - float(obj.consultant.rate)
+        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${note_rate} - {obj.duration} months - Received offer, starting {obj.start_date}"
+        _update_or_create_note(object_slug, submission.id, "Project Details", note, request)
+        return True
+    except Exception as error:
+        write_exception(str(error), request)
+        return False
+    
+def get_rate(obj: Any) -> float:
+    submission = obj.submission
+    if submission.work_type != "Full Time":
+        if int(obj.duration) % 3 == 0:
+            rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(obj.duration) / 3) 
+        else:
+            rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(obj.duration)
+    else:
+        rate = float(submission.rate)
+    return rate
+
+def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, request: Any = None) -> None:
+    try:
+        record = _fetch_record(object_slug, {"deal_id": deal_id}, request)
+        if not record:
+            return
+
+        deal_record_id = record.get("record_id", [{}])[0].get("value")
+        update_url = f"{ATTIO_URL}/objects/{object_slug}/records/{deal_record_id}"
+        payload = {"data": {"values": {"deal_stage": stage}}}
+        response = requests.patch(update_url, headers=HEADERS, json=payload)
+        if response.status_code != 200:
+            write_exception("Error updating deal stage in Attio.", request)
+    except Exception as error:
+        write_exception(str(error), request)
+
+
+def _extract_deal_data(submission_obj: Any, rate: float, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
+    deal_data = {
+        "vendor_company": f"{submission_obj.vendor.name}",
+        "deal_rate": rate,
+        "client_name": submission_obj.client,
+        "consultant_name": submission_obj.consultant.name,
+        "unique_key": f"{submission_obj.vendor.name} {submission_obj.vendor_contact.region or ''} - {submission_obj.client} - {submission_obj.consultant.name}",
+        "deal_id": submission_obj.id,
+        "vendor_region": submission_obj.vendor_contact.region or ''
+    }
+
+    if company_id:
+        deal_data["associated_company"] = [company_id]
+    if person_id:
+        deal_data["associated_people"] = [person_id]
+    if creator_id:
+        deal_data["lead_source"] = [creator_id]
+
+    return deal_data
+
+
+def _update_or_create_deal(deal_data: Dict, object_slug: str, request: Any = None) -> Optional[bool]:
+    try:
+        record = _fetch_record(object_slug, {"deal_id": deal_data["deal_id"]}, request)
+        if record:
+            deal_record_id = record.get("record_id", [{}])[0].get("value")
+            update_url = f"{ATTIO_URL}/objects/{object_slug}/records/{deal_record_id}"
+            payload = {"data": {"values": deal_data}}
+            response = requests.patch(update_url, headers=HEADERS, json=payload)
+            if response.status_code != 200:
+                write_exception("Error updating deal record in Attio.", request)
+            return True
+
+        # Create a new record if not found
+        create_url = f"{ATTIO_URL}/objects/{object_slug}/records"
+        payload = {"data": {"values": deal_data}}
+        response = requests.post(create_url, headers=HEADERS, json=payload)
+        if response.status_code != 200:
+            write_exception("Error creating deal record in Attio.", request)
+            return False
+
+        return True
+    except Exception as error:
+        write_exception(str(error), request)
+        return False
+
+def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note: str, request: Any = None) -> bool:
+    try:
+        record = _fetch_record(object_slug, {"deal_id": deal_id}, request)
+        if not record:
+            return False
+
+        deal_record_id = record.get("record_id", [{}])[0].get("value")
+        note_url = f"{ATTIO_URL}/notes"
+        query_params = {
+            "parent_object": object_slug,
+            "parent_record_id": deal_record_id
+        }
+        response = requests.get(note_url, headers=HEADERS, params=query_params)
+        if response.status_code != 200:
+            write_exception("Error fetching notes from Attio.", request)
+            return None
+
+        data = response.json().get("data", [])
+        note_exist = next((note for note in data if note.get("title") == note_title), None)
+        if note_exist:
+            note_id = note_exist['id']['note_id']
+            response = requests.delete(f"{note_url}/{note_id}", headers=HEADERS)
+            if response.status_code != 200:
+                write_exception("Error fetching notes from Attio.", request)
+                return None
+
+        payload = {
+            "data": {
+                "parent_object": object_slug,
+                "parent_record_id": deal_record_id,
+                "title": note_title,
+                "format": "plaintext",
+                "content": note
+            }
+        }
+        response = requests.post(note_url, headers=HEADERS, json=payload)
+        if response.status_code != 200:
+            write_exception("Error adding a note to record in Attio.", request)
+            return False
+
+        return True
+    except Exception as error:
+        write_exception(str(error), request)
+        return False
+
+
+def _fetch_record(object_slug: str, filter_payload: Dict, request: Any = None) -> Optional[Dict]:
+    """Fetch a record from Attio based on the given filter."""
+    try:
+        url = f"{ATTIO_URL}/objects/{object_slug}/records/query"
+        response = requests.post(url, headers=HEADERS, json={"filter": filter_payload})
+        if response.status_code != 200:
+            write_exception("Error fetching record from Attio.", request)
+            return None
+
+        data = response.json().get("data", [])
+        return data[0].get("values") if data else None
+    except Exception as error:
+        write_exception(str(error), request)
+        return None
 
 def _extract_vendor_data(submission_obj: Any) -> Dict:
     """Extract vendor-related data from the submission object."""
