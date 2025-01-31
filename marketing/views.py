@@ -22,7 +22,7 @@ from marketing.serializers import *
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
-from utils_app.attio import attio_trigger
+from utils_app.attio import attio_trigger,attio_create_deal_trigger
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from utils_app.calendar import GoogleCalendar
@@ -111,7 +111,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     def retrieve(self, request, *args, **kwargs):
         try:
             contact = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
-            data = contact.values('id', 'name', 'email', 'number', 'company__name', 'source_link')
+            data = contact.values('id', 'name', 'email', 'number','region' ,'company__name', 'source_link')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -120,7 +120,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     def list(self, request, *args, **kwargs):
         try:
             contact = VendorContact.objects.filter(company_id=request.GET.get('company'), created_by=request.user)
-            data = contact.values('id', 'name', 'email', 'number', 'company__name')
+            data = contact.values('id', 'name', 'email', 'number','region', 'company__name')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -142,13 +142,15 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
                 created_by=request.user,
                 name=request.data.get('name', None),
                 number=request.data.get('number', None),
-                source_link=request.data.get('source_link', None)
+                source_link=request.data.get('source_link', None),
+                region=request.data.get('region', None)
             )
             data = {
                 "id": contact.id,
                 "name": contact.name,
                 "email": contact.email,
                 "number": contact.number,
+                "region": contact.region,
             }
             return Response({"data": data, "message": "Vendor Contact created"}, status=201)
         except Exception as error:
@@ -172,6 +174,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             )
             updated_keys = self.update_detail(
                 request, updated_keys, **{"object": vendor_contact, 'key': 'source_link', 'display_name': 'Source Link'}
+            )
+            updated_keys = self.update_detail(
+                request, updated_keys, **{"object": vendor_contact, 'key': 'region', 'display_name': 'Vendor Region'}
             )
 
             serializer = VendorContactSerializer(vendor_contact)
@@ -836,6 +841,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             sub, msg = create_submission(request, lead_id)
 
+            #Attio Create Deal Trigger
+            if sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and sub.client and sub.consultant.status != 'on_project':
+                attio_create_deal_trigger(sub, config.ATTIO_DEAL_NAME, request)
+
             # Activity
             desc = f"{request.user.employee_name} added submission"
             create_activity(sub.id, 'submission', request.user, desc, 'created')
@@ -899,6 +908,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     submission.is_complete = False
 
                 submission.save()
+
+                 #Attio Create Deal Trigger
+                if submission.rate and submission.employer == 'Consultadd' and submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
+                   attio_create_deal_trigger(submission, config.ATTIO_DEAL_NAME, request)
+                   
                 project = Project.objects.filter(submission=submission)
                 if project and prev_work_type != serializer.data['work_type']:
                     status = project.first().statuses.filter(is_current=True, status='joined')
@@ -1700,6 +1714,7 @@ class InterviewViewSets(ModelViewSet):
             if interview.round == 1:
                 interview = self.rank_interviews(interview, 'create')
 
+            #Attio Trigger
             data_recorded = attio_trigger(interview, "log1_vendor_company", request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
@@ -1864,6 +1879,12 @@ class InterviewViewSets(ModelViewSet):
                     "summary": title, "call_details": request.data["call_details"],
                 }
 
+                #Attio Trigger
+                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
+
+
                 # Updating calendar Booking
                 calendar_id = interview.calendar_id
                 calendar = GoogleCalendar()
@@ -1923,10 +1944,6 @@ class InterviewViewSets(ModelViewSet):
                 interview.guest_type = guest_type
 
             interview.save()
-
-            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
-            if not data_recorded:
-                write_exception("Issue while adding vendor data to attio", request)
 
             # Activity
             updated_fields = self.check_activity(prev=prev_interview_data, obj=interview, request=request)
@@ -2082,7 +2099,8 @@ class InterviewViewSets(ModelViewSet):
                 post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
 
             # Update Attio Entry
-            data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+            status_change = prev_status != interview.get_status_display()
+            data_recorded = attio_trigger(interview, "log1_vendor_company", status_change, request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
 
@@ -2161,6 +2179,12 @@ class InterviewViewSets(ModelViewSet):
                     "end": end_time, "description": request.data["description"], "start": start_time, "summary": title,
                 }
 
+                #Attio Trigger
+                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
+
+
                 # Updating calendar Booking
                 calendar_id = interview.calendar_id
                 calendar = GoogleCalendar()
@@ -2234,10 +2258,6 @@ class InterviewViewSets(ModelViewSet):
                          'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
                          'company_name', 'screening_type', 'interview_mode')
 
-                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
-                if not data_recorded:
-                    write_exception("Issue while adding vendor data to attio", request)
-
                 notification_data = {
                     'parent_id': submission.id, 'sender_user_type': 'user', 'target_type': 'interview',
                     'parent_type': 'submission', 'title': 'Interview Updated', 'sender_id': request.user.id,
@@ -2291,6 +2311,7 @@ class InterviewViewSets(ModelViewSet):
 
             submission = interview.submission
 
+            #Attio Trigger
             data_recorded = attio_trigger(interview, "log1_vendor_company", request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
