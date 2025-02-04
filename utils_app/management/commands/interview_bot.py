@@ -113,10 +113,10 @@ class Command(BaseCommand):
                 self.post_msg_to_slack(us_slack_data, 'USA')
             except Exception as error:
                 create_cron_error(job, error)
-            try:
-                self.post_msg_to_slack(cn_slack_data, 'Canada')
-            except Exception as error:
-                create_cron_error(job, error)
+            # try:
+            #     self.post_msg_to_slack(cn_slack_data, 'Canada')
+            # except Exception as error:
+            #     create_cron_error(job, error)
 
         except Exception as error:
             create_cron_error(job, error)

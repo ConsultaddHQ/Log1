@@ -79,7 +79,7 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, stage: Optional[str] =
             else None
         )
         if obj.rate:
-            deal_data = _extract_deal_data(obj, obj.rate, stage, associated_company_id, associated_person_id, associated_creator_id)
+            deal_data = _extract_deal_data(obj, int(obj.rate), stage, associated_company_id, associated_person_id, associated_creator_id)
             _update_or_create_deal(deal_data, object_slug, request)
         
         return True
@@ -96,19 +96,19 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
         deal_data = _extract_deal_data(submission, rate, "Won", company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
-        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate} - {obj.duration} months - Received offer, starting {obj.start_date}"
+        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${int(submission.rate)} - {obj.duration} months - Received offer, starting {obj.start_date}"
         _update_or_create_note(object_slug, submission.id, "Project Details", note, request)
         return True
     except Exception as error:
         write_exception(str(error), request)
         return False
     
-def get_rate(obj: Any) -> float:
+def get_rate(obj: Any) -> int:
     submission = obj.submission
     if int(obj.duration) % 3 == 0:
-        rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(obj.duration) / 3) 
+        rate = (int(submission.rate) - int(submission.consultant.rate)) *  520 * (int(int(obj.duration) / 3)) 
     else:
-        rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(obj.duration)
+        rate = (int(submission.rate) - int(submission.consultant.rate)) * 40 * 4 * int(obj.duration)
     return rate
 
 def update_deal_stage_trigger(object_slug: str, obj: Any, stage: str, request: Any = None) -> None:
@@ -129,7 +129,7 @@ def update_deal_stage_trigger(object_slug: str, obj: Any, stage: str, request: A
         write_exception(str(error), request)
 
 
-def _extract_deal_data(submission_obj: Any, rate: float, stage: str, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
+def _extract_deal_data(submission_obj: Any, rate: int, stage: str, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
     deal_data = {
         "vendor_company": f"{submission_obj.vendor.name}",
         "deal_rate": rate,
