@@ -622,8 +622,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['GET'], detail=True, url_path='balance')
     def balance(self, request, pk):
         try:
-            # year = date.today().year
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False, on_hold=False)
+            year = request.GET.get('year', date.today().year)
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=int(year))
             # leaves = ConsultantLeave.objects.filter(consultant_id=pk)
             serial = ConsultantLeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
@@ -722,12 +722,10 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['GET'], detail=True, url_path='type')
     def type(self, request, pk):
         try:
-            data = []
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False, on_hold=False)
-            for leave in leaves:
-                data.append({"id": leave.id, "leave_type": leave.leave_type.display_name, "balance": leave.balance})
-
-            return Response({"result": data}, status=200)
+            year = request.GET.get("year", date.today().year)
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year)
+            serial = ConsultantLeaveSerializer(leaves, many=True)
+            return Response({"result": serial.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -735,7 +733,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['GET'], detail=False, url_path='holiday')
     def holiday(self, request):
         try:
-            year = date.today().year
+            year = request.GET.get("year", date.today().year)
             holidays = [f"01/02/{year}", f"01/16/{year}", f"02/20/{year}", f"05/29/{year}", f"06/19/{year}",
                         f"07/04/{year}", f"09/04/{year}", f"10/09/{year}", f"11/13/{year}",
                         f"11/23/{year}", f"11/24/{year}", f"12/25/{year}"]

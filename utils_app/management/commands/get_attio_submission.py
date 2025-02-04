@@ -34,6 +34,10 @@ class Command(BaseCommand):
             ).order_by('created')
 
             for submission in submissions:
+                if submission.work_type == "Full Time":
+                    rate = float(submission.rate)
+                else:
+                    rate = float(submission.rate) - float(submission.consultant.rate)
                 deal_data = {
                     "vendor_company": submission.vendor.name,
                     "deal_rate": int(submission.rate),
