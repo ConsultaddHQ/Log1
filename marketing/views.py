@@ -842,7 +842,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             sub, msg = create_submission(request, lead_id)
 
             #Attio Create Deal Trigger
-            if sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and sub.client and sub.consultant.status != 'on_project':
+            if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and sub.client and sub.consultant.status != 'on_project':
                 attio_create_deal_trigger(sub, config.ATTIO_DEAL_NAME, request)
 
             # Activity
@@ -910,7 +910,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 submission.save()
 
                  #Attio Create Deal Trigger
-                if submission.rate and submission.employer == 'Consultadd' and submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
+                if submission.work_type == "c2c" and submission.rate and submission.employer == 'Consultadd' and submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
                    attio_create_deal_trigger(submission, config.ATTIO_DEAL_NAME, request)
                    
                 project = Project.objects.filter(submission=submission)
