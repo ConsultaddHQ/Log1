@@ -31,7 +31,7 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
         # deal stage change
         if submission_obj.status in ['interview',"in_offer"]: 
             stage = "Failed" if obj.get_status_display() in ["Failed", "Cancelled"] else "In Process"
-            update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj.id, stage)
+            update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj, stage, request)
         
         # add note for interview status update with feedback
         if obj.get_status_display() in ["Next Round", "offer", "Failed", "Cancelled"] and status_change:
@@ -58,7 +58,7 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
         return False
     
 @shared_task
-def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
+def attio_create_deal_trigger(obj: Any, object_slug: str, stage: Optional[str] = "Lead", request: Any = None) -> bool:
     try:
         company_obj = _fetch_record("companies", {"name": obj.vendor.name}, request)
         associated_company_id = (
@@ -78,12 +78,8 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
             if creator_obj and "record_id" in creator_obj and creator_obj["record_id"]
             else None
         )
-        if obj.rate and obj.consultant.rate:
-            if obj.work_type == "Full Time":
-                rate = float(obj.rate)
-            else:
-                rate = float(obj.rate) - float(obj.consultant.rate)
-            deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id, associated_creator_id)
+        if obj.rate:
+            deal_data = _extract_deal_data(obj, obj.rate, stage, associated_company_id, associated_person_id, associated_creator_id)
             _update_or_create_deal(deal_data, object_slug, request)
         
         return True
@@ -96,17 +92,11 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
 def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> bool:
     try:
         submission = obj.submission
-        update_deal_stage_trigger(object_slug, submission.id, "Won", request)
-
         rate = get_rate(obj)
-        deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None, creator_id=None)
+        deal_data = _extract_deal_data(submission, rate, "Won", company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
-        if obj.work_type == "Full Time":
-            note_rate = float(obj.rate)
-        else:
-            note_rate = float(obj.rate) - float(obj.consultant.rate)
-        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${note_rate} - {obj.duration} months - Received offer, starting {obj.start_date}"
+        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate} - {obj.duration} months - Received offer, starting {obj.start_date}"
         _update_or_create_note(object_slug, submission.id, "Project Details", note, request)
         return True
     except Exception as error:
@@ -115,19 +105,18 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
     
 def get_rate(obj: Any) -> float:
     submission = obj.submission
-    if submission.work_type != "Full Time":
-        if int(obj.duration) % 3 == 0:
-            rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(obj.duration) / 3) 
-        else:
-            rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(obj.duration)
+    if int(obj.duration) % 3 == 0:
+        rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(obj.duration) / 3) 
     else:
-        rate = float(submission.rate)
+        rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(obj.duration)
     return rate
 
-def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, request: Any = None) -> None:
+def update_deal_stage_trigger(object_slug: str, obj: Any, stage: str, request: Any = None) -> None:
     try:
-        record = _fetch_record(object_slug, {"deal_id": deal_id}, request)
+        record = _fetch_record(object_slug, {"deal_id": obj.id}, request)
         if not record:
+            if obj.work_type == "c2c" and obj.employer == 'Consultadd' and obj.vendor_contact and obj.client and obj.consultant.status != 'on_project':
+                attio_create_deal_trigger(obj, object_slug, stage, request)
             return
 
         deal_record_id = record.get("record_id", [{}])[0].get("value")
@@ -140,10 +129,11 @@ def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, reques
         write_exception(str(error), request)
 
 
-def _extract_deal_data(submission_obj: Any, rate: float, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
+def _extract_deal_data(submission_obj: Any, rate: float, stage: str, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
     deal_data = {
         "vendor_company": f"{submission_obj.vendor.name}",
         "deal_rate": rate,
+        "deal_stage": stage,
         "client_name": submission_obj.client,
         "consultant_name": submission_obj.consultant.name,
         "unique_key": f"{submission_obj.vendor.name} {submission_obj.vendor_contact.region or ''} - {submission_obj.client} - {submission_obj.consultant.name}",

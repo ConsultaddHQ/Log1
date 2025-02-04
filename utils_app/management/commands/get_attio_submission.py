@@ -26,20 +26,17 @@ class Command(BaseCommand):
                 created__gte=start_date,
                 rate__gt=0,
                 employer='Consultadd',
+                work_type="c2c"
             ).exclude(
-                Q(client__isnull=True) | Q(client='')
+                Q(client__isnull=True) | Q(client='') | Q(consultant_marketing__consultant__status='on_project')  
             ).filter(
                 vendor_contact_id__isnull=False
             ).order_by('created')
 
             for submission in submissions:
-                if submission.work_type == "Full Time":
-                    rate = float(submission.rate)
-                else:
-                    rate = float(submission.rate) - float(submission.consultant.rate)
                 deal_data = {
                     "vendor_company": submission.vendor.name,
-                    "deal_rate": rate,
+                    "deal_rate": int(submission.rate),
                     "client_name": submission.client,
                     "consultant_name": submission.consultant.name,
                     "unique_key": f"{submission.vendor.name} {submission.vendor_contact.region or ''} - {submission.client} - {submission.consultant.name}",
@@ -88,20 +85,15 @@ class Command(BaseCommand):
                                 # end_date = datetime.strptime(project.end_date, '%Y-%m-%d')
                                 # start_date = datetime.strptime(project.start_date, '%Y-%m-%d')
                                 # total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-                                if submission.work_type == "Full Time":
-                                    rate = float(submission.rate)
-                                    note_rate = rate
+                                if int(project.duration) % 3 == 0:
+                                    rate = (int(submission.rate) - int(submission.consultant.rate)) *  520 * ( int(project.duration) / 3)
                                 else:
-                                    if int(project.duration) % 3 == 0:
-                                        rate = (float(submission.rate) - float(submission.consultant.rate)) *  520 * ( float(project.duration) / 3) 
-                                    else:
-                                        rate = (float(submission.rate) - float(submission.consultant.rate)) * 40 * 4 * float(project.duration)
-                                    note_rate = (float(submission.rate) - float(submission.consultant.rate))
+                                    rate = (int(submission.rate) - int(submission.consultant.rate)) * 40 * 4 * int(project.duration)
 
                                 deal_data['deal_rate'] = rate
                                 deal_data["deal_stage"] = "Won"
 
-                                note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${note_rate} - {project.duration} months - Received offer, starting {project.start_date}"
+                                note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${int(submission.rate)} - {project.duration} months - Received offer, starting {project.start_date}"
                                 _update_or_create_note("deals_2025", submission.id, "Project Details", note)
 
                         _update_or_create_deal(deal_data, "deals_2025")
@@ -146,12 +138,12 @@ def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note
         }
         response = requests.post(note_url, headers=HEADERS, json=payload)
         if response.status_code != 200:
-            print("Error adding a note to record in Attio.")
+            print(f"Error adding a note to record in Attio. {deal_id}")
             return False
 
         return True
     except Exception as error:
-        print(f"Error in _update_or_create_note: {error}")
+        print(f"Error in _update_or_create_note: {deal_id} {error}")
         return False
 
 def _update_or_create_deal(deal_data: Dict, object_slug: str) -> Optional[bool]:
@@ -163,7 +155,7 @@ def _update_or_create_deal(deal_data: Dict, object_slug: str) -> Optional[bool]:
             payload = {"data": {"values": deal_data}}
             response = requests.patch(update_url, headers=HEADERS, json=payload)
             if response.status_code != 200:
-                print(f"Error updating deal record in Attio.")
+                print(f"Error updating deal record in Attio.{deal_data['deal_id']}")
             return True
 
         # Create a new record if not found
@@ -171,7 +163,8 @@ def _update_or_create_deal(deal_data: Dict, object_slug: str) -> Optional[bool]:
         payload = {"data": {"values": deal_data}}
         response = requests.post(create_url, headers=HEADERS, json=payload)
         if response.status_code != 200:
-            print("Error creating deal record in Attio.")
+            print(deal_data)
+            print(f"Error creating deal record in Attio.{deal_data['deal_id']}")
             return False
 
         return True
