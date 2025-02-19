@@ -4,6 +4,7 @@ from celery import shared_task
 from datetime import datetime
 from constance import config
 from log1.utils import write_exception
+from django.utils import timezone
 
 ATTIO_URL = config.ATTIO_URL
 API_KEY = config.ATTIO_API_KEY
@@ -30,7 +31,7 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
         # deal stage change
         if submission_obj.status in ['interview', "in_offer"]:
             stage = "Failed" if obj.get_status_display() in ["Failed", "Cancelled"] else "In Process"
-            update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj.id, stage)
+            update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj, stage, request)
         
         # add note for interview status update with feedback
         if obj.get_status_display() in ["Next Round", "offer", "Failed", "Cancelled"] and status_change:
@@ -58,7 +59,7 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
 
 
 @shared_task
-def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -> bool:
+def attio_create_deal_trigger(obj: Any, object_slug: str, stage: Optional[str] = "Lead", request: Any = None) -> bool:
     try:
         company_obj = _fetch_record("companies", {"name": obj.vendor.name}, request)
         associated_company_id = (
@@ -78,9 +79,8 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
             if creator_obj and "record_id" in creator_obj and creator_obj["record_id"]
             else None
         )
-        if obj.rate and obj.consultant.rate:
-            rate = float(obj.rate) - float(obj.consultant.rate)
-            deal_data = _extract_deal_data(obj, rate, associated_company_id, associated_person_id, associated_creator_id)
+        if obj.rate:
+            deal_data = _extract_deal_data(obj, int(obj.rate), stage, associated_company_id, associated_person_id, associated_creator_id)
             _update_or_create_deal(deal_data, object_slug, request)
         
         return True
@@ -93,27 +93,31 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, request: Any = None) -
 def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> bool:
     try:
         submission = obj.submission
-        update_deal_stage_trigger(object_slug, submission.id, "Won", request)
-
-        end_date = datetime.strptime(obj.end_date, '%Y-%m-%d')
-        start_date = datetime.strptime(obj.start_date, '%Y-%m-%d')
-        total_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-        rate = (float(obj.rate) - float(obj.consultant.rate)) * 40 * 4 * total_months
-        deal_data = _extract_deal_data(submission, rate, company_id=None, person_id=None, creator_id=None)
+        rate = get_rate(obj)
+        deal_data = _extract_deal_data(submission, rate, "Won", company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
-        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${submission.rate - submission.consultant.rate} - {total_months} months - Received offer, starting {obj.start_date}"
+        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${int(submission.rate)} - {obj.duration} months - Received offer, starting {obj.start_date}"
         _update_or_create_note(object_slug, submission.id, "Project Details", note, request)
         return True
     except Exception as error:
         write_exception(str(error), request)
         return False
+    
+def get_rate(obj: Any) -> int:
+    submission = obj.submission
+    if int(obj.duration) % 3 == 0:
+        rate = (int(submission.rate) - int(submission.consultant.rate)) *  520 * (int(int(obj.duration) / 3)) 
+    else:
+        rate = (int(submission.rate) - int(submission.consultant.rate)) * 40 * 4 * int(obj.duration)
+    return rate
 
-
-def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, request: Any = None) -> None:
+def update_deal_stage_trigger(object_slug: str, obj: Any, stage: str, request: Any = None) -> None:
     try:
-        record = _fetch_record(object_slug, {"deal_id": deal_id}, request)
+        record = _fetch_record(object_slug, {"deal_id": obj.id}, request)
         if not record:
+            if obj.work_type == "c2c" and obj.employer == 'Consultadd' and obj.vendor_contact and obj.client and obj.consultant.status != 'on_project':
+                attio_create_deal_trigger(obj, object_slug, stage, request)
             return
 
         deal_record_id = record.get("record_id", [{}])[0].get("value")
@@ -126,10 +130,11 @@ def update_deal_stage_trigger(object_slug: str, deal_id: int, stage: str, reques
         write_exception(str(error), request)
 
 
-def _extract_deal_data(submission_obj: Any, rate: float, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
+def _extract_deal_data(submission_obj: Any, rate: int, stage: str, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
     deal_data = {
         "vendor_company": f"{submission_obj.vendor.name}",
         "deal_rate": rate,
+        "deal_stage": stage,
         "client_name": submission_obj.client,
         "consultant_name": submission_obj.consultant.name,
         "unique_key": f"{submission_obj.vendor.name} {submission_obj.vendor_contact.region or ''} - {submission_obj.client} - {submission_obj.consultant.name}",
@@ -179,19 +184,25 @@ def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note
             return False
 
         deal_record_id = record.get("record_id", [{}])[0].get("value")
-        # list_note_url = f"{ATTIO_URL}/notes"
-        # query_params = {
-        #     "parent_object": object_slug,
-        #     "parent_record_id": deal_record_id
-        # }
-        # response = requests.get(list_note_url, headers=HEADERS, params=query_params)
-        # if response.status_code != 200:
-        #     write_exception("Error fetching notes from Attio.", request)
-        #     return None
-
-        # data = response.json().get("data", [])
-        # note_exist = next((note for note in data if note.get("title") == "Interview Details"), None)
         note_url = f"{ATTIO_URL}/notes"
+        query_params = {
+            "parent_object": object_slug,
+            "parent_record_id": deal_record_id
+        }
+        response = requests.get(note_url, headers=HEADERS, params=query_params)
+        if response.status_code != 200:
+            write_exception("Error fetching notes from Attio.", request)
+            return None
+
+        data = response.json().get("data", [])
+        note_exist = next((note for note in data if note.get("title") == note_title), None)
+        if note_exist:
+            note_id = note_exist['id']['note_id']
+            response = requests.delete(f"{note_url}/{note_id}", headers=HEADERS)
+            if response.status_code != 200:
+                write_exception("Error fetching notes from Attio.", request)
+                return None
+
         payload = {
             "data": {
                 "parent_object": object_slug,
