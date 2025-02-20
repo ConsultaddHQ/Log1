@@ -772,7 +772,7 @@ class ProjectViewSets(ModelViewSet):
                     project.save()
 
                     #send attio Trigger
-                    attio_deal_won_trigger(config.ATTIO_DEAL_NAME, project)
+                    attio_deal_won_trigger(config.ATTIO_DEAL_NAME, project, request)
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
