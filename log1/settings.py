@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'algoliasearch_django'
 ]
 
 THIRD_PARTY_APPS = [
@@ -387,3 +388,8 @@ CONSTANCE_CONFIG_FIELDSETS = {
     )
 }
 
+ALGOLIA = {
+    'APPLICATION_ID': 'ETV3IV4LUO',
+    'API_KEY': '5891a6f60c43b8459da4331a2a21bbe8',
+    'INDEX_PREFIX': 'log1_'  # Optional prefix for your indexes, e.g., 'dev_'
+}
