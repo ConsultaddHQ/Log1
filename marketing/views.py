@@ -1880,7 +1880,7 @@ class InterviewViewSets(ModelViewSet):
                 }
 
                 #Attio Trigger
-                data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
+                data_recorded = attio_trigger(interview, "log1_vendor_company", request)
                 if not data_recorded:
                     write_exception("Issue while adding vendor data to attio", request)
 

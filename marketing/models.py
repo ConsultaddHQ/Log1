@@ -8,9 +8,7 @@ from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKe
 from activity.models import Comment
 from employee.models import User, Team
 from attachment.models import Attachment
-from algoliasearch_django import AlgoliaIndex
 from consultant.models import ConsultantMarketing
-from algoliasearch_django.decorators import register
 from utils_app.models import TimeStampedModel, Choice
 
 
@@ -139,7 +137,7 @@ class Lead(TimeStampedModel):
             return f'{self.id}:{self.vendor_company.name} - {self.owner.employee_name} - {self.city}'
         return f'{self.id}- {self.city}'
 
-@register
+
 class Submission(TimeStampedModel):
     STATUS_CHOICES = (
         ('draft', 'Draft'),
@@ -230,11 +228,6 @@ class Submission(TimeStampedModel):
     def vendor(self):
         return self.lead.vendor_company
 
-
-class SubmissionIndex(AlgoliaIndex):
-    fields = ('id', 'title', 'content', 'published_at')
-    settings = {'searchableAttributes': ['title', 'content']}
-    index_name = 'articles_index'  # Optional: Custom index name
 
 class VendorLayer(TimeStampedModel):
     level = models.IntegerField(default=1)
