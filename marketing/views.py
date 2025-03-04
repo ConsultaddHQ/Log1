@@ -440,7 +440,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
                     return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
  
-            if (sub.created_by in users) or (
+            if (sub.created_by in users) or ('attio_user' in request.user.roles) or (
                     request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
@@ -664,12 +664,13 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             data = queryset[first:last].annotate(
                 city=F('lead__city'),
                 marketer_id=F('created_by'),
+                team_name=F('marketing_team__name'),
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('created_by__employee_name'),
-                consultant_name=F('consultant_marketing__consultant__name'),
+                consultant_name=F('consultant_marketing__consultant__name')
             ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
                      'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact',
-                     'is_complete', 'work_type')
+                     'is_complete', 'work_type', 'team_name')
 
             return data, data_counts
         except Exception as error:
@@ -704,7 +705,15 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
-            if ('superadmin' not in roles) and ('admin' not in roles):
+            if 'attio_user' in roles:
+                queryset = Submission.objects.filter(
+                    vendor_contact__isnull=False, client__isnull=False,
+                    work_type="c2c", rate__isnull=False, employer="Consultadd"
+                ).exclude(consultant_marketing__consultant__status="on_project").exclude(
+                    rate=0
+                )
+
+            elif ('superadmin' not in roles) and ('admin' not in roles):
                 # Team submissions for Scrum master and Proxy Scrum Master
                 # if 'admin' in roles or 'proxy' in roles:
                 #     consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
@@ -778,6 +787,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     queryset = queryset.filter(
                         consultant_marketing__consultant__name__in=filters['consultant']
                     )
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(lead__position_id__in=filters["position"])
 
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
@@ -1427,6 +1439,9 @@ class InterviewViewSets(ModelViewSet):
                 if 'position' in filters and len(filters["position"]) > 0:
                     queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
 
+                if 'teams' in filters and len(filters["teams"]) > 0:
+                    queryset = queryset.filter(submission__marketing_team__name__in=filters['teams'])
+
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
                     queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
 
@@ -1481,7 +1496,15 @@ class InterviewViewSets(ModelViewSet):
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()
-            queryset = Interview.objects.exclude(submission__status='archive')
+            if 'attio_user' in request.user.roles:
+                queryset = Interview.objects.filter(
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False,
+                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(submission__consultant_marketing__consultant__status="on_project").exclude(submission__rate=0).exclude(
+                    submission__status='archive'
+                )
+            else:
+                queryset = Interview.objects.exclude(submission__status='archive')
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
