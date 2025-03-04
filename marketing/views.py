@@ -189,7 +189,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             if submission:
                 interview_obj = submission.screening.exclude(status='cancelled').first()
                 if interview_obj:
-                    attio_trigger(interview_obj, "log1_vendor_company", request=request)
+                    attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
 
             #Create Activity
             desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
@@ -947,7 +947,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 if submission.status in ['project', 'interview', 'in-offer']:
                     interview_obj = submission.screening.exclude(status='cancelled').first()
                     if interview_obj:
-                        attio_trigger(interview_obj, "log1_vendor_company", request=request)
+                        attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
 
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
@@ -1738,7 +1738,7 @@ class InterviewViewSets(ModelViewSet):
                 interview = self.rank_interviews(interview, 'create')
 
             #Attio Trigger
-            data_recorded = attio_trigger(interview, "log1_vendor_company", request=request)
+            data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
 
@@ -1903,7 +1903,7 @@ class InterviewViewSets(ModelViewSet):
                 }
 
                 #Attio Trigger
-                data_recorded = attio_trigger(interview, "log1_vendor_company", request=request)
+                data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
                 if not data_recorded:
                     write_exception("Issue while adding vendor data to attio", request)
 
@@ -2203,7 +2203,7 @@ class InterviewViewSets(ModelViewSet):
                 }
 
                 #Attio Trigger
-                data_recorded = attio_trigger(interview, "log1_vendor_company", request=request)
+                data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
                 if not data_recorded:
                     write_exception("Issue while adding vendor data to attio", request)
 
@@ -2335,7 +2335,7 @@ class InterviewViewSets(ModelViewSet):
             submission = interview.submission
 
             #Attio Trigger
-            data_recorded = attio_trigger(interview, "log1_vendor_company", request=request)
+            data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
             if not data_recorded:
                 write_exception("Issue while adding vendor data to attio", request)
 
