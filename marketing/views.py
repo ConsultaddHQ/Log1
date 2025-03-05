@@ -440,7 +440,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
                     return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
  
-            if (sub.created_by in users) or (
+            if (sub.created_by in users) or ('attio_user' in request.user.roles) or (
                     request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
