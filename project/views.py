@@ -597,6 +597,7 @@ class ProjectViewSets(ModelViewSet):
             projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
 
             if export:
+                attio_user = True if "attio_user" in roles else False
                 col_name = [
                     {"name": "consultant_name", "display_name": "Consultant Name"},
                     {"name": "marketer_name", "display_name": "Marketer Name"},
@@ -607,11 +608,13 @@ class ProjectViewSets(ModelViewSet):
                     {"name": "end_date", "display_name": "End Date"},
                     {"name": "duration", "display_name": "Duration"},
                     {"name": "city", "display_name": "City"},
-                    {"name": "is_remote", "display_name": "Remote"},
                     {"name": "status", "display_name": "Status"},
-                    {"name": "rate", "display_name": "Rate"}
+                    {"name": "rate", "display_name": "Rate"},
+                    {"name": "is_remote", "display_name": "Remote"},
                 ]
-                serializer = self.serializer_class(projects, many=True)
+                if attio_user:
+                    col_name.pop()
+                serializer = self.serializer_class(projects, context={"attio_user": attio_user}, many=True)
                 url = export_to_csv(
                     serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )

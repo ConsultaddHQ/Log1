@@ -491,25 +491,46 @@ def get_authenticated_users(request, get_id=False):
 
 def get_interview_report(payload, request):
     try:
+        roles = request.user.roles
         response = HttpResponse(content_type='text/csv')
         writer = csv.writer(response)
-        writer.writerow([
-            "Interview Id", "Consultant Name", "Marketer Name", "Supervisor Name", "Client Name", "Vendor Name",
-            "Call Type", "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason",
-            "Passed Reason"
-        ])
-        for data in payload:
-            writer.writerow([
-                data.get('id', None), data.get('consultant_name', None),
-                data.get('submission').get('marketer_name', None),
-                f"{data.get('supervisor_detail').get('supervisor_name')}"
-                f"({data.get('supervisor_detail').get('call_given_by')})",
-                data.get('submission').get('client', None), data.get('submission').get('vendor', None),
-                data.get('call_type'), data.get('round', None), data.get('start_time', None),
-                data.get('interview_mode', None), data.get('screening_type', None), data.get('tech_stack', None),
-                data.get('status', None), data.get('failure_reason', None), data.get('passed_reason', None)
-            ])
+
+        if "attio_user" in roles:
+            headers = [
+                "Interview Id", "Round", "Consultant Name", "Marketer Name", "Marketing Team Name",
+                "Client Name", "Vendor Name", "Scheduled At", "Screening Type", "Status", "Feedback"
+            ]
+            rows = [
+                [
+                    data.get('id'), f"R-{data.get('round')}", data.get('consultant_name'),
+                    data.get('submission', {}).get('marketer_name'), data.get('submission', {}).get('marketing_team'),
+                    data.get('submission', {}).get('client'), data.get('submission', {}).get('vendor'),
+                    data.get('start_time'), data.get('screening_type'), data.get('status'),
+                    data.get('feedback')
+                ] for data in payload
+            ]
+        else:
+            headers = [
+                "Interview Id", "Consultant Name", "Marketer Name", "Supervisor Name", "Client Name",
+                "Vendor Name", "Call Type", "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack",
+                "Status", "Failure Reason", "Passed Reason"
+            ]
+            rows = [
+                [
+                    data.get('id'), data.get('consultant_name'),
+                    data.get('submission', {}).get('marketer_name'),
+                    f"{data.get('supervisor_detail', {}).get('supervisor_name', '')} ({data.get('supervisor_detail', {}).get('call_given_by', '')})",
+                    data.get('submission', {}).get('client'), data.get('submission', {}).get('vendor'),
+                    data.get('call_type'), data.get('round'), data.get('start_time'),
+                    data.get('interview_mode'), data.get('screening_type'), data.get('tech_stack'),
+                    data.get('status'), data.get('failure_reason'), data.get('passed_reason')
+                ] for data in payload
+            ]
+
+        writer.writerow(headers)
+        writer.writerows(rows)
         return response
+
     except Exception as error:
         write_exception(error, request)
 

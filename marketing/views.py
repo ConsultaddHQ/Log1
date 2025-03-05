@@ -445,6 +445,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
+            elif "attio_user" in roles:
+                serializer = SubmissionV2DetailSerializer(sub)
+                return Response({"data": serializer.data, "permission": permission}, status=200)
             else:
                 serializer = SubmissionV2Serializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
@@ -805,7 +808,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 {"name": "company_name", "display_name": "Company Name"},
                 {"name": "vendor_contact", "display_name": "Vendor Contact"},
                 {"name": "city", "display_name": "City"},
-                {"name": "created", "display_name": "Submitted On"}
+                {"name": "created", "display_name": "Submitted On"},
+                {"name": "rate", "display_name": "Rate"}
             ]
             url = ""
             if export:
