@@ -440,9 +440,12 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
                     return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
  
-            if (sub.created_by in users) or ('attio_user' in request.user.roles) or (
+            if (sub.created_by in users) or (
                     request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
+                serializer = SubmissionV2DetailSerializer(sub)
+                return Response({"data": serializer.data, "permission": permission}, status=200)
+            elif "attio_user" in roles:
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
             else:
@@ -805,7 +808,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 {"name": "company_name", "display_name": "Company Name"},
                 {"name": "vendor_contact", "display_name": "Vendor Contact"},
                 {"name": "city", "display_name": "City"},
-                {"name": "created", "display_name": "Submitted On"}
+                {"name": "created", "display_name": "Submitted On"},
+                {"name": "rate", "display_name": "Rate"}
             ]
             url = ""
             if export:
