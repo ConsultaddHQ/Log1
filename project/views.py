@@ -419,7 +419,7 @@ class ProjectViewSets(ModelViewSet):
             # search project by client and consultant
             if "attio_user" in roles:
                 projects = Project.objects.filter(
-                    submission__vendor_contact__isnull=False, submission__client__isnull=False,
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
                     submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
                 ).exclude(submission__status='archive').exclude(submission__rate=0)
 
