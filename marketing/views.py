@@ -440,8 +440,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 if(sub and not (sub.created_by==request.user or sub.consultant_marketing.consultant.internal_user_profile==request.user)):
                     return Response({"message": "Forbidden", "error": "You are not allowed to check this details."}, status=403)
  
-            if (sub.created_by in users) or ('attio_user' in request.user.roles) or (
-                    request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
+            if (sub.created_by in users) or (request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
@@ -710,8 +709,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             if 'attio_user' in roles:
                 queryset = Submission.objects.filter(
-                    vendor_contact__isnull=False, client__isnull=False,
-                    work_type="c2c", rate__isnull=False, employer="Consultadd"
+                    vendor_contact__isnull=False, client__isnull=False, work_type="c2c",
+                    rate__isnull=False, employer="Consultadd", created__gt="2024-12-31"
                 ).exclude(consultant_marketing__consultant__status="on_project").exclude(
                     rate=0
                 )
@@ -1502,8 +1501,8 @@ class InterviewViewSets(ModelViewSet):
             change_to_feedback_due()
             if 'attio_user' in request.user.roles:
                 queryset = Interview.objects.filter(
-                    submission__vendor_contact__isnull=False, submission__client__isnull=False,
-                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__work_type="c2c",
+                    submission__created__gt="2024-12-31", submission__rate__isnull=False, submission__employer="Consultadd"
                 ).exclude(submission__consultant_marketing__consultant__status="on_project").exclude(submission__rate=0).exclude(
                     submission__status='archive'
                 )
