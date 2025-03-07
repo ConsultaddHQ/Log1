@@ -404,6 +404,7 @@ class ProjectViewSets(ModelViewSet):
     def list(self, request, *args, **kwargs):
         url = ""
         status_count = {}
+        roles = request.user.roles
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         sort_by = request.GET.get('sort_by', None)
@@ -416,7 +417,13 @@ class ProjectViewSets(ModelViewSet):
 
         try:
             # search project by client and consultant
-            if filter_for == 'my':
+            if "attio_user" in roles:
+                projects = Project.objects.filter(
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
+                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(submission__status='archive').exclude(submission__rate=0)
+
+            elif filter_for == 'my':
                 projects = Project.objects.filter(submission__created_by=request.user).exclude(
                     submission__status='archive'
                 )
@@ -440,9 +447,11 @@ class ProjectViewSets(ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
-            roles = request.user.roles
             if "usa_employee" in roles:
-                projects = projects.filter(Q(submission__created_by=request.user) | Q(submission__consultant_marketing__consultant__internal_user_profile=request.user))
+                projects = projects.filter(
+                    Q(submission__created_by=request.user) |
+                    Q(submission__consultant_marketing__consultant__internal_user_profile=request.user)
+                )
 
             if filter_json and json.loads(filter_json):
                 filters = json.loads(filter_json)
@@ -450,6 +459,10 @@ class ProjectViewSets(ModelViewSet):
                 created = filters.get('created', None)
                 if created:
                     projects = date_filter(projects, created, 'created')
+
+                start = filters.get('start', None)
+                if start:
+                    projects = date_filter(projects, start, 'start_date')
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client__in=filters['client'])
@@ -459,6 +472,12 @@ class ProjectViewSets(ModelViewSet):
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     projects = projects.filter(submission__lead__vendor_company__name__in=filters['vendor'])
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    projects = projects.filter(submission__lead__position_id__in=filters["position"])
+
+                if 'teams' in filters and len(filters["teams"]) > 0:
+                    projects = projects.filter(submission__marketing_team__name__in=filters['teams'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     projects = projects.filter(
@@ -578,6 +597,7 @@ class ProjectViewSets(ModelViewSet):
             projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
 
             if export:
+                attio_user = True if "attio_user" in roles else False
                 col_name = [
                     {"name": "consultant_name", "display_name": "Consultant Name"},
                     {"name": "marketer_name", "display_name": "Marketer Name"},
@@ -588,11 +608,13 @@ class ProjectViewSets(ModelViewSet):
                     {"name": "end_date", "display_name": "End Date"},
                     {"name": "duration", "display_name": "Duration"},
                     {"name": "city", "display_name": "City"},
-                    {"name": "is_remote", "display_name": "Remote"},
                     {"name": "status", "display_name": "Status"},
-                    {"name": "rate", "display_name": "Rate"}
+                    {"name": "rate", "display_name": "Rate"},
+                    {"name": "is_remote", "display_name": "Remote"},
                 ]
-                serializer = self.serializer_class(projects, many=True)
+                if attio_user:
+                    col_name.pop()
+                serializer = self.serializer_class(projects, context={"attio_user": attio_user}, many=True)
                 url = export_to_csv(
                     serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )
@@ -772,7 +794,7 @@ class ProjectViewSets(ModelViewSet):
                     project.save()
 
                     #send attio Trigger
-                    attio_deal_won_trigger(config.ATTIO_DEAL_NAME, project)
+                    attio_deal_won_trigger(config.ATTIO_DEAL_NAME, project, request)
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
