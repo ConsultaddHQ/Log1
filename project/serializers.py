@@ -59,8 +59,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_check_list(obj):
         return get_project_check_list(obj)
 
-    @staticmethod
-    def get_consultant_name(obj):
+    def get_consultant_name(self, obj):
+        if self.context.get("attio_user", False):
+            return {"name": obj.submission.consultant.name, "remote": None}
         if obj.consultant:
             if obj.is_remote:
                 firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Not Assigned'
