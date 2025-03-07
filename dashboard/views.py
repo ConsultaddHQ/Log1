@@ -46,6 +46,24 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 interviews = Interview.objects.filter(submission__marketing_team__name=team_name)
                 project_qs = Project.objects.filter(submission__marketing_team__name=team_name)
 
+            elif "attio_user" in request.user.roles:
+                sub = Submission.objects.filter(
+                    vendor_contact__isnull=False, client__isnull=False, work_type="c2c",
+                    rate__isnull=False, employer="Consultadd", created__gt="2024-12-31"
+                ).exclude(consultant_marketing__consultant__status="on_project").exclude(
+                    rate=0
+                )
+                interviews = Interview.objects.filter(
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__work_type="c2c",
+                    submission__created__gt="2024-12-31", submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(submission__consultant_marketing__consultant__status="on_project").exclude(
+                    submission__rate=0).exclude(submission__status='archive')
+                project_qs = Project.objects.filter(
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
+                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(submission__status='archive').exclude(submission__rate=0)
+                consultant = Consultant.objects.all()
+
             else:
                 sub = Submission.objects.all()
                 project_qs = Project.objects.all()
@@ -271,6 +289,38 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     submission__marketing_team__name=team_name
                 ).count()
 
+            elif "attio_user" in request.user.roles:
+                submissions_count = Submission.objects.filter(
+                    marketing_team__dept="Marketing", vendor_contact__isnull=False, created__gt="2024-12-31",
+                    client__isnull=False, work_type="c2c", rate__isnull=False, employer="Consultadd"
+                ).exclude(status='draft').exclude(consultant_marketing__consultant__status="on_project").exclude(
+                    rate=0
+                ).count()
+                interviews_count = Interview.objects.filter(
+                    submission__marketing_team__dept="Marketing", submission__work_type="c2c",
+                    submission__created__gt="2024-12-31", submission__vendor_contact__isnull=False,
+                    submission__client__isnull=False, submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(status='cancelled').exclude(
+                    submission__consultant_marketing__consultant__status="on_project"
+                ).exclude(submission__rate=0).exclude(
+                    submission__status='archive'
+                ).order_by('submission_id').distinct('submission_id').count()
+                offers_count = project.filter(
+                    submission__work_type="c2c", submission__employer="Consultadd",
+                    submission__client__isnull=False, submission__vendor_contact__isnull=False,
+                    submission__created__gt="2024-12-31", submission__rate__isnull=False
+                ).exclude(submission__status='archive').exclude(submission__rate=0).count()
+
+                new_po = project.filter(
+                    statuses__status='joined', submission__work_type="c2c", submission__employer="Consultadd",
+                    submission__client__isnull=False, submission__vendor_contact__isnull=False,
+                    submission__created__gt="2024-12-31", submission__rate__isnull=False
+                ).exclude(submission__status='archive').exclude(submission__rate=0).count()
+                joining_count = project.filter(
+                    statuses__status='joined', submission__work_type="c2c", submission__employer="Consultadd",
+                    submission__client__isnull=False, submission__vendor_contact__isnull=False,
+                    submission__created__gt="2024-12-31", submission__rate__isnull=False
+                ).exclude(submission__status='archive').exclude(submission__rate=0).count()
             else:
                 submissions_count = Submission.objects.filter(
                     created__range=[first, last], marketing_team__dept="Marketing").exclude(status='draft').count()
@@ -329,7 +379,13 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         end_year = request.GET.get("end_year", None)
 
         try:
-            if filter_for == 'my':
+            if "attio_user" in request.user.roles:
+                projects = Project.objects.filter(
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
+                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(submission__status='archive').exclude(submission__rate=0)
+
+            elif filter_for == 'my':
                 projects = Project.objects.filter(
                     submission__created_by=request.user, submission__marketing_team__dept="Marketing")
             elif filter_for == 'team':
@@ -339,7 +395,6 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     submission__marketing_team__name=team_name, submission__marketing_team__dept="Marketing")
             else:
                 projects = Project.objects.all()
-
             result = []
             diff = 0
             if filter_by_time == 'last_12_month':
@@ -376,8 +431,17 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             filter_for = request.GET.get("filter_for", "")
 
             today = date.today() - timedelta(days=7)
-            tests = Test.objects.filter(status='feedback_due', submit_date__lte=today)
-            interviews = Interview.objects.filter(status='feedback_due', start_time__date__lte=today)
+            if "attio_user" in request.user.roles:
+                tests = Test.objects.filter(status='feedback_due', submit_date__lte=today)
+                interviews = Interview.objects.filter(
+                    status='feedback_due', start_time__date__lte=today, submission__vendor_contact__isnull=False,
+                    submission__client__isnull=False, submission__work_type="c2c", submission__rate__isnull=False,
+                    submission__employer="Consultadd"
+                ).exclude(submission__consultant_marketing__consultant__status="on_project").exclude(
+                    submission__rate=0).exclude(submission__status='archive')
+            else:
+                tests = Test.objects.filter(status='feedback_due', submit_date__lte=today)
+                interviews = Interview.objects.filter(status='feedback_due', start_time__date__lte=today)
 
             if filter_for == 'my':
                 tests = tests.filter(submission__created=request.user)

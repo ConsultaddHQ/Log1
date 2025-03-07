@@ -242,6 +242,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
             "job_title": submission.lead.job_title,
             "marketer_name": obj.marketer.employee_name,
             "vendor": submission.lead.vendor_company.name,
+            "marketing_team": obj.submission.marketing_team.name,
             "project": True if hasattr(submission, "project") else False,
             "position_name": submission.lead.position.display_name if submission.lead.position else None,
         }
@@ -468,6 +469,7 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
 class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     vendor_layer = VendorLayerSerializer(read_only=True)
     vendor_contact = serializers.SerializerMethodField()
+    marketing_team = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
@@ -475,11 +477,15 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type')
+                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type', 'marketing_team')
 
     @staticmethod
     def get_marketer_name(obj):
         return obj.created_by.employee_name
+
+    @staticmethod
+    def get_marketing_team(obj):
+        return obj.marketing_team.name
 
     @staticmethod
     def get_vendor_contact(obj):
