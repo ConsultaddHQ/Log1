@@ -213,7 +213,16 @@ AWS_LOCATION = 'media'
 
 PUBLIC_MEDIA_LOCATION = 'media'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
-DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
+# DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
+
+STORAGES = {
+    "default": {
+        "BACKEND": 'utils_app.storage.PublicMediaStorage'
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',  # Default storage for static files
+    },
+}
 
 # Password Reset Token Expiry Time
 RESET_TOKEN_EXPIRY_TIME = 1
