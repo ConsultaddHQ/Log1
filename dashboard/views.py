@@ -379,7 +379,13 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         end_year = request.GET.get("end_year", None)
 
         try:
-            if filter_for == 'my':
+            if "attio_user" in request.user.roles:
+                projects = Project.objects.filter(
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
+                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
+                ).exclude(submission__status='archive').exclude(submission__rate=0)
+
+            elif filter_for == 'my':
                 projects = Project.objects.filter(
                     submission__created_by=request.user, submission__marketing_team__dept="Marketing")
             elif filter_for == 'team':
@@ -388,10 +394,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 projects = Project.objects.filter(
                     submission__marketing_team__name=team_name, submission__marketing_team__dept="Marketing")
             else:
-                projects = Project.objects.filter(
-                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
-                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
-                ).exclude(submission__status='archive').exclude(submission__rate=0)
+                projects = Project.objects.all()
 
             result = []
             diff = 0

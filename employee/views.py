@@ -86,8 +86,8 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         try:
             employee_id = request.data.get('employee_id', None)
-            latitude = request.data.get('latitude', None)
-            longitude = request.data.get('longitude', None)
+            # latitude = request.data.get('latitude', None)
+            # longitude = request.data.get('longitude', None)
 
             if not employee_id.isnumeric():
                 return Response({"message": "Enter valid Employee Id"}, status=status.HTTP_400_BAD_REQUEST)
@@ -103,70 +103,72 @@ class EmployeeAuthViewSets(GenericViewSet):
             if user and not user.account_login:
                 return Response({"message": "Your account is not active"}, status=status.HTTP_400_BAD_REQUEST)
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
-            if user:
-                # need to check if cookies id is available or not
-                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
-                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
-                other_device = Devices.objects.filter(user=user).last()
+            if not user:
+                return Response(
+                    {"message": "Incorrect Password", "error": "Incorrect Password"}, status=status.HTTP_400_BAD_REQUEST
+                )
 
-                if not devices_cookies:
-                    device_id = other_device.device_id if other_device else 0
-                    cookie_value = generate_unique_cookies()
-                    devices_cookies = Devices.objects.create(
-                        user=user,
-                        device_id=device_id,
-                        cookies_value=cookie_value,
-                    )
+                # # need to check if cookies id is available or not
+                # cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+                # devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+                # other_device = Devices.objects.filter(user=user).last()
+                #
+                # if not devices_cookies:
+                #     device_id = other_device.device_id if other_device else 0
+                #     cookie_value = generate_unique_cookies()
+                #     devices_cookies = Devices.objects.create(
+                #         user=user,
+                #         device_id=device_id,
+                #         cookies_value=cookie_value,
+                #     )
+                #
+                #     # ip address and location needs to determine here
+                #     if latitude and longitude:
+                #         latitude = string_to_decimal_point_converter(latitude)
+                #         longitude = string_to_decimal_point_converter(longitude)
+                #         location_data = Location.objects.filter(latitude=latitude, longitude=longitude).first()
+                #         if location_data:
+                #             Location.objects.create(
+                #                 latitude=latitude,
+                #                 longitude=longitude,
+                #                 place_name=location_data.place_name,
+                #                 state=location_data.state,
+                #                 country=location_data.country,
+                #                 pin_code=location_data.pin_code,
+                #                 display_name=location_data.display_name,
+                #                 device=devices_cookies
+                #             )
+                #         else:
+                #             location_data = get_address_by_location(latitude, longitude)
+                #             if location_data:
+                #                 Location.objects.create(
+                #                     device=devices_cookies,
+                #                     state=location_data["address"]["state"],
+                #                     place_name=location_data["address"]["town"] if 'town' in location_data[
+                #                         "address"] else location_data["address"]["city"],
+                #                     country=location_data["address"]["country"],
+                #                     pin_code=location_data["address"]["postcode"],
+                #                     display_name=location_data["display_name"]
+                #                 )
 
-                    # ip address and location needs to determine here
-                    if latitude and longitude:
-                        latitude = string_to_decimal_point_converter(latitude)
-                        longitude = string_to_decimal_point_converter(longitude)
-                        location_data = Location.objects.filter(latitude=latitude, longitude=longitude).first()
-                        if location_data:
-                            Location.objects.create(
-                                latitude=latitude,
-                                longitude=longitude,
-                                place_name=location_data.place_name,
-                                state=location_data.state,
-                                country=location_data.country,
-                                pin_code=location_data.pin_code,
-                                display_name=location_data.display_name,
-                                device=devices_cookies
-                            )
-                        else:
-                            location_data = get_address_by_location(latitude, longitude)
-                            if location_data:
-                                Location.objects.create(
-                                    device=devices_cookies,
-                                    state=location_data["address"]["state"],
-                                    place_name=location_data["address"]["town"] if 'town' in location_data[
-                                        "address"] else location_data["address"]["city"],
-                                    country=location_data["address"]["country"],
-                                    pin_code=location_data["address"]["postcode"],
-                                    display_name=location_data["display_name"]
-                                )
+            user.last_login = datetime.now()
+            user.save()
 
-                user.last_login = datetime.now()
-                user.save()
+            fcm_token = request.data.get("fcm_token", None)
+            if fcm_token:
+                fcm_token, created = FCMDevice.objects.get_or_create(
+                    device_id=request.data.get("fcm_token"),
+                    content_type=ContentType.objects.get(model='user')
+                )
+                fcm_token.type = 'web'
+                fcm_token.name = 'windows'
+                fcm_token.object_id = user.id
+                fcm_token.save()
 
-                fcm_token = request.data.get("fcm_token", None)
-                if fcm_token:
-                    fcm_token, created = FCMDevice.objects.get_or_create(
-                        device_id=request.data.get("fcm_token"),
-                        content_type=ContentType.objects.get(model='user')
-                    )
-                    fcm_token.type = 'web'
-                    fcm_token.name = 'windows'
-                    fcm_token.object_id = user.id
-                    fcm_token.save()
-
-                return Response({
-                    "data": self.login_serializer_class(user).data, "cookie": devices_cookies.cookies_value
-                }, status=status.HTTP_202_ACCEPTED)
-            return Response(
-                {"message": "Incorrect Password", "error": "Incorrect Password"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"data": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
+                # return Response({
+                #     "data": self.login_serializer_class(user).data, "cookie": devices_cookies.cookies_value
+                # }, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(message=error)
             return Response({"message": "Unable to Login", "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

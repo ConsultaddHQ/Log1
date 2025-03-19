@@ -697,6 +697,7 @@ class MarketingReportViewSets(GenericViewSet):
             user_status = request.GET.get('user_status', 'all')
             export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
+            screening_type = json.loads(request.GET.get('screening_type', '["interview"]'))
 
             if query:
                 employees = User.objects.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
@@ -731,14 +732,15 @@ class MarketingReportViewSets(GenericViewSet):
                     created_by=user, created__gte=start, created__lte=end
                 ).exclude(status='cancelled').count()
                 unique_interview_count = Interview.objects.filter(
-                    submission__created_by=user, created__gte=start, created__lte=end, submission__rank__in=[0, 1]
+                    submission__created_by=user, screening_type__in=screening_type,
+                    created__gte=start, created__lte=end, submission__rank__in=[0, 1]
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 repeat_interview_count = Interview.objects.filter(
-                    submission__created_by=user, created__gte=start, created__lte=end, submission__rank__gt=1
+                    submission__created_by=user, screening_type__in=screening_type,
+                    created__gte=start, created__lte=end, submission__rank__gt=1
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
-                    statuses__status='received',
-                    submission__created_by=user,
+                    statuses__status='received', submission__created_by=user,
                     statuses__created__gte=start, statuses__created__lte=end
                 ).count()
                 data.append({
