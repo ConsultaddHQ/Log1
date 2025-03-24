@@ -17,6 +17,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_202_ACCEPTED
 
+from marketing.modleManager import SubmissionQuerySet
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -752,8 +753,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                         )
 
             if "usa_employee" in roles: 
-                queryset = queryset.filter(Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user))
-                
+                queryset = queryset.filter(
+                    Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user)
+                )
+
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
@@ -2077,13 +2080,14 @@ class InterviewViewSets(ModelViewSet):
             if not interview_link or (interview_link and len(interview_link.strip()) == 0):
                 return Response({"message": "Invalid value of interview link, Please provide a valid link"}, status=400)
 
-            if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
-                return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
-
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
+
+            if queryset.first().supervisor.employee_id != 9999:
+                if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
+                    return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
 
             if queryset.first().get_screening_type_display() == 'Interview' and \
                     ('interviewer_profiles' not in request.data or request.data.get('interviewer_profiles', []) is None):
@@ -4112,3 +4116,116 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+
+class RBACSubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = Submission.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = SubmissionSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def date_filter_params(timestamp, field_str):
+        """
+        Construct and return filter parameters based on the given timestamp and field string.
+        """
+        filters = Q()  # Initialize an empty Q object
+        if timestamp and isinstance(timestamp, dict):
+            lte_date = timestamp.get('lte', None)
+            if lte_date:
+                lte_date = (
+                        datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)
+                ).strftime("%Y-%m-%d")
+            lte = lte_date
+            gte = timestamp.get('gte', None)
+
+            if lte and gte and lte == gte:  # Check if lte and gte are the same date
+                filters &= Q(**{f"{field_str}__date": lte})  # Exact date matching
+            else:
+                if lte:
+                    filters &= Q(**{f"{field_str}__lte": lte})
+                if gte:
+                    filters &= Q(**{f"{field_str}__gte": gte})
+        return filters
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        query = request.GET.get('query', None)
+        sort_by = request.GET.get('sort_by', None)
+        filter_for = request.GET.get('filter_for', 'all')
+        filter_json = request.GET.get('filter_json', None)
+        # export = json.loads(request.GET.get('export', 'false'))
+        filter_by_status = request.GET.get('filter_by_status', None)
+
+        try:
+            queryset_filters = Q()
+            team = request.user.team
+            associated_teams = request.user.associated_to.all()
+
+            queryset_exclude = Q(status__in=['draft', 'archive'])
+            if query:
+                queryset_filters = Q(
+                    Q(client__istartswith=query) |
+                    Q(lead__city__istartswith=query) |
+                    Q(lead__job_title__istartswith=query) |
+                    Q(lead__vendor_company__name__icontains=query) |
+                    Q(created_by__employee_name__istartswith=query) |
+                    Q(vendors__vendor_company__name__icontains=query) |
+                    Q(consultant_marketing__consultant__name__istartswith=query)
+                )
+            else:
+                queryset_exclude |= Q(consultant_marketing__consultant__status='terminated')
+
+            role_base_filters = SubmissionQuerySet.RBAC_filter_kwargs_by_role(request.user)
+            if "filter_q" in role_base_filters and role_base_filters.get("filter_q", None):
+                queryset_filters &= role_base_filters.get("filter_q", None)
+            if "exclude_q" in role_base_filters and role_base_filters.get("exclude_q", None):
+                queryset_exclude |= role_base_filters.get("exclude_q")
+
+            if filter_for == "my":
+                queryset_filters &= Q(created_by=request.user)
+            elif filter_for == 'team':
+                queryset_filters &= Q(Q(created_by__team=team) | Q(marketing_team__in=associated_teams))
+            elif filter_for == 'handover':
+                users = get_authenticated_users(request)
+                users.remove(request.user)
+                queryset_filters &= Q(created_by__in=users)
+
+            if filter_json:
+                filter_by_status = list()
+                filters = json.loads(filter_json.strip())
+
+                if 'status' in filters and len(filters["status"]) > 0:
+                    filter_by_status = filters["status"]
+
+                if 'client' in filters and len(filters["client"]) > 0:
+                    queryset_filters &= Q(client__in=filters['client'])
+
+                if 'teams' in filters and len(filters["teams"]) > 0:
+                    queryset_filters &= Q(marketing_team__name__in=filters['teams'])
+
+                if 'incomplete' in filters:
+                    queryset_exclude |= Q(is_complete=filters['incomplete'])
+
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    queryset_filters &= Q(created_by_id__in=filters['marketer'])
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    queryset_filters &= Q(lead__vendor_company__name__in=filters['vendor'])
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    queryset_filters &= Q(consultant_marketing__consultant__name__in=filters['consultant'])
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset_filters &= Q(lead__position_id__in=filters["position"])
+
+                created = filters.get('created', None)
+                queryset_filters &= self.date_filter_params(created, "created")
+
+            queryset = Submission.objects.filter(queryset_filters).exclude(queryset_exclude)
+            data, sub_data = SubmissionViewSets.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
+            return Response({"counts": sub_data, "data": data, "url": "url"}, status=200)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

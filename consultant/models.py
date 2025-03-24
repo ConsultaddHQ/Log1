@@ -240,6 +240,7 @@ class WorkAuth(TimeStampedModel):
         ('j2', 'J-2'),
         ('tps', 'TPS'),
         ('h1b', 'H-1B'),
+        ('h1b1', 'H1B1'),
         ('opt', 'OPT-EAD'),
         ('cpt', 'CPT-EAD'),
         ('gc', 'Green Card'),
