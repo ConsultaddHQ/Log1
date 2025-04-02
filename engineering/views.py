@@ -122,6 +122,11 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         "count": projects.filter(support__statuses__is_current=True, support_required=True,
                                                  support__statuses__frequency='terminated').count()
                     },
+                    "cancelled": {
+                        "display_name": "Project Cancelled",
+                        "count": projects.filter(support__statuses__is_current=True, support_required=True,
+                                                 support__statuses__frequency='cancelled').count()
+                    }
 
                 },
                 "project_status": {
@@ -227,6 +232,12 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             support__statuses__is_current=True,
                             support__statuses__frequency='terminated'
                         )
+                    elif filters['support_status'] == 'cancelled':
+                        projects = projects.filter(
+                            support_required=True,
+                            support__statuses__is_current=True,
+                            support__statuses__frequency='cancelled'
+                        )
 
             total = projects.count()
             if filters.get('status', None) not in ['complete', 'cancelled', 'terminated']:
@@ -269,6 +280,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     {'name': 'independent', 'display_name': 'Independent'},
                     {'name': 'handover', 'display_name': 'Handover'},
                     {'name': 'terminated', 'display_name': 'Terminated'},
+                    {'name': 'cancelled', 'display_name': 'Project Cancelled'},
                 ],
                 "assignment_status": [
                     {'name': 'all', 'display_name': 'All'},
