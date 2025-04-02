@@ -2077,13 +2077,16 @@ class InterviewViewSets(ModelViewSet):
             if not interview_link or (interview_link and len(interview_link.strip()) == 0):
                 return Response({"message": "Invalid value of interview link, Please provide a valid link"}, status=400)
 
-            if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
-                return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
-
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
+
+            if queryset.first().supervisor.employee_id != 9999:
+                if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
+                    return Response(
+                        {"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400
+                    )
 
             if queryset.first().get_screening_type_display() == 'Interview' and \
                     ('interviewer_profiles' not in request.data or request.data.get('interviewer_profiles', []) is None):

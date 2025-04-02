@@ -1392,6 +1392,10 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             desc = f"{request.user.employee_name} updated {msg.get('var2', '')} support {msg.get('var1', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
 
+            if support.statuses.filter(frequency='cancelled', is_current=True).first():
+                support.end = date.today()
+                support.save()
+
             # need to add slack card here
             if data.get('status') == "independent":
                 # adding consultant update here
