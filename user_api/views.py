@@ -21,8 +21,6 @@ from user_api.serializers import UserApiSerializer
 from log1.utils import write_exception, get_page_limits
 
 
-
-# Create your views here.
 class UserApiKeyViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, DestroyModelMixin):
     queryset = UserAPIKey.objects.all()
     serializer_class = UserApiSerializer
@@ -68,6 +66,7 @@ class UserApiKeyViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Destro
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
 
