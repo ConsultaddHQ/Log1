@@ -2082,14 +2082,16 @@ class InterviewViewSets(ModelViewSet):
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
 
+            if queryset.first().supervisor.employee_id != 9999:
+                if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
+                    return Response(
+                        {"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400
+                    )
+
             if queryset.first().get_screening_type_display() == 'Interview' and \
                     ('interviewer_profiles' not in request.data or request.data.get('interviewer_profiles', []) is None):
                 if self.invalid_interviewer_profiles(request.data.get('interviewer_profiles', [])):
                     return Response({"message": "Please add valid interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
-
-            if queryset.first().supervisor.employee_id != 9999:
-                if not interview_recording_link or (interview_recording_link and len(interview_recording_link.strip()) == 0):
-                    return Response({"message": "Invalid value of interview recording link, Please provide a valid link"}, status=400)
 
             interview = queryset.first()
             prev_status = interview.get_status_display()
