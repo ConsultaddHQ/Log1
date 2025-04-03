@@ -13,6 +13,7 @@ class UserAPIKey(TimeStampedModel):
 
     class Meta:
         ordering = ('-user__employee_name',)
+        verbose_name = "User API-Key"
 
     def __str__(self):
         return f"{self.user} --> {self.api_key}"
@@ -51,6 +52,7 @@ class TriggerEvent(models.Model):
     )
 
     class Meta:
+        verbose_name = "Trigger Event"
         unique_together = ('name', 'content_type')  # Ensure unique name per content type
 
     def __str__(self):
@@ -66,3 +68,6 @@ class WebhookEndpoint(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({', '.join(t.name for t in self.subscribed_events.all())})"
+
+    class Meta:
+        verbose_name = "Webhook Endpoint"
