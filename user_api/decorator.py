@@ -32,7 +32,7 @@ def webhook_notify(events=None):
                         'object_id': response.data.get('trigger_payload').get("object_id")
                     }
                     process_trigger.delay(
-                        payload=response_data, request=request
+                        payload=response_data, request=None
                     )
 
                 except Exception as error:

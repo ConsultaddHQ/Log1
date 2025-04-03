@@ -48,7 +48,10 @@ def process_trigger(self, payload, request):
 
                 # Prepare filter and get instance
                 filter_key = event_obj.model_filter_relation.replace(".", "__")
-                instance = getattr(model_instance, event_obj.object_id_path)
+                if event_obj.object_id_path:
+                    instance = getattr(model_instance, event_obj.object_id_path)
+                else:
+                    instance = model_instance
                 if not instance:
                     continue
 
@@ -64,7 +67,7 @@ def process_trigger(self, payload, request):
                         .filter(is_active=True)
                         .values_list('id', flat=True)
                     )
-
+                print(event_data)
                 # Bulk deliver webhooks
                 for webhook_id in webhook_ids:
                     deliver_webhook.delay(
