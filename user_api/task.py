@@ -67,7 +67,7 @@ def process_trigger(self, payload, request):
                         .filter(is_active=True)
                         .values_list('id', flat=True)
                     )
-                print(event_data)
+
                 # Bulk deliver webhooks
                 for webhook_id in webhook_ids:
                     deliver_webhook.delay(
