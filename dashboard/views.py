@@ -395,6 +395,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     submission__marketing_team__name=team_name, submission__marketing_team__dept="Marketing")
             else:
                 projects = Project.objects.all()
+
             result = []
             diff = 0
             if filter_by_time == 'last_12_month':
