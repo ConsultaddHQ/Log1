@@ -1157,6 +1157,11 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             supports = project.support.filter(end=None, is_proxy_support=False)
             proxy_start_date = request.data.get('proxy_start_date', None)
             proxy_support_person = request.data.get('proxy_support_person', None)
+
+            project_cancelled_verdict = project.statuses.filter(status__istartswith='cancelled').exists()
+            if request.data.get('status') == 'cancelled' or project_cancelled_verdict:
+                return Response({"message": "You can not create support for cancelled project"}, status=400)
+
             if proxy_support_person and proxy_start_date:
                 proxy_support_person = get_object_or_404(User, id=proxy_support_person)
                 if supports.filter(support=proxy_support_person, statuses__frequency="active",
@@ -1391,6 +1396,10 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             serializer.save()
             desc = f"{request.user.employee_name} updated {msg.get('var2', '')} support {msg.get('var1', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
+
+            if support.statuses.filter(frequency='cancelled', is_current=True).first():
+                support.end = date.today()
+                support.save()
 
             # need to add slack card here
             if data.get('status') == "independent":

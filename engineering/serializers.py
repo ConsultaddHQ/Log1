@@ -97,32 +97,26 @@ class EngineeringSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_status(obj):
-        if obj.statuses.filter(status__istartswith='terminated').first():
+        if obj.statuses.filter(status__istartswith='terminated').exists():
             return 'terminated'
 
-        support_qs = obj.support.filter(end=None)
-        support = obj.support.all()
-        if support_qs:
-            qs = support_qs.first().statuses.filter(is_current=True)
-            if qs:
-                support_status = qs.first()
-                if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
-                    return "training"
-                elif obj.start_date and support_status.frequency == 'active' and obj.start_date <= date.today():
-                    return "active"
-                else:
-                    return support_status.frequency
-        elif support:
-            qs = support.latest('start').statuses.filter(is_current=True)
-            if qs:
-                support_status = qs.first()
-                if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
-                    return "training"
-                elif obj.start_date and support_status.frequency == 'active' and obj.start_date <= date.today():
-                    return "active"
-                else:
-                    return support_status.frequency
-        return None
+        support_qs = obj.support.filter(is_proxy_support=False).order_by('-start')
+        active_support = support_qs.filter(end=None).first() or support_qs.first()
+
+        if not active_support:
+            return None
+
+        support_status = active_support.statuses.filter(is_current=True).first()
+        if not support_status:
+            return None
+
+        if obj.start_date:
+            if obj.start_date > date.today() and support_status.frequency == 'active':
+                return "training"
+            elif obj.start_date <= date.today() and support_status.frequency == 'active':
+                return "active"
+
+        return support_status.frequency
 
 
 class EngineeringDetailSerializer(serializers.ModelSerializer):
