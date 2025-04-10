@@ -24,6 +24,7 @@ class BaseAPIKeyManager(models.Manager):
         obj.id = pk
         obj.prefix = prefix
         obj.hashed_key = hashed_key
+        obj.api_key = key
 
         return key
 
@@ -37,6 +38,17 @@ class BaseAPIKeyManager(models.Manager):
 
     def get_usable_keys(self) -> models.QuerySet:
         return self.filter(revoked=False)
+
+    def delete_key_by_string(self, key: str) -> bool:
+        prefix, _, _ = key.partition(".")
+        queryset = self.get_usable_keys()
+
+        try:
+            api_key = queryset.get(prefix=prefix)  # type: AbstractAPIKey
+            api_key.delete()
+            return True
+        except self.model.DoesNotExist:
+            return False
 
     def is_valid(self, key: str) -> bool:
         prefix, _, _ = key.partition(".")
@@ -127,6 +139,9 @@ class AbstractAPIKey(models.Model):
             raise ValidationError(
                 "The API key has been revoked, which cannot be undone."
             )
+
+    def delete_key(self):
+        self.delete()
 
     def __str__(self) -> str:
         return str(self.name)

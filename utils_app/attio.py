@@ -106,7 +106,7 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
 def get_rate(obj: Any) -> int:
     submission = obj.submission
     if int(obj.duration) % 3 == 0:
-        rate = (int(submission.rate) - int(submission.consultant.rate)) *  520 * (int(int(obj.duration) / 3)) 
+        rate = (int(submission.rate) - int(submission.consultant.rate)) * 520 * (int(int(obj.duration) / 3))
     else:
         rate = (int(submission.rate) - int(submission.consultant.rate)) * 40 * 4 * int(obj.duration)
     return rate

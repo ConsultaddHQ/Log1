@@ -178,7 +178,8 @@ def create_message(from_email, mail_data):
         message['from'] = from_email
         if os.environ.get('ENV', 'local') == 'prod':
             email_recipients = {"to": mail_data.get("to"), "cc": mail_data.get("cc"), "bcc": mail_data.get("bcc")}
-            active_users = get_active_user(to=mail_data.get("to"), cc=mail_data.get("cc"), bcc=mail_data.get("bcc"))
+            active_users = get_active_user(cc=mail_data.get("cc"), bcc=mail_data.get("bcc"))
+            active_users["to"] = mail_data.get("to")
             for key in email_recipients.keys():
                 message[key] = ','.join(active_users.get(key, []))
 
@@ -199,7 +200,8 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
         obj['from'] = from_mail
         if os.environ.get('ENV', 'local') == 'prod':
             email_recipients = {"to": to, "cc": cc, "bcc": bcc}
-            active_users = get_active_user(to=to, cc=cc, bcc=bcc)
+            active_users = get_active_user(cc=cc, bcc=bcc)
+            active_users["to"] = email_recipients["to"]
             for key in email_recipients.keys():
                 obj[key] = ','.join(active_users.get(key, []))
         else:
