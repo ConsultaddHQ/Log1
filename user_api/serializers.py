@@ -1,8 +1,29 @@
 from rest_framework import serializers
+from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from project.models import Project
 from user_api.models import UserAPIKey
-from marketing.models import Submission
+from consultant.models import Consultant
+from marketing.models import Submission, Interview, Lead, VendorCompany, VendorContact
+
+
+class CustomPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"  # Allow clients to set page size
+    max_page_size = 100  # Limit the maximum page size
+
+    def get_paginated_response(self, data):
+        return Response({
+            "links": {
+                "next": self.get_next_link(),
+                "previous": self.get_previous_link(),
+            },
+            "count": self.page.paginator.count,
+            "page_size": self.page.paginator.per_page,
+            "current_page": self.page.number,
+            "results": data,
+        })
 
 
 class UserApiSerializer(serializers.ModelSerializer):
@@ -29,106 +50,133 @@ class UserApiSerializer(serializers.ModelSerializer):
         }
 
 
+class ConsultantDetailsSerializer(serializers.ModelSerializer):
+    active_projects = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ["id", "name", "email", "active_projects"]
+
+    @staticmethod
+    def get_active_projects(obj):
+        active_projects = Project.objects.filter(
+            submission__consultant_marketing__consultant=obj,
+            statuses__status="joined", statuses__is_current=True
+        ).values("id", "submission_id", "employer", "created")
+
+        return [
+            {
+                "project_id": po.get("id"),
+                "employer": po.get("employer"),
+                "submission_id": po.get("submission_id"),
+                "created_at": po.get("created").strftime("%Y-%m-%d"),
+            }
+            for po in active_projects
+        ]
+
+
+class InterviewDetailsSerializer(serializers.ModelSerializer):
+    round = serializers.SerializerMethodField()
+    status = serializers.CharField(source="get_status_display")
+    screening_type = serializers.CharField(source="get_screening_type_display")
+    interview_mode = serializers.CharField(source="get_interview_mode_display")
+    call_type = serializers.CharField(source="call_type.display_name", default=None)
+    supervisor = serializers.SerializerMethodField(source="supervisor.employee_name", default=None)
+
+    class Meta:
+        model = Interview
+        fields = [
+            "id", "feedback", "end_time", "start_time", "call_type", "supervisor",
+            "screening_type", "round", "interview_mode", "status"
+        ]
+
+    @staticmethod
+    def get_round(obj):
+        return f"Round - {obj.round}"
+
+    @staticmethod
+    def get_supervisor(obj):
+        return "Consultant" if obj.supervisor.employee_id == 9999 else obj.supervisor.employee_name
+
+
+class ProjectDetailsSerializer(serializers.ModelSerializer):
+    end_date = serializers.DateField(format="%Y-%m-%d")
+    start_date = serializers.DateField(format="%Y-%m-%d")
+    submission = serializers.IntegerField(source="submission_id")
+    remote_consultant_id = serializers.IntegerField(source="consultant_id")
+
+    class Meta:
+        model = Project
+        fields = [
+            "id", "rate", "start_date", "end_date", "feedback", "employer",
+            "is_remote", "city", "duration", "submission", "remote_consultant_id", "status"
+        ]
+
+    def __int__(self, obj):
+        if self.context.get("project_filters"):
+            obj.filter(self.context.get("project_filters"))
+            # obj.filter(self.context.get("project_filters"))
+
+
+class LeadSerializer(serializers.ModelSerializer):
+    position = serializers.CharField(source="position.display_name", required=False)
+
+    class Meta:
+        model = Lead
+        fields = ["id", "position"]
+
+
+class VendorCompanySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = VendorCompany
+        fields = ["id", "name", "created_by"]
+
+
+class VendorContactSerializer(serializers.ModelSerializer):
+    created_by = serializers.CharField(source="created_by.employee_name")
+
+    class Meta:
+        model = VendorContact
+        fields = ["id", "created_by", "company_id", "source_link", "email", "region", "name"]
+
+
 class MarketingTriggerSerializer(serializers.ModelSerializer):
-    lead = serializers.SerializerMethodField()
+    lead = LeadSerializer(read_only=True)
     created_by = serializers.SerializerMethodField()
-    vendor_company = serializers.SerializerMethodField()
-    vendor_contact = serializers.SerializerMethodField()
-    marketing_team = serializers.SerializerMethodField()
     project_details = serializers.SerializerMethodField()
-    submission_status = serializers.SerializerMethodField()
     interview_details = serializers.SerializerMethodField()
-    consultant_details = serializers.SerializerMethodField()
+    vendor_contact = VendorContactSerializer(read_only=True)
+    vendor_company = VendorCompanySerializer(source="vendor", read_only=True)
+    work_type = serializers.CharField(source="get_status_display", read_only=True)
+    marketing_team = serializers.CharField(source="marketing_team.name", read_only=True)
+    consultant_details = ConsultantDetailsSerializer(source="consultant", read_only=True)
+    submission_status = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
         model = Submission
         fields = [
-            "id", "client", "email", "work_type", "vendor_company", "vendor_contact", "created_by", "rate", "employer",
-            "lead", "consultant_details", "project_details", "interview_details", "marketing_team", "submission_status"
+            "id", "client", "email", "work_type", "marketing_team", "submission_status", "created", "modified",
+            "rate", "employer", "created_by", "vendor_company", "vendor_contact", "lead", "consultant_details",
+            "interview_details", "project_details"
         ]
 
-    @staticmethod
-    def get_vendor_company(obj):
-        return {
-            "id": obj.vendor.id, "name": obj.vendor.name, "created_by": obj.vendor.created_by,
-        }
+    def get_project_details(self, obj):
+        project = getattr(obj, "project", None)
+        if project:
+            return ProjectDetailsSerializer(project).data
+        return {}
 
-    @staticmethod
-    def get_lead(obj):
-        lead = obj.lead
-        return {
-            "lead_id": lead.id, "job_position": lead.job_title
-        }
-
-    @staticmethod
-    def get_vendor_contact(obj):
-        return {
-            "id": obj.vendor_contact.id, "created_by": obj.vendor_contact.created_by.employee_name,
-            "vendor_company_id": obj.vendor_contact.company_id, "source_link": obj.vendor_contact.source_link,
-            "email": obj.vendor_contact.email, "region": obj.vendor_contact.region, "name": obj.vendor_contact.name
-        }
-
-    @staticmethod
-    def get_project_details(obj):
-        if hasattr(obj, 'project'):
-            project_obj = obj.project
-            return {
-                "id": project_obj.id, "rate": project_obj.rate,
-                "start_date": project_obj.start_date.strftime("%Y-%m-%d"),
-                "end_date": project_obj.end_date.strftime("%Y-%m-%d"),
-                "feedback": project_obj.feedback, "employer": project_obj.employer,
-                "is_remote": project_obj.is_remote, "city": project_obj.city, "duration": project_obj.duration,
-                "submission": project_obj.submission_id, "remote_consultant_id": project_obj.consultant_id,
-                "status": project_obj.status
-            }
-        return dict()
-
-    @staticmethod
-    def get_interview_details(obj):
-        screenings = list()
-        if hasattr(obj, 'screening'):
-            screening_qs = obj.screening.all()
-            for screening in screening_qs:
-                screenings.append({
-                    "id": screening.id,
-                    "feedback": screening.feedback,
-                    "end_time": screening.end_time.strftime("%Y-%m-%d"),
-                    "start_time": screening.start_time.strftime("%Y-%m-%d"),
-                    "call_type": screening.call_type.display_name if screening.call_type else None,
-                    "screening_type": screening.get_screening_type_display(), "Round": f"Round - {screening.round}",
-                    "interview_mode": screening.get_interview_mode_display(), "status": screening.get_status_display(),
-                    "supervisor": screening.supervisor.employee_name
-                    if screening.supervisor.employee_id != 9999 else "Consultant"
-                })
-        return screenings
-
-    @staticmethod
-    def get_submission_status(obj):
-        return obj.get_status_display()
-
-    @staticmethod
-    def get_marketing_team(obj):
-        return obj.marketing_team.name
+    def get_interview_details(self, obj):
+        if not hasattr(obj, "screening"):
+            return []
+        return InterviewDetailsSerializer(
+            obj.screening.exclude(status__iexact="cancelled").order_by("-id"), many=True
+        ).data
 
     @staticmethod
     def get_created_by(obj):
+        creator = obj.created_by
         return {
-            "id": obj.created_by.id, "name": obj.created_by.employee_name, "team": obj.created_by.team.name
-        }
-
-    @staticmethod
-    def get_consultant_details(obj):
-        active_project_qs = Project.objects.filter(
-            submission__consultant_marketing__consultant=obj.consultant, created__gt="2024-12-31",
-            statuses__status='joined', statuses__is_current=True
-        )
-        active_projects = [
-            {
-                "project_id": po.id, "submission_id": po.submission.id,
-                "employer": po.employer, "created_at": po.created.strftime("%Y-%m-%d")
-            } for po in active_project_qs
-        ]
-        return {
-            "id": obj.consultant.id, "name": obj.consultant.name,
-            "email": obj.consultant.email, "active_projects": active_projects
-        }
+            "id": creator.id, "name": creator.employee_name, "team": creator.team.name
+        } if creator else {}

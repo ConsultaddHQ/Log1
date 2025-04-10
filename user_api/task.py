@@ -8,8 +8,6 @@ from django.contrib.contenttypes.models import ContentType
 from log1.utils import write_exception, write_info
 from user_api.models import WebhookEndpoint, TriggerEvent
 
-logger = logging.getLogger(__name__)
-
 
 def import_from_path(path):
     """Dynamically import a class from a string path"""

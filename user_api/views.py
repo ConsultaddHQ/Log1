@@ -1,23 +1,23 @@
 import json
-
 from django.db.models import Q
-from django.shortcuts import render, get_object_or_404
+from datetime import datetime, timedelta
+from django.shortcuts import get_object_or_404
 
+from rest_framework.mixins import *
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import *
 
-from api_key.models import APIKey
 from employee.models import User
+from api_key.models import APIKey
 from user_api.models import UserAPIKey
 
+from marketing.utils import date_filter
 from marketing.models import Submission, Test, Interview, VendorContact
 from marketing.serializers import SubmissionSerializer, TestListSerializer, InterviewSerializer
-from marketing.utils import date_filter
 
-from user_api.serializers import UserApiSerializer
+from user_api.serializers import UserApiSerializer, MarketingTriggerSerializer, CustomPagination
 from log1.utils import write_exception, get_page_limits
 
 
@@ -69,20 +69,134 @@ class UserApiKeyViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Destro
 
 
 class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
+    queryset = Submission.objects.all()
+    serializer_class = MarketingTriggerSerializer
 
     @staticmethod
     def verify_api_key(auth_header):
         if auth_header and auth_header.startswith("Token "):
             try:
                 api_key = auth_header.split("Token ")[1]
-                print(api_key)
                 if not APIKey.objects.is_valid(api_key):
                     return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-                return None  # Indicating success
+                return None
             except IndexError:
                 return Response({"message": "Invalid Token Format"}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    @staticmethod
+    def date_filter_params(timestamp, field_str):
+        filters = Q()
+        if timestamp and isinstance(timestamp, dict):
+            lte_date = timestamp.get('lte', None)
+            if lte_date:
+                lte_date = (
+                        datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)
+                ).strftime("%Y-%m-%d")
+            lte = lte_date
+            gte = timestamp.get('gte', None)
+
+            if lte and gte and lte == gte:
+                filters &= Q(**{f"{field_str}__date": lte})
+            else:
+                if lte:
+                    filters &= Q(**{f"{field_str}__lte": lte})
+                if gte:
+                    filters &= Q(**{f"{field_str}__gte": gte})
+        return filters
+
+    def _get_submission_by_id(self, submission_id):
+        """Fetch a single submission by ID."""
+        try:
+            submission_obj = Submission.objects.get(id=int(submission_id))
+            serializer = self.get_serializer(submission_obj)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+        except Submission.DoesNotExist:
+            return Response({"message": "Submission ID does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+
+    def _apply_filters(self, filters, queryset_filters, queryset_exclude):
+        """Apply filters to the query."""
+        if 'status' in filters:
+            queryset_filters &= Q(status__iexact=filters["status"])
+
+        if 'client' in filters:
+            if filters['client'] == "not_null":
+                queryset_exclude |= Q(client__isnull=True)
+            else:
+                queryset_filters &= Q(client__in=filters['client'])
+
+        if 'teams' in filters:
+            queryset_filters &= Q(marketing_team__name__in=filters['teams'])
+
+        if 'work_type' in filters:
+            queryset_filters &= Q(work_type=filters['work_type'])
+
+        if 'rate' in filters and filters.get("rate") == "not_null":
+            queryset_exclude |= Q(rate__isnull=True) | Q(rate=0)
+
+        if 'employer' in filters:
+            queryset_filters &= Q(employer__iexact=filters['employer'])
+
+        if 'marketer' in filters:
+            queryset_filters &= Q(created_by__name__in=filters['marketer'])
+
+        if 'vendor' in filters:
+            queryset_filters &= Q(lead__vendor_company__name__in=filters['vendor'])
+
+        if 'consultant' in filters:
+            queryset_filters &= Q(consultant_marketing__consultant__name__in=filters['consultant'])
+
+        if 'position' in filters:
+            queryset_filters &= Q(lead__position__name__in=filters["position"])
+
+        if 'incomplete' in filters:
+            queryset_exclude |= Q(is_complete=filters['incomplete'])
+
+        if 'created' in filters:
+            queryset_filters &= self.date_filter_params(filters['created'], "created")
+
+        return queryset_filters, queryset_exclude
+
+    @action(methods=['get'], detail=False, url_path='marketing_data')
+    def get_marketing_data(self, request):
+        # API key verification
+        auth_response = self.verify_api_key(request.headers.get("Api-Key"))
+        if auth_response:
+            return auth_response
+
+        # Initialize filters
+        sort_by = request.GET.get('sort_by', 'created')
+        get_by_id = request.GET.get('submission_id', None)
+        filter_json = request.GET.get('filter_json', None)
+        queryset_filters = Q()
+        queryset_exclude = Q(status__in=['draft', 'archive'])
+
+        try:
+            # If fetching a single submission by ID
+            if get_by_id and get_by_id.isdigit():
+                return self._get_submission_by_id(get_by_id)
+
+            # Apply filters if provided
+            if filter_json:
+                queryset_filters, queryset_exclude = self._apply_filters(json.loads(filter_json.strip()), queryset_filters, queryset_exclude)
+            # Query the database with filters
+            queryset = (
+                Submission.objects.filter(queryset_filters)
+                .exclude(queryset_exclude)
+                .order_by(f"-{sort_by}")
+            )
+
+            # Paginate results
+            context = {"project_filters": Q(employer="consultadd")}
+            paginator = CustomPagination()
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True, context=context)
+
+            return paginator.get_paginated_response(serializer.data)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='submission')
     def get_submission(self, request):
@@ -280,10 +394,3 @@ class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-
-
-

@@ -128,13 +128,16 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
+        name = request.data.get('name', None)
         email = request.data.get('email', None)
         company = request.data.get('company', None)
         if not company:
             return Response({"message": "Select company"}, status=400)
 
-        vendor = VendorContact.objects.filter(email__iexact=email, created_by=request.user, company_id=company)
-        if vendor:
+        filter_conditions = Q(created_by=request.user, company_id=company) & (
+            Q(email__iexact=email) if email else Q(name__iexact=name)
+        )
+        if VendorContact.objects.filter(filter_conditions).exists():
             return Response({"message": "Already exists"}, status=400)
         try:
             contact = VendorContact.objects.create(
@@ -187,10 +190,10 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             submission = Submission.objects.filter(
                 id=int(submission_id), status__in=['project', 'interview', 'in-offer']
             ).first()
-            if submission:
-                interview_obj = submission.screening.exclude(status='cancelled').first()
-                if interview_obj:
-                    attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
+            # if submission:
+            #     interview_obj = submission.screening.exclude(status='cancelled').first()
+            #     if interview_obj:
+            #         attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
 
             #Create Activity
             desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
