@@ -61,6 +61,7 @@ PROJECT_APPS = [
     'dashboard.apps.DashboardConfig',
     'tracking.apps.TrackingConfig',
     'finance.apps.FinanceConfig',
+    'user_api.apps.UserApiConfig'
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS

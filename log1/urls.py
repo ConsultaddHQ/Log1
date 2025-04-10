@@ -39,6 +39,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
+from user_api.views import UserApiKeyViewSet, MarketingPublicApiViewSet
 
 router = DefaultRouter()
 schema_view = get_swagger_view(title="Log1")
@@ -150,6 +151,10 @@ router.register(r'finance_timesheet', FinanceTimeSheetViewSet, basename="finance
 # Twilio messaging app routes
 router.register(r"twilio", SMSViewSet, basename="twilio")
 router.register(r"twilio_receive", ReceiveSMSViewSet, basename="twilio-receive")
+
+#User api app routes
+router.register(r"user_api", UserApiKeyViewSet)
+router.register(r"public_api", MarketingPublicApiViewSet, basename="public_api")
 
 router_v2 = DefaultRouter()
 router_v2.register(r"submission", SubmissionV2ViewSets, basename="submission-v2")
