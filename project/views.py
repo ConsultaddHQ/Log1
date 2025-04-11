@@ -631,7 +631,7 @@ class ProjectViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @transaction.atomic
-    @webhook_notify
+    @webhook_notify()
     def create(self, request, *args, **kwargs):
         sub_id = request.data.get('submission')
         try:
@@ -676,13 +676,16 @@ class ProjectViewSets(ModelViewSet):
                 # support_assignment_mail(support, request)
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
-                return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
+                trigger_payload = {"object_id": project.id}
+                return Response({
+                    "message": message, "data": serializer.data, "exception": error_msg, "trigger_payload": trigger_payload
+                }, status=201)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @webhook_notify
+    @webhook_notify()
     def update(self, request, *args, **kwargs):
         project_id = kwargs.get('pk')
         try:
@@ -856,7 +859,10 @@ class ProjectViewSets(ModelViewSet):
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
-            return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
+            trigger_payload = {"object_id": project.id}
+            return Response({
+                "data": serializer.data, "error": err, "message": "Project updated", "trigger_payload": trigger_payload
+            }, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

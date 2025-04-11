@@ -112,11 +112,6 @@ class ProjectDetailsSerializer(serializers.ModelSerializer):
             "is_remote", "city", "duration", "submission", "remote_consultant_id", "status"
         ]
 
-    def __int__(self, obj):
-        if self.context.get("project_filters"):
-            obj.filter(self.context.get("project_filters"))
-            # obj.filter(self.context.get("project_filters"))
-
 
 class LeadSerializer(serializers.ModelSerializer):
     position = serializers.CharField(source="position.display_name", required=False)
@@ -148,7 +143,7 @@ class MarketingTriggerSerializer(serializers.ModelSerializer):
     interview_details = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer(read_only=True)
     vendor_company = VendorCompanySerializer(source="vendor", read_only=True)
-    work_type = serializers.CharField(source="get_status_display", read_only=True)
+    work_type = serializers.CharField(source="get_work_type_display", read_only=True)
     marketing_team = serializers.CharField(source="marketing_team.name", read_only=True)
     consultant_details = ConsultantDetailsSerializer(source="consultant", read_only=True)
     submission_status = serializers.CharField(source="get_status_display", read_only=True)
@@ -170,9 +165,7 @@ class MarketingTriggerSerializer(serializers.ModelSerializer):
     def get_interview_details(self, obj):
         if not hasattr(obj, "screening"):
             return []
-        return InterviewDetailsSerializer(
-            obj.screening.exclude(status__iexact="cancelled").order_by("-id"), many=True
-        ).data
+        return InterviewDetailsSerializer(obj.screening.all().order_by("-id"), many=True).data
 
     @staticmethod
     def get_created_by(obj):
