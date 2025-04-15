@@ -69,7 +69,7 @@ class ConsultantDetailsSerializer(serializers.ModelSerializer):
                 "project_id": po.get("id"),
                 "employer": po.get("employer"),
                 "submission_id": po.get("submission_id"),
-                "created_at": po.get("created").strftime("%Y-%m-%d"),
+                "created": po.get("created").strftime("%Y-%m-%d"),
             }
             for po in active_projects
         ]
@@ -96,7 +96,7 @@ class InterviewDetailsSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_supervisor(obj):
-        return "Consultant" if obj.supervisor.employee_id == 9999 else obj.supervisor.employee_name
+        return obj.supervisor.employee_name
 
 
 class ProjectDetailsSerializer(serializers.ModelSerializer):
@@ -108,7 +108,7 @@ class ProjectDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = [
-            "id", "rate", "start_date", "end_date", "feedback", "employer",
+            "id", "rate", "start_date", "end_date", "feedback", "employer", "created",
             "is_remote", "city", "duration", "submission", "remote_consultant_id", "status"
         ]
 
@@ -165,7 +165,7 @@ class MarketingTriggerSerializer(serializers.ModelSerializer):
     def get_interview_details(self, obj):
         if not hasattr(obj, "screening"):
             return []
-        return InterviewDetailsSerializer(obj.screening.all().order_by("-id"), many=True).data
+        return InterviewDetailsSerializer(obj.screening.filter().order_by("-id"), many=True).data
 
     @staticmethod
     def get_created_by(obj):

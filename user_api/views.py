@@ -130,7 +130,7 @@ class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
             queryset_filters &= Q(marketing_team__name__in=filters['teams'])
 
         if 'work_type' in filters:
-            queryset_filters &= Q(work_type=filters['work_type'])
+            queryset_filters &= Q(work_type__iexact=filters['work_type'])
 
         if 'rate' in filters and filters.get("rate") == "not_null":
             queryset_exclude |= Q(rate__isnull=True) | Q(rate=0)
@@ -142,13 +142,25 @@ class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
             queryset_filters &= Q(created_by__name__in=filters['marketer'])
 
         if 'vendor' in filters:
-            queryset_filters &= Q(lead__vendor_company__name__in=filters['vendor'])
+            if filters['vendor'] == "not_null":
+                queryset_filters &= Q(lead__vendor_company__isnull=False)
+            else:
+                queryset_filters &= Q(lead__vendor_company__name__in=filters['vendor'])
+
+        if 'vendor_contact' in filters:
+            if filters['vendor_contact'] == "not_null":
+                queryset_filters &= Q(vendor_contact__isnull=False)
+            else:
+                queryset_filters &= Q(lead__vendor_company__name__in=filters['vendor_contact'])
 
         if 'consultant' in filters:
             queryset_filters &= Q(consultant_marketing__consultant__name__in=filters['consultant'])
 
         if 'position' in filters:
-            queryset_filters &= Q(lead__position__name__in=filters["position"])
+            if filters['position'] == "not_null":
+                queryset_filters &= Q(lead__position__isnull=False)
+            else:
+                queryset_filters &= Q(lead__position__name__in=filters["position"])
 
         if 'incomplete' in filters:
             queryset_exclude |= Q(is_complete=filters['incomplete'])
