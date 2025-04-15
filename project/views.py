@@ -18,6 +18,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
+
+from user_api.decorator import webhook_notify
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -78,7 +80,7 @@ class ProjectViewSets(ModelViewSet):
             msg, resp, _ = send_email_(mail_data, config.RELATIONS, request)
             if not resp:
                 write_exception(msg, request)
-                return  resp, "error"
+                return resp, "error"
             return resp, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -419,7 +421,8 @@ class ProjectViewSets(ModelViewSet):
             # search project by client and consultant
             if "attio_user" in roles:
                 projects = Project.objects.filter(
-                    submission__vendor_contact__isnull=False, submission__client__isnull=False, submission__created__gt="2024-12-31",
+                    submission__vendor_contact__isnull=False, submission__client__isnull=False,
+                    submission__created__gt="2024-12-31",
                     submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
                 ).exclude(submission__status='archive').exclude(submission__rate=0)
 
@@ -628,6 +631,7 @@ class ProjectViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @transaction.atomic
+    @webhook_notify()
     def create(self, request, *args, **kwargs):
         sub_id = request.data.get('submission')
         try:
@@ -672,12 +676,16 @@ class ProjectViewSets(ModelViewSet):
                 # support_assignment_mail(support, request)
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
-                return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
+                trigger_payload = {"object_id": project.id}
+                return Response({
+                    "message": message, "data": serializer.data, "exception": error_msg, "trigger_payload": trigger_payload
+                }, status=201)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @webhook_notify()
     def update(self, request, *args, **kwargs):
         project_id = kwargs.get('pk')
         try:
@@ -793,7 +801,7 @@ class ProjectViewSets(ModelViewSet):
                     assign_project_associates(project, request)
                     project.save()
 
-                    #send attio Trigger
+                    # send attio Trigger
                     attio_deal_won_trigger(config.ATTIO_DEAL_NAME, project, request)
 
                 # Project Cancelled
@@ -851,7 +859,10 @@ class ProjectViewSets(ModelViewSet):
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
-            return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
+            trigger_payload = {"object_id": project.id}
+            return Response({
+                "data": serializer.data, "error": err, "message": "Project updated", "trigger_payload": trigger_payload
+            }, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1246,7 +1257,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
     def delete(self, request, *args, **kwargs):
         try:
-            if 'superadmin' not in request.user.roles and not ('admin' in request.user.roles and 'engineer' in request.user.roles):
+            if 'superadmin' not in request.user.roles and not (
+                    'admin' in request.user.roles and 'engineer' in request.user.roles):
                 return Response({"message": "You do not have access to perform this action"}, status=400)
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             supports = ProjectSupport.objects.filter(project=project)
@@ -1257,7 +1269,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-    
+
     @action(methods=['put'], detail=True, url_path="status")
     def status(self, request, project_id, pk):
         try:
