@@ -190,10 +190,10 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             submission = Submission.objects.filter(
                 id=int(submission_id), status__in=['project', 'interview', 'in-offer']
             ).first()
-            # if submission:
-            #     interview_obj = submission.screening.exclude(status='cancelled').first()
-            #     if interview_obj:
-            #         attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
+            if submission:
+                interview_obj = submission.screening.exclude(status='cancelled').first()
+                if interview_obj:
+                    attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
 
             #Create Activity
             desc = f"{request.user.employee_name} updated {', '.join(updated_keys)} info of vendor contact"
@@ -861,9 +861,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             sub, msg = create_submission(request, lead_id)
 
-            # #Attio Create Deal Trigger
-            # if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and sub.client and sub.consultant.status != 'on_project':
-            #     attio_create_deal_trigger(sub, config.ATTIO_DEAL_NAME, request=request)
+            #Attio Create Deal Trigger
+            if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and \
+                    sub.client and sub.consultant.status != 'on_project':
+                attio_create_deal_trigger(sub, config.ATTIO_DEAL_NAME, request=request)
 
             # Activity
             desc = f"{request.user.employee_name} added submission"
@@ -933,10 +934,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
                 submission.save()
 
-                #  #Attio Create Deal Trigger
-                # if submission.work_type == "c2c" and submission.rate and submission.employer == 'Consultadd' and submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
-                #    attio_create_deal_trigger(submission, config.ATTIO_DEAL_NAME, request=request)
-                   
+                #Attio Create Deal Trigger
+                if submission.work_type == "c2c" and submission.rate and submission.employer == 'Consultadd' and \
+                        submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
+                    attio_create_deal_trigger(submission, config.ATTIO_DEAL_NAME, request=request)
+
                 project = Project.objects.filter(submission=submission)
                 if project and prev_work_type != serializer.data['work_type']:
                     status = project.first().statuses.filter(is_current=True, status='joined')
@@ -955,11 +957,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                         }
                         send_email_without_template(mail_data, request.user.email, request=request)
 
-                # #Attio Trigger
-                # if submission.status in ['project', 'interview', 'in-offer']:
-                #     interview_obj = submission.screening.exclude(status='cancelled').first()
-                #     if interview_obj:
-                #         attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
+                #Attio Trigger
+                if submission.status in ['project', 'interview', 'in-offer']:
+                    interview_obj = submission.screening.exclude(status='cancelled').first()
+                    if interview_obj:
+                        attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
                 trigger_payload = {"object_id": submission.id}
                 return Response({
                     "data": serializer.data, "message": "Submission updated", "trigger_payload": trigger_payload
@@ -1753,9 +1755,9 @@ class InterviewViewSets(ModelViewSet):
                 interview = self.rank_interviews(interview, 'create')
 
             #Attio Trigger
-            # data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
-            # if not data_recorded:
-            #     write_exception("Issue while adding vendor data to attio", request)
+            data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
 
             # Calendar attendees and User for sending notification
             title = get_interview_title(interview)
@@ -1919,10 +1921,10 @@ class InterviewViewSets(ModelViewSet):
                     "summary": title, "call_details": request.data["call_details"],
                 }
 
-                # #Attio Trigger
-                # data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
-                # if not data_recorded:
-                #     write_exception("Issue while adding vendor data to attio", request)
+                #Attio Trigger
+                data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
 
 
                 # Updating calendar Booking
@@ -2146,11 +2148,11 @@ class InterviewViewSets(ModelViewSet):
                 slack_card_json = interview_feedback_card(interview, request)
                 post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
 
-            # # Update Attio Entry
-            # status_change = prev_status != interview.get_status_display()
-            # data_recorded = attio_trigger(interview, "log1_vendor_company", status_change, request)
-            # if not data_recorded:
-            #     write_exception("Issue while adding vendor data to attio", request)
+            # Update Attio Entry
+            status_change = prev_status != interview.get_status_display()
+            data_recorded = attio_trigger(interview, "log1_vendor_company", status_change, request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
 
             # Activity
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -2230,9 +2232,9 @@ class InterviewViewSets(ModelViewSet):
                 }
 
                 #Attio Trigger
-                # data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
-                # if not data_recorded:
-                #     write_exception("Issue while adding vendor data to attio", request)
+                data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
+                if not data_recorded:
+                    write_exception("Issue while adding vendor data to attio", request)
 
 
                 # Updating calendar Booking
@@ -2366,9 +2368,9 @@ class InterviewViewSets(ModelViewSet):
             submission = interview.submission
 
             #Attio Trigger
-            # data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
-            # if not data_recorded:
-            #     write_exception("Issue while adding vendor data to attio", request)
+            data_recorded = attio_trigger(interview, "log1_vendor_company", False, request=request)
+            if not data_recorded:
+                write_exception("Issue while adding vendor data to attio", request)
 
             # Activity
             desc = f"Interview round {interview.round} is cancelled"
