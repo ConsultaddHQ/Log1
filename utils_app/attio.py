@@ -29,7 +29,7 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
         vendor_data = _extract_vendor_data(submission_obj)
 
         # deal stage change
-        if submission_obj.status in ['interview',"in_offer"]: 
+        if submission_obj.status in ['interview', "in_offer"]:
             stage = "Failed" if obj.get_status_display() in ["Failed", "Cancelled"] else "In Process"
             update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj, stage, request)
         
@@ -56,7 +56,8 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
     except Exception as error:
         write_exception(str(error), request)
         return False
-    
+
+
 @shared_task
 def attio_create_deal_trigger(obj: Any, object_slug: str, stage: Optional[str] = "Lead", request: Any = None) -> bool:
     try:

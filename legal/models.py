@@ -2,7 +2,7 @@ import os
 from django.db import models
 from django.utils import timezone
 from django.dispatch import receiver
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User

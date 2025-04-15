@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, date
 from pytz import timezone
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.contrib.contenttypes.models import ContentType
 
@@ -57,7 +58,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     serializer_class = NotificationSerializer
 
-    @never_cache
+    @method_decorator(never_cache, name='dispatch')
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
@@ -340,7 +341,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @never_cache
+    @method_decorator(never_cache, name='dispatch')
     def list(self, request, *args, **kwargs):
         try:
             queryset = Notification.objects.active(request.user, 'consultant')
