@@ -69,10 +69,10 @@ def process_trigger(self, payload, request):
                 # Bulk deliver webhooks
                 for webhook_id in webhook_ids:
                     deliver_webhook.delay(
+                        request=request,
                         webhook_id=webhook_id,
                         event_data=event_data,
-                        event_name=event_obj.name,
-                        request=request
+                        event_type=event_obj.name
                     )
 
             except Exception as error:
@@ -91,15 +91,17 @@ def deliver_webhook(self, webhook_id, event_data, event_type, request):
     """
     try:
         webhook_obj = WebhookEndpoint.objects.get(id=webhook_id)
+        if type(event_data) is not list:
+            event_data = [event_data]
         response = requests.post(
-            webhook_obj.target_url, headers=webhook_obj.headers, timeout=10, json=event_data
+            webhook_obj.target_url, headers=webhook_obj.headers, timeout=10, json=[event_data]
         )
         response.raise_for_status()
 
-        write_info(f"Webhook delivered to {webhook_obj.target_url} for {event_type}")
+        write_info(f"Webhook delivered to {webhook_obj.target_url} for {event_type}", function=deliver_webhook)
 
     except requests.exceptions.RequestException as e:
-        write_info(f"Webhook delivery failed (attempt {self.request.retries + 1}): {str(e)}")
+        write_info(f"Webhook delivery failed (attempt {self.request.retries + 1}): {str(e)}", function=deliver_webhook)
         self.retry(exc=e, countdown=2 ** self.request.retries)
     except Exception as e:
         write_exception(f"Unexpected webhook delivery error: {str(e)}", request)
