@@ -94,7 +94,7 @@ def deliver_webhook(self, webhook_id, event_data, event_type, request):
         if type(event_data) is not list:
             event_data = [event_data]
         response = requests.post(
-            webhook_obj.target_url, headers=webhook_obj.headers, timeout=10, json=[event_data]
+            webhook_obj.target_url, headers=webhook_obj.headers, timeout=10, json=event_data
         )
         response.raise_for_status()
 
