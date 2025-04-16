@@ -22,10 +22,10 @@ from marketing.serializers import *
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
-from utils_app.attio import attio_trigger,attio_create_deal_trigger
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from utils_app.calendar import GoogleCalendar
+from user_api.decorator import webhook_notify
 from employee.serializers import TeamSerializer
 from consultant.models import ConsultantMarketing
 from engineering.utils import assigned_test_points
@@ -33,6 +33,7 @@ from activity.serializers import ActivitySerializer
 from utils_app.mailing import send_email_without_template
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
+from utils_app.attio import attio_trigger, attio_create_deal_trigger
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from utils_app.thred_mail import send_email_attachment_multiple, send_email_without_template
@@ -127,13 +128,16 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
+        name = request.data.get('name', None)
         email = request.data.get('email', None)
         company = request.data.get('company', None)
         if not company:
             return Response({"message": "Select company"}, status=400)
 
-        vendor = VendorContact.objects.filter(email__iexact=email, created_by=request.user, company_id=company)
-        if vendor:
+        filter_conditions = Q(created_by=request.user, company_id=company) & (
+            Q(email__iexact=email) if email else Q(name__iexact=name)
+        )
+        if VendorContact.objects.filter(filter_conditions).exists():
             return Response({"message": "Already exists"}, status=400)
         try:
             contact = VendorContact.objects.create(
@@ -826,6 +830,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             return Response({"message": ERROR_MSG, "error": str(error), "url": ""}, status=400)
 
     @transaction.atomic
+    @webhook_notify()
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
@@ -857,7 +862,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             sub, msg = create_submission(request, lead_id)
 
             #Attio Create Deal Trigger
-            if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and sub.client and sub.consultant.status != 'on_project':
+            if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and \
+                    sub.client and sub.consultant.status != 'on_project':
                 attio_create_deal_trigger(sub, config.ATTIO_DEAL_NAME, request=request)
 
             # Activity
@@ -884,11 +890,15 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 "consultant_name": sub.consultant.name,
                 "attachments": AttachmentSerializer(sub.attachments.all(), many=True).data,
             }
-            return Response({"data": data, "message": "Submission created"}, status=201)
+            trigger_payload = {"object_id": sub.id}
+            return Response(
+                {"data": data, "message": "Submission created", "trigger_payload": trigger_payload}, status=201
+            )
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @webhook_notify()
     def update(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -924,10 +934,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
                 submission.save()
 
-                 #Attio Create Deal Trigger
-                if submission.work_type == "c2c" and submission.rate and submission.employer == 'Consultadd' and submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
-                   attio_create_deal_trigger(submission, config.ATTIO_DEAL_NAME, request=request)
-                   
+                #Attio Create Deal Trigger
+                if submission.work_type == "c2c" and submission.rate and submission.employer == 'Consultadd' and \
+                        submission.vendor_contact and submission.client and submission.consultant.status != 'on_project':
+                    attio_create_deal_trigger(submission, config.ATTIO_DEAL_NAME, request=request)
+
                 project = Project.objects.filter(submission=submission)
                 if project and prev_work_type != serializer.data['work_type']:
                     status = project.first().statuses.filter(is_current=True, status='joined')
@@ -951,8 +962,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     interview_obj = submission.screening.exclude(status='cancelled').first()
                     if interview_obj:
                         attio_trigger(interview_obj, "log1_vendor_company", False, request=request)
-
-                return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
+                trigger_payload = {"object_id": submission.id}
+                return Response({
+                    "data": serializer.data, "message": "Submission updated", "trigger_payload": trigger_payload
+                }, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
@@ -1653,6 +1666,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @webhook_notify()
     def create(self, request, *args, **kwargs):
 
         try:
@@ -1818,12 +1832,14 @@ class InterviewViewSets(ModelViewSet):
                 self.notify_on_slack(interview, "Interview Scheduled Today", request)
 
             return Response({
-                "data": data[0], 'booking_response': booking_res, "message": "Interview created"
+                "data": data[0], 'booking_response': booking_res, "message": "Interview created",
+                "trigger_payload": {"object_id": interview.id, "submission_id": interview.submission.id}
             }, status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @webhook_notify()
     def update(self, request, *args, **kwargs):
         # Change status of past Screening to feedback due
         change_to_feedback_due()
@@ -1995,13 +2011,16 @@ class InterviewViewSets(ModelViewSet):
                 'sender_id': request.user.id, 'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
-            return Response(
-                {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
-            )
+            trigger_payload = {"object_id": interview.id, "submission_id": interview.submission.id}
+            return Response({
+                "data": data[0], "booking_response": booking_res,
+                "message": "Interview updated", "trigger_payload": trigger_payload
+            }, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @webhook_notify()
     def destroy(self, request, *args, **kwargs):
         interview_id = kwargs.get('pk')
         try:
@@ -2050,7 +2069,8 @@ class InterviewViewSets(ModelViewSet):
             }
             user_list, _ = get_users_and_attendees(request, interview)
             create_notification(user_list, notification_data)
-            return Response(status=204)
+            trigger_payload = {"object_id": interview.id, "submission_id": interview.submission.id}
+            return Response({"trigger_payload": trigger_payload}, status=204)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -2058,6 +2078,7 @@ class InterviewViewSets(ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @webhook_notify()
     @action(methods=['put'], detail=True, url_path='status')
     def status(self, request, *args, **kwargs):
         # Change status of past Screening to feedback due
@@ -2155,14 +2176,16 @@ class InterviewViewSets(ModelViewSet):
                 'sender_id': request.user.id, 'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
-            return Response(
-                {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
-            )
+            trigger_payload = {"object_id": interview.id, "submission_id": interview.submission.id}
+            return Response({
+                "data": data[0], "message": "Interview updated", "booking_response": booking_res, "trigger_payload": trigger_payload
+            }, status=202)
 
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @webhook_notify()
     @action(methods=['put'], detail=True, url_path='reschedule')
     def reschedule(self, request, pk):
         # Change status of past Screening to feedback due
@@ -2296,12 +2319,16 @@ class InterviewViewSets(ModelViewSet):
 
                 if interview.start_time.date() == date.today() and interview.supervisor.employee_id != 9999:
                     self.notify_on_slack(interview, "Interview Rescheduled Today", request)
-
-                return Response({"data": data[0], "calendar": booking_res, "message": "Interview updated"}, status=202)
+                trigger_payload = {"object_id": interview.id, "submission_id": interview.submission.id}
+                return Response({
+                    "data": data[0], "calendar": booking_res,
+                    "message": "Interview updated", "trigger_payload": trigger_payload
+                }, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @webhook_notify()
     @action(methods=['put'], detail=True, url_path='cancel_interview')
     def cancel_interview(self, request, pk):
         try:
@@ -2375,7 +2402,8 @@ class InterviewViewSets(ModelViewSet):
             }
             user_list, _ = get_users_and_attendees(request, interview)
             create_notification(user_list, notification_data)
-            return Response({"message": "Interview cancelled"}, status=202)
+            trigger_payload = {"object_id": interview.id, "submission_id": interview.submission.id}
+            return Response({"message": "Interview cancelled", "trigger_payload": trigger_payload}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
