@@ -1,12 +1,11 @@
-import logging
 import requests
 from celery import shared_task
 from django.db.models import Q
 from importlib import import_module
 from django.contrib.contenttypes.models import ContentType
 
-from log1.utils import write_exception, write_info, log_celery_success, log_celery_error
 from user_api.models import WebhookEndpoint, TriggerEvent
+from log1.utils import log_celery_success, log_celery_error
 
 
 def import_from_path(path):
