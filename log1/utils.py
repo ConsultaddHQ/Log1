@@ -1,6 +1,7 @@
 import os
 import ssl
 import sys
+import traceback
 
 import certifi
 import yaml
@@ -70,12 +71,9 @@ def log_celery_error(message, function_name=None, task_id=None, extra_info=None)
     log_message += f", Message: {message}"
 
     try:
-        _, _, tb = sys.exc_info()
-        if tb:
-            f = tb.tb_frame
-            lineno = tb.tb_lineno
-            filename = f.f_code.co_filename
-            log_message += f", Error in {filename}, Line: {lineno}"
+        formatted_traceback = traceback.format_exc()
+        if formatted_traceback and "NoneType" not in formatted_traceback:
+            log_message += f", Traceback: {formatted_traceback.strip()}"
         celery_error_logger.error(log_message)
     except Exception as error:
         celery_error_logger.error(f"{log_message}, Additional logging error: {error}")
