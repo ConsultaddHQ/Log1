@@ -5,7 +5,7 @@ from django.db.models import Q
 from importlib import import_module
 from django.contrib.contenttypes.models import ContentType
 
-from log1.utils import write_exception, write_info
+from log1.utils import write_exception, write_info, log_celery_success, log_celery_error
 from user_api.models import WebhookEndpoint, TriggerEvent
 
 
@@ -76,11 +76,19 @@ def process_trigger(self, payload, request):
                     )
 
             except Exception as error:
-                write_exception(f"Error processing serializer group {serializer_path}: {str(error)}", request)
+                log_celery_error(
+                    message=f"Error processing serializer group {serializer_path}: {str(error)}",
+                    function_name="process_trigger",
+                    task_id=self.request.id,
+                )
                 continue
 
     except Exception as e:
-        write_exception(f"Trigger processing failed: {str(e)}", request)
+        log_celery_error(
+            message=f"Trigger processing failed: {str(e)}",
+            function_name="process_trigger",
+            task_id=self.request.id,
+        )
         self.retry(exc=e, countdown=60)
 
 
@@ -89,19 +97,37 @@ def deliver_webhook(self, webhook_id, event_data, event_type, request):
     """
     Second queue: Actually deliver the webhook
     """
+    unique_object_id = None
     try:
         webhook_obj = WebhookEndpoint.objects.get(id=webhook_id)
         if type(event_data) is not list:
+            unique_object_id = event_data.get("id")
             event_data = [event_data]
+        else:
+            unique_object_id = event_data[0].get("id")
         response = requests.post(
             webhook_obj.target_url, headers=webhook_obj.headers, timeout=10, json=event_data
         )
         response.raise_for_status()
 
-        write_info(f"Webhook delivered to {webhook_obj.target_url} for {event_type}", function=deliver_webhook)
-
+        log_celery_success(
+            message=f"Webhook delivered to {webhook_obj.target_url} for {event_type}",
+            function_name="deliver_webhook",
+            task_id=self.request.id,
+            extra_info={"unique_object_id": unique_object_id, "event_type": event_type}
+        )
     except requests.exceptions.RequestException as e:
-        write_info(f"Webhook delivery failed (attempt {self.request.retries + 1}): {str(e)}", function=deliver_webhook)
+        log_celery_error(
+            message=f"Webhook delivery failed (attempt {self.request.retries + 1}): {str(e)}",
+            function_name="deliver_webhook",
+            task_id=self.request.id,
+            extra_info={"webhook_id": webhook_id, "unique_object_id": unique_object_id, "event_type": event_type}
+        )
         self.retry(exc=e, countdown=2 ** self.request.retries)
     except Exception as e:
-        write_exception(f"Unexpected webhook delivery error: {str(e)}", request)
+        log_celery_error(
+            message=f"Unexpected error: {str(e)}",
+            function_name="deliver_webhook",
+            task_id=self.request.id,
+            extra_info={"webhook_id": webhook_id, "unique_object_id": unique_object_id, "event_type": event_type}
+        )

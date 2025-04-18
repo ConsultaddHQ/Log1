@@ -16,6 +16,8 @@ from logging.config import dictConfig
 from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
+celery_success_logger = logging.getLogger('celery_success')
+celery_error_logger = logging.getLogger('celery_error')
 
 DONT_HAVE_ACCESS = "You don't have access"
 ERROR_MSG = "Something went wrong. Please contact support"
@@ -47,6 +49,36 @@ def log_request(request):
     except Exception as error:
         text = f"Exception : [{method}] : {address} : {request_path} : {error} : "
         return text
+
+
+def log_celery_success(message, function_name=None, task_id=None, extra_info=None):
+    log_message = f"[SUCCESS] Task ID: {task_id or 'N/A'}"
+    if function_name:
+        log_message += f", Function: {function_name}"
+    if extra_info:
+        log_message += f", Info: {extra_info}"
+    log_message += f", Message: {message}"
+    celery_success_logger.info(log_message)
+
+
+def log_celery_error(message, function_name=None, task_id=None, extra_info=None):
+    log_message = f"[ERROR] Task ID: {task_id or 'N/A'}"
+    if function_name:
+        log_message += f", Function: {function_name}"
+    if extra_info:
+        log_message += f", Info: {extra_info}"
+    log_message += f", Message: {message}"
+
+    try:
+        _, _, tb = sys.exc_info()
+        if tb:
+            f = tb.tb_frame
+            lineno = tb.tb_lineno
+            filename = f.f_code.co_filename
+            log_message += f", Error in {filename}, Line: {lineno}"
+        celery_error_logger.error(log_message)
+    except Exception as error:
+        celery_error_logger.error(f"{log_message}, Additional logging error: {error}")
 
 
 def write_info(message, function, request=None):
