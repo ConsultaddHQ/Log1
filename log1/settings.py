@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'elasticapm.contrib.django'
 ]
 
 THIRD_PARTY_APPS = [
@@ -78,8 +79,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'log1.middleware.AddressLogMiddleware',
+    'elasticapm.contrib.django.middleware.TracingMiddleware'
 ]
-
 ROOT_URLCONF = 'log1.urls'
 
 TEMPLATES = [
@@ -422,3 +423,9 @@ CONSTANCE_CONFIG_FIELDSETS = {
     )
 }
 
+ELASTIC_APM = {
+    'SERVICE_NAME': 'Log1',
+    'SECRET_TOKEN': 'e9QDV9u6wrAj4alUQY',
+    'SERVER_URL': 'https://ea977b755b2246b786bd37992851570e.apm.us-central1.gcp.cloud.es.io:443',
+    'ENVIRONMENT': 'staging',
+}
