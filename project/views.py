@@ -422,9 +422,9 @@ class ProjectViewSets(ModelViewSet):
             if "attio_user" in roles:
                 projects = Project.objects.filter(
                     submission__vendor_contact__isnull=False, submission__client__isnull=False,
-                    submission__created__gt="2024-12-31",
-                    submission__work_type="c2c", submission__rate__isnull=False, submission__employer="Consultadd"
-                ).exclude(submission__status='archive').exclude(submission__rate=0)
+                    submission__created__gt="2024-12-31", submission__employer="Consultadd",
+                    submission__work_type="c2c", rate__isnull=False, employer="Consultadd"
+                ).exclude(submission__status='archive').exclude(rate__lte=0.0)
 
             elif filter_for == 'my':
                 projects = Project.objects.filter(submission__created_by=request.user).exclude(

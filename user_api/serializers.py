@@ -55,7 +55,7 @@ class ConsultantDetailsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ["id", "name", "email", "active_projects"]
+        fields = ["id", "name", "email", "rate", "active_projects"]
 
     @staticmethod
     def get_active_projects(obj):
