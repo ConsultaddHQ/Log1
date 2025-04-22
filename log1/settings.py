@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'elasticapm.contrib.django'
 ]
 
 THIRD_PARTY_APPS = [
@@ -78,8 +79,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'log1.middleware.AddressLogMiddleware',
+    'elasticapm.contrib.django.middleware.TracingMiddleware'
 ]
-
 ROOT_URLCONF = 'log1.urls'
 
 TEMPLATES = [
@@ -230,6 +231,9 @@ RESET_TOKEN_EXPIRY_TIME = 1
 
 # Logger Configuration
 LOGGING_CONFIG = None
+celery_success_log_file = os.path.join(BASE_DIR, 'logs/celery_success.log')
+celery_error_log_file = os.path.join(BASE_DIR, 'logs/celery_error.log')
+
 ## ----- logging integrations starts here ----- ##
 logging_conf = {
     'version': 1,
@@ -240,6 +244,9 @@ logging_conf = {
         },
         'address_format': {
             'format': '%(asctime)s %(levelname)-5s %(message)s'
+        },
+        'celery_format': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
         },
     },
     'handlers': {
@@ -265,6 +272,24 @@ logging_conf = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs/address.log'),
         },
+        'celery_success': {
+            'level': 'INFO',
+            'backupCount': 5,
+            'encoding': 'utf8',
+            'formatter': 'celery_format',
+            'maxBytes': 10485760,
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': celery_success_log_file,
+        },
+        'celery_error': {
+            'level': 'ERROR',
+            'backupCount': 5,
+            'encoding': 'utf8',
+            'formatter': 'celery_format',
+            'maxBytes': 10485760,
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': celery_error_log_file,
+        },
     },
     'loggers': {
         '': {
@@ -274,6 +299,16 @@ logging_conf = {
         'address': {
             'level': 'INFO',
             'handlers': ['access']
+        },
+        'celery_success': {
+            'level': 'INFO',
+            'handlers': ['celery_success'],
+            'propagate': False
+        },
+        'celery_error': {
+            'level': 'ERROR',
+            'handlers': ['celery_error'],
+            'propagate': False
         }
     }
 }
@@ -397,3 +432,9 @@ CONSTANCE_CONFIG_FIELDSETS = {
     )
 }
 
+ELASTIC_APM = {
+    'SERVER_URL': os.environ.get('AVM_SERVER_URL'),
+    'ENVIRONMENT': os.environ.get('AVM_ENVIRONMENT'),
+    'SERVICE_NAME': os.environ.get('AVM_SERVICE_NAME'),
+    'SECRET_TOKEN': os.environ.get('AVM_SECRET_TOKEN')
+}

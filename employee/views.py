@@ -1352,7 +1352,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.is_active = False
             user.account_login = False
             user.save()
-            return Response({"message": "No change required"}, status=status.HTTP_200_OK)
+            return Response({"message": "No change required"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

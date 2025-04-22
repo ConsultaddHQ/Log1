@@ -1,10 +1,8 @@
 import requests
-from typing import Any, Dict, Optional
-from celery import shared_task
-from datetime import datetime
 from constance import config
+from celery import shared_task
 from log1.utils import write_exception
-from django.utils import timezone
+from typing import Any, Dict, Optional
 
 ATTIO_URL = config.ATTIO_URL
 API_KEY = config.ATTIO_API_KEY
@@ -32,10 +30,10 @@ def attio_trigger(obj: Any, object_slug: str, status_change: Optional[bool], req
         if submission_obj.status in ['interview', "in_offer"]:
             stage = "Failed" if obj.get_status_display() in ["Failed", "Cancelled"] else "In Process"
             update_deal_stage_trigger(ATTIO_DEAL_NAME, submission_obj, stage, request)
-        
+
         # add note for interview status update with feedback
         if obj.get_status_display() in ["Next Round", "offer", "Failed", "Cancelled"] and status_change:
-            note = f"Interview Date - {obj.start_time.strftime('%Y-%m-%d')},\nFeedback: {obj.feedback}"
+            note = f"Interview Date - {obj.start_time.strftime('%Y-%m-%d')}, \nFeedback: {obj.feedback}"
             title = f"Interview Details - R{obj.round}"
             _update_or_create_note(ATTIO_DEAL_NAME, submission_obj.id, title, note, request)
 
@@ -80,9 +78,11 @@ def attio_create_deal_trigger(obj: Any, object_slug: str, stage: Optional[str] =
             else None
         )
         if obj.rate:
-            deal_data = _extract_deal_data(obj, int(obj.rate), stage, associated_company_id, associated_person_id, associated_creator_id)
+            deal_data = _extract_deal_data(
+                obj, int(obj.rate), stage, associated_company_id, associated_person_id, associated_creator_id
+            )
             _update_or_create_deal(deal_data, object_slug, request)
-        
+
         return True
     except Exception as error:
         write_exception(f"Error in attio_create_deal_trigger: {str(error)}", request)
@@ -97,13 +97,16 @@ def attio_deal_won_trigger(object_slug: str, obj: Any, request: Any = None) -> b
         deal_data = _extract_deal_data(submission, rate, "Won", company_id=None, person_id=None, creator_id=None)
         _update_or_create_deal(deal_data, object_slug, request)
 
-        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - ${int(submission.rate)} - {obj.duration} months - Received offer, starting {obj.start_date}"
+        note = f"{submission.consultant.name} - {submission.lead.job_title} - {submission.client} - " \
+               f"${int(submission.rate)} - {obj.duration} months - Received offer, starting {obj.start_date}"
         _update_or_create_note(object_slug, submission.id, "Project Details", note, request)
         return True
     except Exception as error:
         write_exception(str(error), request)
         return False
-    
+
+
+# TODO: Add constant for rate calculation logic
 def get_rate(obj: Any) -> int:
     submission = obj.submission
     if int(obj.duration) % 3 == 0:
@@ -112,11 +115,13 @@ def get_rate(obj: Any) -> int:
         rate = (int(submission.rate) - int(submission.consultant.rate)) * 40 * 4 * int(obj.duration)
     return rate
 
+
 def update_deal_stage_trigger(object_slug: str, obj: Any, stage: str, request: Any = None) -> None:
     try:
         record = _fetch_record(object_slug, {"deal_id": obj.id}, request)
         if not record:
-            if obj.work_type == "c2c" and obj.employer == 'Consultadd' and obj.vendor_contact and obj.client and obj.consultant.status != 'on_project':
+            if obj.work_type == "c2c" and obj.employer == 'Consultadd' and obj.vendor_contact and \
+                    obj.client and obj.consultant.status != 'on_project':
                 attio_create_deal_trigger(obj, object_slug, stage, request)
             return
 
@@ -130,14 +135,16 @@ def update_deal_stage_trigger(object_slug: str, obj: Any, stage: str, request: A
         write_exception(str(error), request)
 
 
-def _extract_deal_data(submission_obj: Any, rate: int, stage: str, company_id: Optional[str], person_id: Optional[str], creator_id: Optional[str]) -> Dict:
+def _extract_deal_data(submission_obj: Any, rate: int, stage: str, company_id: Optional[str],
+                       person_id: Optional[str], creator_id: Optional[str]) -> Dict:
     deal_data = {
         "vendor_company": f"{submission_obj.vendor.name}",
         "deal_rate": rate,
         "deal_stage": stage,
         "client_name": submission_obj.client,
         "consultant_name": submission_obj.consultant.name,
-        "unique_key": f"{submission_obj.vendor.name} {submission_obj.vendor_contact.region or ''} - {submission_obj.client} - {submission_obj.consultant.name}",
+        "unique_key": f"{submission_obj.vendor.name} {submission_obj.vendor_contact.region or ''} - "
+                      f"{submission_obj.client} - {submission_obj.consultant.name}",
         "deal_id": submission_obj.id,
         "vendor_region": submission_obj.vendor_contact.region or ''
     }
@@ -177,6 +184,7 @@ def _update_or_create_deal(deal_data: Dict, object_slug: str, request: Any = Non
         write_exception(str(error), request)
         return False
 
+
 def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note: str, request: Any = None) -> bool:
     try:
         record = _fetch_record(object_slug, {"deal_id": deal_id}, request)
@@ -192,7 +200,7 @@ def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note
         response = requests.get(note_url, headers=HEADERS, params=query_params)
         if response.status_code != 200:
             write_exception("Error fetching notes from Attio.", request)
-            return None
+            return False
 
         data = response.json().get("data", [])
         note_exist = next((note for note in data if note.get("title") == note_title), None)
@@ -201,7 +209,7 @@ def _update_or_create_note(object_slug: str, deal_id: str, note_title: str, note
             response = requests.delete(f"{note_url}/{note_id}", headers=HEADERS)
             if response.status_code != 200:
                 write_exception("Error fetching notes from Attio.", request)
-                return None
+                return False
 
         payload = {
             "data": {
@@ -237,6 +245,7 @@ def _fetch_record(object_slug: str, filter_payload: Dict, request: Any = None) -
     except Exception as error:
         write_exception(str(error), request)
         return None
+
 
 def _extract_vendor_data(submission_obj: Any) -> Dict:
     """Extract vendor-related data from the submission object."""

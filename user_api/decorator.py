@@ -10,7 +10,6 @@ def webhook_notify(events=None):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(self, request, *args, **kwargs):
-            print("executed")
             response = view_func(self, request, *args, **kwargs)
 
             if hasattr(response, 'status_code') and response.status_code in [200, 201, 202, 204]:
