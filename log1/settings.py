@@ -424,8 +424,8 @@ CONSTANCE_CONFIG_FIELDSETS = {
 }
 
 ELASTIC_APM = {
-    'SERVICE_NAME': 'Log1',
-    'SECRET_TOKEN': 'e9QDV9u6wrAj4alUQY',
-    'SERVER_URL': 'https://ea977b755b2246b786bd37992851570e.apm.us-central1.gcp.cloud.es.io:443',
-    'ENVIRONMENT': 'staging',
+    'SERVER_URL': os.environ.get('AVM_SERVER_URL'),
+    'ENVIRONMENT': os.environ.get('AVM_ENVIRONMENT'),
+    'SERVICE_NAME': os.environ.get('AVM_SERVICE_NAME'),
+    'SECRET_TOKEN': os.environ.get('AVM_SECRET_TOKEN')
 }
