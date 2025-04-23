@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'elasticapm.contrib.django'
 ]
 
 THIRD_PARTY_APPS = [
@@ -78,8 +79,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'log1.middleware.AddressLogMiddleware',
+    'elasticapm.contrib.django.middleware.TracingMiddleware'
 ]
-
 ROOT_URLCONF = 'log1.urls'
 
 TEMPLATES = [
@@ -422,3 +423,9 @@ CONSTANCE_CONFIG_FIELDSETS = {
     )
 }
 
+ELASTIC_APM = {
+    'SERVER_URL': os.environ.get('AVM_SERVER_URL'),
+    'ENVIRONMENT': os.environ.get('AVM_ENVIRONMENT'),
+    'SERVICE_NAME': os.environ.get('AVM_SERVICE_NAME'),
+    'SECRET_TOKEN': os.environ.get('AVM_SECRET_TOKEN')
+}
