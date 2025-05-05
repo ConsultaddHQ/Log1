@@ -433,8 +433,8 @@ CONSTANCE_CONFIG_FIELDSETS = {
 }
 
 ELASTIC_APM = {
-    'SERVER_URL': os.environ.get('AVM_SERVER_URL'),
-    'ENVIRONMENT': os.environ.get('AVM_ENVIRONMENT'),
-    'SERVICE_NAME': os.environ.get('AVM_SERVICE_NAME'),
-    'SECRET_TOKEN': os.environ.get('AVM_SECRET_TOKEN')
+    'SERVER_URL': os.environ.get('APM_SERVER_URL'),
+    'ENVIRONMENT': os.environ.get('APM_ENVIRONMENT'),
+    'SERVICE_NAME': os.environ.get('APM_SERVICE_NAME'),
+    'SECRET_TOKEN': os.environ.get('APM_SECRET_TOKEN')
 }

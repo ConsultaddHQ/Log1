@@ -377,7 +377,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             user_id = request.data.get('user_id')
             account_login = request.data.get('active', None)
-            if request.user.is_superuser:
+            if "superadmin" in request.user.roles:
                 user = get_object_or_404(User, id=user_id)
                 if account_login is not None:
                     user.account_login = account_login
