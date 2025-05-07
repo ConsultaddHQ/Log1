@@ -1001,7 +1001,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f":clipboard: {payload.get('title')}",
+                            "text": f":clipboard: {payload.get('title', 'Interview Schedule')}",
                             "emoji": True
                         }
                     },
@@ -1018,13 +1018,14 @@ class MessageCard:
                 ]
             }
 
-            if not payload.get("data", None):
+            # Handle no interviews scheduled
+            if not payload.get("data"):
                 card_data['blocks'].append(
                     {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"No Interviews Scheduled.",
+                            "text": "No Interviews Scheduled.",
                             "emoji": True
                         }
                     }
@@ -1032,70 +1033,82 @@ class MessageCard:
                 res, msg = post_msg_using_webhook(url, card_data)
                 return res, msg
 
-            screening_type_headers = payload['data'].keys()
-            for header in screening_type_headers:
-                if not payload['data'][header]:
+            # Append interview data
+            for header, entries in payload['data'].items():
+                if not entries:
                     continue
                 card_data['blocks'].append(
                     {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"{header}",
+                            "text": header,
                             "emoji": True
                         }
                     }
                 )
-                sl = 1
-                for data in payload['data'][header]:
+                for index, data in enumerate(entries, start=1):
                     card_data['blocks'].append(
                         {
                             "type": "section",
                             "fields": [
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
-                                            f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
-                                            f"   *Time:* {data.get('start', None).split('::')[1]}\n\t   "
-                                            f"*Project Type:* {data.get('project_type')}\n\t   "
-                                            f"*Vendor Company:* {data.get('vendor')}"
+                                    "text": (
+                                        f"*`{index}.`* *CTB:* {data.get('ctb', 'NA')}\n\t   "
+                                        f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', 'NA')}\n\t   "
+                                        f"*Time:* {data.get('start', 'NA').split('::')[1] if '::' in data.get('start', '') else 'NA'}\n\t   "
+                                        f"*Project Type:* {data.get('project_type', 'NA')}\n\t   "
+                                        f"*Vendor Company:* {data.get('vendor', 'NA')}"
+                                    )
                                 },
                                 {
                                     "type": "mrkdwn",
-                                    "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
-                                            f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
-                                            f"\n `Call Type` {data.get('call_type')}"
+                                    "text": (
+                                        f"`Consultant` {data.get('consultant', 'NA')}\n `Client` {data.get('client', 'NA')} \n"
+                                        f"`Marketer` {data.get('marketer', 'NA')}\n `Job` {data.get('position', 'NA')}\n"
+                                        f"`Call Type` {data.get('call_type', 'NA')}"
+                                    )
                                 }
                             ]
-                        },
+                        }
                     )
-                    sl += 1
+                card_data['blocks'].append({"type": "divider"})
+
+            # Add screening counts
+            screening_counts = payload.get("screening_count", {})
+            screening_count_text = ":pushpin: *Screening Counts:* " + (
+                    " | ".join(f"`{key}` - {value}" for key, value in screening_counts.items() if
+                               value) or "No data available."
+            )
+            card_data['blocks'].append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": screening_count_text}
+            })
+
+            # Add divider and action button for CSV
+            card_data['blocks'].append({"type": "divider"})
+            if file_url := payload.get('file_url'):
                 card_data['blocks'].append(
                     {
-                        "type": "divider"
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {"type": "plain_text", "emoji": True, "text": "Download CSV"},
+                                "style": "primary",
+                                "url": file_url,
+                                "value": "click_me_123",
+                                "action_id": "button-action"
+                            }
+                        ]
                     }
                 )
-            card_data['blocks'].append(
-                {
-                    "type": "actions",
-                    "elements": [
-                        {
-                            "type": "button",
-                            "text": {
-                                "type": "plain_text",
-                                "emoji": True,
-                                "text": "Download CSV"
-                            },
-                            "style": "primary",
-                            "url": payload['file_url'],
-                            "value": "click_me_123",
-                            "action_id": "button-action"
-                        }
-                    ]
-                }
-            )
+
+            # Post message using webhook
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
+
         except Exception as error:
             return error, "error"
 
@@ -1341,13 +1354,13 @@ class MessageCard:
 
             if payload.get('type').capitalize() == 'Offline':
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Reviewed By:*   {reviewed_by} \n" \
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                                       f"*Reviewed By:*   {reviewed_by} \n" \
+                                       f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                       f"*Feedback*:  {payload.get('coder_remark')}"
             else:
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
-                                    f"*Performance Rating:* {payload.get('coder_rating')} \n " \
-                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                                       f"*Performance Rating:* {payload.get('coder_rating')} \n " \
+                                       f"*Feedback*:  {payload.get('coder_remark')}"
 
             if payload.get('emoji') == ":x:":
                 block_header = "Reason of Cancellation"
