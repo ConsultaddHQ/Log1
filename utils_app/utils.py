@@ -177,7 +177,10 @@ def get_slack_tag(user_obj: any, request: any = None) -> str:
         if not user_obj:
             return "Not Available"
 
-        slack_id = user_obj.slack_id if user_obj.slack_id else get_slack_id(user_obj, request)
+        if os.environ.get("ENV") == "prod":
+            slack_id = user_obj.slack_id if user_obj.slack_id else get_slack_id(user_obj, request)
+        else:
+            slack_id = user_obj.slack_id if user_obj.slack_id else user_obj.employee_name
 
         if slack_id:
             return f"<@{slack_id}>"
