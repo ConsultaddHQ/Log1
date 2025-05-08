@@ -1077,7 +1077,7 @@ class MessageCard:
 
             # Add screening counts
             screening_counts = payload.get("screening_count", {})
-            screening_count_text = ":pushpin: *Screening Counts:* " + (
+            screening_count_text = ":pushpin: *Monthly Screening Counts:* " + (
                     " | ".join(f"`{key}` - {value}" for key, value in screening_counts.items() if
                                value) or "No data available."
             )
