@@ -110,11 +110,12 @@ class Command(BaseCommand):
                         us_slack_data["screening_data"][screening_label] = []
                     us_slack_data["screening_data"][screening_label].append(slack_data)
 
-                count = Interview.objects.filter(
-                    start_time__date__range=(month_start_date, today_date),
-                    screening_type=screening_type
-                ).exclude(status='cancelled').count()
-                us_slack_data["screening_count"][screening_label] = count
+            screening_label = "Interview"
+            screening_count = Interview.objects.filter(
+                start_time__date__range=(month_start_date, today_date), screening_type__iexact=screening_label
+            ).exclude(status="cancelled").values("submission_id").distinct().count()
+
+            us_slack_data["screening_count"][screening_label] = screening_count
 
             try:
                 self.post_msg_to_slack(us_slack_data, 'USA')
