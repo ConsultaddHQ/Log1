@@ -7,7 +7,10 @@ from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
 from employee.models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover, DefaultCalendar, \
-    Certificate, CertificateInfo
+    Certificate, CertificateInfo, PermissionMetadata
+
+# from employee.models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover, DefaultCalendar, \
+#     Certificate, CertificateInfo, CustomPermission, CustomGroup
 
 admin.site.site_header = "Log1"
 
@@ -107,3 +110,29 @@ class CertificateAdmin(admin.ModelAdmin):
 class CertificateInfoAdmin(admin.ModelAdmin):
     search_fields = ('employee__employee_name', 'certificate__name')
     list_display = ('id', 'employee', 'certificate', 'issued_date', 'expiry_date', 'has_expiry')
+
+
+@admin.register(PermissionMetadata)
+class PermissionMetadataAdmin(admin.ModelAdmin):
+    search_fields = ('id',)
+    list_filter = ('condition', 'action')
+    list_display = ('id', 'action', 'filter_string', 'permission_name', 'permission_codename', 'permission_contenttype')
+
+    def permission_codename(self, obj):
+        return obj.permission.codename
+
+    permission_codename.short_description = "CodeName"
+
+    def permission_contenttype(self, obj):
+        return obj.permission.content_type
+
+    permission_contenttype.short_description = "Content Type"
+
+    def permission_name(self, obj):
+        return obj.permission.name
+
+    permission_name.short_description = " Name"
+
+    class Meta:
+        verbose_name = "Permission Metadata"  # Singular name
+        verbose_name_plural = "Permission Metadata Records"  # Plural name

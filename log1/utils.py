@@ -2,11 +2,11 @@ import os
 import ssl
 import sys
 
-import certifi
 import yaml
 import json
 import random
 import logging
+import certifi
 import requests
 from constance import config
 from bs4 import BeautifulSoup

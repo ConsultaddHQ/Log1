@@ -3,10 +3,10 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.contrib.auth.models import BaseUserManager
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.auth.models import BaseUserManager, Permission
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from log1.utils import write_exception
@@ -14,6 +14,20 @@ from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
+
+
+class PermissionMetadata(models.Model):
+    action = models.CharField(max_length=50)
+    filter_string = models.TextField(null=True, blank=True)  # Filter string or query expression
+    condition = models.CharField(max_length=10, default="OR")  # AND, OR, NOT, etc.
+    permission = models.OneToOneField(
+        Permission,
+        related_name='metadata',
+        on_delete=models.CASCADE
+    )
+
+    def __str__(self):
+        return f"{self.action}-{self.permission.name}"
 
 
 class UserManager(BaseUserManager):

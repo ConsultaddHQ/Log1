@@ -17,13 +17,12 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_202_ACCEPTED
 
-from marketing.modleManager import SubmissionQuerySet
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
 from activity.models import Activity
 from utils_app.models import ObjectGroup
-from utils_app.attio import attio_trigger,attio_create_deal_trigger
+from log1.permission import RBACPermission
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from utils_app.calendar import GoogleCalendar
@@ -31,9 +30,11 @@ from employee.serializers import TeamSerializer
 from consultant.models import ConsultantMarketing
 from engineering.utils import assigned_test_points
 from activity.serializers import ActivitySerializer
+from marketing.modleManager import SubmissionQuerySet
 from utils_app.mailing import send_email_without_template
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
+from utils_app.attio import attio_trigger, attio_create_deal_trigger
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from utils_app.thred_mail import send_email_attachment_multiple, send_email_without_template
@@ -640,9 +641,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
 # Route - /submission/
 class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = Submission.objects.all()
-    permission_classes = (IsAuthenticated,)
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, RBACPermission)
 
     @staticmethod
     def get_count_and_queryset(queryset, sub_status, sort_by, first, last):
