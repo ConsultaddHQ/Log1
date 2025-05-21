@@ -11,12 +11,14 @@ from django.db.models import F, Max, Count
 from django.db.models.functions import Lower
 
 from rest_framework.mixins import *
+from rest_framework import status as _status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_202_ACCEPTED
 
+from marketing.permission import check_submission_permissions
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -709,54 +711,58 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
-            if 'attio_user' in roles:
-                queryset = Submission.objects.filter(
-                    vendor_contact__isnull=False, client__isnull=False, work_type="c2c",
-                    rate__isnull=False, employer="Consultadd", created__gt="2024-12-31"
-                ).exclude(consultant_marketing__consultant__status="on_project").exclude(
-                    rate=0
-                )
+            if request.query_filter:
+                query_filter = request.query_filter
+                queryset = queryset.filter(eval(query_filter))
 
-            elif ('superadmin' not in roles) and ('admin' not in roles):
-                # Team submissions for Scrum master and Proxy Scrum Master
-                # if 'admin' in roles or 'proxy' in roles:
-                #     consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
-                #                      list(ConsultantMarketing.objects.filter(
-                #                          in_pool=True, status='open').values_list('consultant_id'))
-                #     queryset = queryset.filter(
-                #         Q(created_by__team=team) |
-                #         Q(consultant_marketing__teams=team) |
-                #         Q(consultant_marketing__consultant__in=consultant_ids) |
-                #         Q(consultant_marketing__consultant__pocs__poc=request.user,
-                #           consultant_marketing__consultant__pocs__poc_type='recruiter')
-                #     )
-                #
-                # Submissions of a marketer and pool consultant submissions (except those are on project)
-                if 'marketer' in roles:
-                    consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id')) + \
-                                     list(ConsultantMarketing.objects.filter(
-                                         in_pool=True, status='open').values_list('consultant_id'))
-                    if 'recruiter' in roles or 'retention_manager' in roles:
-                        queryset = queryset.filter(
-                            Q(created_by=request.user) |
-                            Q(consultant_marketing__consultant__in=consultant_ids) |
-                            Q(consultant_marketing__status='open',
-                              consultant_marketing__consultant__pocs__poc=request.user)
-                        )
-                    elif filter_for == 'handover':
-                        pass
-                    else:
-                        queryset = queryset.filter(
-                            Q(created_by=request.user) |
-                            Q(marketing_team=request.user.team) |
-                            Q(marketing_team__in=associated_teams) |
-                            Q(consultant_marketing__consultant__in=consultant_ids)
-                        )
-
-            if "usa_employee" in roles: 
-                queryset = queryset.filter(
-                    Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user)
-                )
+            # if 'attio_user' in roles:
+            #     queryset = Submission.objects.filter(
+            #         vendor_contact__isnull=False, client__isnull=False, work_type="c2c",
+            #         rate__isnull=False, employer="Consultadd", created__gt="2024-12-31"
+            #     ).exclude(consultant_marketing__consultant__status="on_project").exclude(
+            #         rate=0
+            #     )
+            #
+            # elif ('superadmin' not in roles) and ('admin' not in roles):
+            #     # Team submissions for Scrum master and Proxy Scrum Master
+            #     # if 'admin' in roles or 'proxy' in roles:
+            #     #     consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
+            #     #                      list(ConsultantMarketing.objects.filter(
+            #     #                          in_pool=True, status='open').values_list('consultant_id'))
+            #     #     queryset = queryset.filter(
+            #     #         Q(created_by__team=team) |
+            #     #         Q(consultant_marketing__teams=team) |
+            #     #         Q(consultant_marketing__consultant__in=consultant_ids) |
+            #     #         Q(consultant_marketing__consultant__pocs__poc=request.user,
+            #     #           consultant_marketing__consultant__pocs__poc_type='recruiter')
+            #     #     )
+            #     #
+            #     # Submissions of a marketer and pool consultant submissions (except those are on project)
+            #     if 'marketer' in roles:
+            #         consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id')) + \
+            #                          list(ConsultantMarketing.objects.filter(
+            #                              in_pool=True, status='open').values_list('consultant_id'))
+            #         if 'recruiter' in roles or 'retention_manager' in roles:
+            #             queryset = queryset.filter(
+            #                 Q(created_by=request.user) |
+            #                 Q(consultant_marketing__consultant__in=consultant_ids) |
+            #                 Q(consultant_marketing__status='open',
+            #                   consultant_marketing__consultant__pocs__poc=request.user)
+            #             )
+            #         elif filter_for == 'handover':
+            #             pass
+            #         else:
+            #             queryset = queryset.filter(
+            #                 Q(created_by=request.user) |
+            #                 Q(marketing_team=request.user.team) |
+            #                 Q(marketing_team__in=associated_teams) |
+            #                 Q(consultant_marketing__consultant__in=consultant_ids)
+            #             )
+            #
+            # if "usa_employee" in roles:
+            #     queryset = queryset.filter(
+            #         Q(created_by=request.user) | Q(consultant_marketing__consultant__internal_user_profile=request.user)
+            #     )
 
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
@@ -832,6 +838,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
+            if "add_submission" not in request.permissions:
+                return Response({"message": "You do not have access"}, status=status.HTTP_403_FORBIDDEN)
             roles = request.user.roles
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -861,7 +869,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             sub, msg = create_submission(request, lead_id)
 
             #Attio Create Deal Trigger
-            if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and sub.client and sub.consultant.status != 'on_project':
+            if sub.work_type == "c2c" and sub.rate and sub.employer == 'Consultadd' and sub.vendor_contact and \
+                    sub.client and sub.consultant.status != 'on_project':
                 attio_create_deal_trigger(sub, config.ATTIO_DEAL_NAME, request=request)
 
             # Activity
@@ -895,11 +904,12 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     def update(self, request, *args, **kwargs):
         try:
-            users = get_authenticated_users(request)
-            if request.user.employee_id == 5693:
-                submission = get_object_or_404(Submission, id=kwargs.get('pk'))
-            else:
-                submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by__in=users)
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            valid_permission = check_submission_permissions(request, submission)
+            if not valid_permission:
+                return Response({"message": "You do not have access"}, status=_status.HTTP_403_FORBIDDEN)
+
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             prev_work_type = submission.work_type
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
@@ -970,6 +980,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def marketer_feedback_due(self, request):
         check_after = "2022-01-01"
         try:
+            # create permission for check marketer feedback due
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 

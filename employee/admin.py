@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import Permission
 from django.utils.translation import ugettext_lazy as _
 from import_export.admin import ExportActionModelAdmin
 
@@ -21,7 +22,7 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
         (None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
         ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role', 'technology', 'shift',
                                       'have_certificate', 'slack_id', 'associated_to')}),
-        ('Permissions', {'fields': ('account_login', 'is_active', 'is_superuser', 'is_staff', 'user_permissions')}),
+        ('Permissions', {'fields': ('account_login', 'is_active', 'is_superuser', 'is_staff', 'user_permissions', 'groups')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
 
@@ -112,10 +113,17 @@ class CertificateInfoAdmin(admin.ModelAdmin):
     list_display = ('id', 'employee', 'certificate', 'issued_date', 'expiry_date', 'has_expiry')
 
 
+@admin.register(Permission)
+class PermissionAdmin(admin.ModelAdmin):
+    search_fields = ('code_name', )
+    list_filter = ('content_type', )
+    list_display = ('id', 'name', 'codename', 'content_type')
+
+
 @admin.register(PermissionMetadata)
 class PermissionMetadataAdmin(admin.ModelAdmin):
     search_fields = ('id',)
-    list_filter = ('condition', 'action')
+    list_filter = ('condition', 'action', 'permission__content_type')
     list_display = ('id', 'action', 'filter_string', 'permission_name', 'permission_codename', 'permission_contenttype')
 
     def permission_codename(self, obj):
@@ -132,7 +140,3 @@ class PermissionMetadataAdmin(admin.ModelAdmin):
         return obj.permission.name
 
     permission_name.short_description = " Name"
-
-    class Meta:
-        verbose_name = "Permission Metadata"  # Singular name
-        verbose_name_plural = "Permission Metadata Records"  # Plural name

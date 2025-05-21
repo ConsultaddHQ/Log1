@@ -29,6 +29,10 @@ class PermissionMetadata(models.Model):
     def __str__(self):
         return f"{self.action}-{self.permission.name}"
 
+    class Meta:
+        verbose_name = "Permission Metadata"  # Singular name
+        verbose_name_plural = "Permission Metadata Records"  # Plural name
+
 
 class UserManager(BaseUserManager):
     use_in_migrations = True

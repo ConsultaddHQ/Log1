@@ -438,6 +438,7 @@ class TestUpdateSerializer(serializers.ModelSerializer):
 class SubmissionV2Serializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
+    marketing_team = serializers.SerializerMethodField()
     vendor_layer = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
@@ -445,7 +446,7 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type')
+                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type', 'marketing_team')
 
     @staticmethod
     def get_vendor_layer(obj):
@@ -460,6 +461,10 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_marketer_name(obj):
         return obj.created_by.employee_name
+
+    @staticmethod
+    def get_marketing_team(obj):
+        return obj.marketing_team.name if obj.marketing_team else None
 
     @staticmethod
     def get_work_type(obj):
@@ -813,7 +818,7 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        if user == obj.submission.created_by or 'finance' in user.roles:
+        if user == obj.submission.created_by or 'finance' in user.roles or 'retention' in user.roles:
             return {'update': True}
         authentic_user_id = []
         authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
