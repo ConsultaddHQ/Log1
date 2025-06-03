@@ -7,18 +7,16 @@ from datetime import date
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F, Max, Count
 from django.db.models.functions import Lower
+from django.db.models import F, Max, Count, Q
 
 from rest_framework.mixins import *
-from rest_framework import status as _status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_202_ACCEPTED
 
-from marketing.permission import check_submission_permissions
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -28,10 +26,11 @@ from log1.permission import RBACPermission
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from utils_app.calendar import GoogleCalendar
+from log1.decorators import apply_query_filter
 from employee.serializers import TeamSerializer
-from consultant.models import ConsultantMarketing
 from engineering.utils import assigned_test_points
 from activity.serializers import ActivitySerializer
+from marketing.permission import validate_permission
 from marketing.modleManager import SubmissionQuerySet
 from utils_app.mailing import send_email_without_template
 from attachment.models import Attachment, create_attachment
@@ -446,13 +445,13 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
  
             if (sub.created_by in users) or (request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
-                serializer = SubmissionV2DetailSerializer(sub)
+                serializer = SubmissionV2DetailSerializer(sub, context={"request": request})
                 return Response({"data": serializer.data, "permission": permission}, status=200)
             elif "attio_user" in roles:
-                serializer = SubmissionV2DetailSerializer(sub)
+                serializer = SubmissionV2DetailSerializer(sub, context={"request": request})
                 return Response({"data": serializer.data, "permission": permission}, status=200)
             else:
-                serializer = SubmissionV2Serializer(sub)
+                serializer = SubmissionV2Serializer(sub, context={"request": request})
                 return Response({"data": serializer.data, "permission": permission}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -683,6 +682,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(message=error)
             return error, "error"
 
+    @apply_query_filter(Submission)
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
@@ -694,9 +694,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
         try:
             team = request.user.team
-            roles = request.user.roles
+            queryset = kwargs.get("queryset")
             associated_teams = request.user.associated_to.all()
-            queryset = Submission.objects.exclude(status__in=['draft', 'archive'])
+            queryset = queryset.exclude(status__in=['draft', 'archive'])
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = queryset.filter(
@@ -710,10 +710,6 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 )
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
-
-            if request.query_filter:
-                query_filter = request.query_filter
-                queryset = queryset.filter(eval(query_filter))
 
             # if 'attio_user' in roles:
             #     queryset = Submission.objects.filter(
@@ -836,10 +832,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             return Response({"message": ERROR_MSG, "error": str(error), "url": ""}, status=400)
 
     @transaction.atomic
+    @validate_permission(Submission)
     def create(self, request, *args, **kwargs):
         try:
-            if "add_submission" not in request.permissions:
-                return Response({"message": "You do not have access"}, status=status.HTTP_403_FORBIDDEN)
             roles = request.user.roles
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -902,14 +897,12 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @validate_permission(Submission)
     def update(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
-            valid_permission = check_submission_permissions(request, submission)
-            if not valid_permission:
-                return Response({"message": "You do not have access"}, status=_status.HTTP_403_FORBIDDEN)
+            submission = kwargs["instance"]
 
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            # submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             prev_work_type = submission.work_type
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():

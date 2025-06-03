@@ -1,6 +1,7 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
+from employee.models import GroupAttributeRestriction, UserAttributeAccess
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
     Test, Answer, Question, ChildQuestion, InterviewerProfile, GuestInfo
 
@@ -149,3 +150,24 @@ class GuestInfoAdmin(ExportActionModelAdmin):
     search_fields = ('user__employee_name',)
     list_filter = ('type',)
     list_display = ('id', 'user', 'type')
+
+
+@admin.register(GroupAttributeRestriction)
+class GroupAttributeRestrictionAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    search_fields = ('user_group__name',)
+    list_filter = ('content_type', 'user_group__name')
+    list_display = ('id', 'owner_ref_attribute', 'not_allowed_attributes', 'content_type', 'user_group')
+
+
+@admin.register(UserAttributeAccess)
+class UserAttributeAccessAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    search_fields = ('user__employee_name',)
+    list_filter = ('content_type',)
+    list_display = ('id', 'owner_attribute', 'accessible_attribute', 'content_type', 'user_name')
+
+    def user_name(self, obj):
+        return obj.user.employee_name
+
+    user_name.short_description = "User Name"

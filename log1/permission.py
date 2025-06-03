@@ -2,9 +2,10 @@ import re
 
 from django.db.models import Q
 from rest_framework.permissions import BasePermission
+from django.contrib.contenttypes.models import ContentType
 
-from employee.models import PermissionMetadata
-from consultant.models import Consultant, ConsultantMarketing
+from consultant.models import ConsultantMarketing
+from employee.models import PermissionMetadata, UserAttributeAccess, GroupAttributeRestriction
 
 
 class RBACPermission(BasePermission):
@@ -40,7 +41,6 @@ class RBACPermission(BasePermission):
 
         # Attach the filter to the request for view logic
         request.query_filter = query_filter
-        request.permissions = list(user_permissions.values_list("permission__codename", flat=True))
         return True
 
     @staticmethod
@@ -49,11 +49,12 @@ class RBACPermission(BasePermission):
         Extract all unique placeholders required by the permission filter strings.
         """
         placeholder_pattern = r"<(.*?)>"
-        required_placeholders = set()
-
-        for perm in permissions:
-            matches = re.findall(placeholder_pattern, perm.filter_string)
-            required_placeholders.update(matches)
+        required_placeholders = {
+            match
+            for perm in permissions
+            if (filter_string := getattr(perm, "filter_string", None))
+            for match in re.findall(placeholder_pattern, filter_string)
+        }
 
         return required_placeholders
 
@@ -63,7 +64,8 @@ class RBACPermission(BasePermission):
         Dynamically build the context for only the required placeholders.
         """
         context = {}
-
+        if not required_placeholders:
+            return context
         if "user_id" in required_placeholders:
             context["user_id"] = request.user.id
 
@@ -81,7 +83,9 @@ class RBACPermission(BasePermission):
         if "team_and_pool_consultant_ids" in required_placeholders:
             context["team_and_pool_consultant_ids"] = (
                 list(request.user.marketed.filter(status='open').values_list('consultant_id')) +
-                list(ConsultantMarketing.objects.filter(in_pool=True, status='open').values_list('consultant_id', flat=True))
+                list(ConsultantMarketing.objects.filter(
+                    in_pool=True, status='open'
+                ).values_list('consultant_id', flat=True))
             )
 
         return context
@@ -119,9 +123,9 @@ class RBACPermission(BasePermission):
         """
         queries = []
         for perm in permissions:
-            if perm.filter_string == "*":
-                # No restriction: return an empty query string equivalent to allowing all
-                return ""
+            # if perm.filter_string == "*":
+            #     # No restriction: return an empty query string equivalent to allowing all
+            #     return ""
 
             filter_string = perm.filter_string
             for placeholder, value in context.items():
@@ -141,3 +145,45 @@ class RBACPermission(BasePermission):
             combined_query = " & ".join(queries)  # Default to AND
 
         return combined_query
+
+
+def filter_attributes(user, content_type, data, is_owner=False):
+    """
+    Filters attributes based on the user's group and individual access permissions.
+
+    Args:
+        user (User): The user for whom attributes need to be filtered.
+        content_type (ContentType or str): The content type of the object being accessed.
+        data (dict): The data to filter (from a serializer or request body).
+        is_owner (bool): Whether the user is the owner of the object.
+
+    Returns:
+        dict: The filtered data containing only the allowed attributes.
+    """
+    # Get the content type object if a string is passed
+    if isinstance(content_type, str):
+        content_type = ContentType.objects.get(model=content_type)
+
+    # Get group-based restrictions
+    group_restriction = GroupAttributeRestriction.objects.filter(
+        user_group__in=user.groups.all(), content_type=content_type
+    ).first()
+
+    not_allowed_attributes = set(group_restriction.not_allowed_attributes or [])
+    owner_ref_attributes = set(group_restriction.owner_ref_attribute or [])
+
+    # Get user-based access
+    user_access = UserAttributeAccess.objects.filter(user=user, content_type=content_type).first()
+
+    accessible_attributes = set(getattr(user_access, "accessible_attribute", []) or [])
+    owner_attributes = set(getattr(user_access, "owner_attribute", []) or [])
+
+    # Step 1: Adjust not_allowed_attributes based on user-specific accessible attributes
+    not_allowed_attributes -= accessible_attributes
+
+    # Step 2: If the user is not the owner, add owner-specific attributes to not_allowed_attributes
+    if not is_owner:
+        not_allowed_attributes -= owner_attributes
+        not_allowed_attributes -= owner_ref_attributes
+
+    return not_allowed_attributes

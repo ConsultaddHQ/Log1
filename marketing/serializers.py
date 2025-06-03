@@ -2,16 +2,35 @@ from datetime import datetime
 from rest_framework import serializers
 
 from marketing.models import *
-from django.db.models import Q
 from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
+from log1.decorators import prefetch_filtered_attributes
 from consultant.serializers import ConsultantSerializer, WorkAuth
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 
 CONSULTANT_EMPLOYEE_ID = 9999
+
+
+class BaseFilteredSerializer(serializers.ModelSerializer):
+    """
+    A base serializer to handle filtering of attributes dynamically.
+    """
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        not_allowed_attributes = self.context.get('filtered_attributes', set())
+
+        # Skip filtering if no attributes are restricted
+        if not not_allowed_attributes:
+            return representation
+
+        # Filter attributes
+        return {
+            key: value for key, value in representation.items() if key not in not_allowed_attributes
+        }
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -435,7 +454,8 @@ class TestUpdateSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class SubmissionV2Serializer(serializers.ModelSerializer):
+@prefetch_filtered_attributes
+class SubmissionV2Serializer(BaseFilteredSerializer):
     vendor_contact = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     marketing_team = serializers.SerializerMethodField()
@@ -447,6 +467,19 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'marketer_name', 'is_complete', 'vendor_layer', 'work_type', 'marketing_team')
+
+    # def to_representation(self, instance):
+    #     representation = super().to_representation(instance)
+    #     user = self.context['request'].user
+    #     content_type = ContentType.objects.get_for_model(instance)
+    #     is_owner = instance.created_by == user  # Adjust ownership logic as needed
+    #     return filter_attributes(user, content_type, representation, is_owner)
+    # def to_representation(self, instance):
+    #     representation = super().to_representation(instance)
+    #     not_allowed_attributes = self.context.get('filtered_attributes', set())
+    #     if not not_allowed_attributes:
+    #         return representation
+    #     return {key: value for key, value in representation.items() if key not in not_allowed_attributes}
 
     @staticmethod
     def get_vendor_layer(obj):
@@ -471,6 +504,7 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
         return obj.get_work_type_display()
 
 
+@prefetch_filtered_attributes
 class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     vendor_layer = VendorLayerSerializer(read_only=True)
     vendor_contact = serializers.SerializerMethodField()
@@ -483,6 +517,20 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'marketer_name', 'is_complete', 'vendor_layer', 'work_type', 'marketing_team')
+
+    # def to_representation(self, instance):
+    #     representation = super().to_representation(instance)
+    #     user = self.context['request'].user
+    #     content_type = ContentType.objects.get_for_model(instance)
+    #     is_owner = instance.created_by == user  # Adjust ownership logic as needed
+    #     return filter_attributes(user, content_type, representation, is_owner)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        not_allowed_attributes = self.context.get('filtered_attributes', set())
+        if not not_allowed_attributes:
+            return representation
+        return {key: value for key, value in representation.items() if key not in not_allowed_attributes}
 
     @staticmethod
     def get_marketer_name(obj):

@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.auth.models import BaseUserManager, Permission
+from django.contrib.auth.models import BaseUserManager, Permission, Group
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from log1.utils import write_exception
@@ -339,3 +339,35 @@ class DefaultCalendar(TimeStampedModel):
             self.created = timezone.now()
         self.modified = timezone.now()
         return super(DefaultCalendar, self).save(*args, **kwargs)
+
+
+class GroupAttributeRestriction(TimeStampedModel):
+    owner_ref_attribute = ArrayField(models.TextField(), blank=True)
+    not_allowed_attributes = ArrayField(models.TextField(), blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    user_group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='attributes')
+
+    def __str__(self):
+        return f"{self.user_group.name} - f{self.content_type.model}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(GroupAttributeRestriction, self).save(*args, **kwargs)
+
+
+class UserAttributeAccess(TimeStampedModel):
+    owner_attribute = ArrayField(models.TextField(), blank=True)
+    accessible_attribute = ArrayField(models.TextField(), blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accessible_attributes')
+
+    def __str__(self):
+        return f"{self.user.employee_name} - f{self.content_type.model}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(UserAttributeAccess, self).save(*args, **kwargs)
