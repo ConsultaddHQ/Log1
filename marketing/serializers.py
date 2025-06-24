@@ -813,7 +813,7 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        if user == obj.submission.created_by or 'finance' in user.roles:
+        if user == obj.submission.created_by or 'finance' in user.roles or 'retention' in user.roles:
             return {'update': True}
         authentic_user_id = []
         authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
