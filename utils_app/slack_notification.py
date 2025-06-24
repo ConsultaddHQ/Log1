@@ -1077,8 +1077,8 @@ class MessageCard:
 
             # Add screening counts
             screening_counts = payload.get("screening_count", {})
-            screening_count_text = ":pushpin: *Monthly Screening Counts:* " + (
-                    " | ".join(f"`{key}` - {value}" for key, value in screening_counts.items() if
+            screening_count_text = ":pushpin: *Monthly Interview Counts: - * " + (
+                    " | ".join(f"`{value}`" for key, value in screening_counts.items() if
                                value) or "No data available."
             )
             card_data['blocks'].append({
@@ -1352,7 +1352,7 @@ class MessageCard:
             for j in payload.get('reviewed_by'):
                 reviewed_by += f"`{j}`  "
 
-            if payload.get('type').capitalize() == 'Offline':
+            if payload.get('type', "").capitalize() == 'Offline':
                 engineering_feedback = f"*Submitted By:*  {coders}\n " \
                                        f"*Reviewed By:*   {reviewed_by} \n" \
                                        f"*Performance Rating:* {payload.get('coder_rating')} \n " \

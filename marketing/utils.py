@@ -4,12 +4,15 @@ import json
 
 from pytz import timezone
 
+from fuzzywuzzy import fuzz
 from celery import shared_task
+from django.db.models import Q
 from django.http import HttpResponse
 from datetime import datetime, timedelta
 
 from rest_framework import status
 from rest_framework.response import Response
+from typing import Tuple, Optional, List, Dict
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
@@ -21,7 +24,7 @@ from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from notification.models import FCMDevice, UserNotification
 from marketing.serializers import InterviewerProfileSerializer
-from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile, GuestInfo
+from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile, GuestInfo, VendorCompany
 
 from utils_app.utils import get_slack_tag
 from log1.utils import write_info, write_exception
@@ -764,3 +767,116 @@ def send_slack_message(test_obj, request):
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+class EfficientVendorChecker:
+    """
+    Efficient vendor duplication checker using Django ORM and minimal fuzzy matching
+    """
+
+    def __init__(self, similarity_threshold: int = 85):
+        self.similarity_threshold = similarity_threshold
+
+    def check_exact_matches(self, company_name: str, domain: str = None) -> Optional[VendorCompany]:
+        """
+        Check for exact matches using Django filters - O(1) database query
+        """
+        normalized_name = VendorCompany.normalize_company_name(company_name)
+
+        # Build query conditions
+        query = Q()
+
+        # Check normalized name match
+        if normalized_name:
+            query |= Q(normalized_name=normalized_name)
+
+        # Check domain match (highest priority)
+        if domain:
+            clean_domain = VendorCompany.clean_domain(domain)
+            if clean_domain:
+                query |= Q(domain=clean_domain)
+
+        if query:
+            return VendorCompany.objects.filter(query).first()
+
+        return None
+
+    def check_partial_matches(self, company_name: str) -> List[VendorCompany]:
+        """
+        Use Django's icontains for partial matches - single database query
+        """
+        normalized_name = VendorCompany.normalize_company_name(company_name)
+
+        if len(normalized_name) < 3:  # Skip very short names
+            return []
+
+        # Split normalized name into significant words (length > 2)
+        words = [word for word in normalized_name.split() if len(word) > 2]
+
+        if not words:
+            return []
+
+        # Build query for partial matches using the longest word
+        longest_word = max(words, key=len)
+
+        # Use Django's icontains for efficient partial matching
+        vendor_company_qs = VendorCompany.objects.filter(normalized_name__icontains=longest_word).exclude(
+            normalized_name=normalized_name
+        )[:10]
+
+        return list(vendor_company_qs)
+
+    def calculate_similarity(self, name1: str, name2: str) -> int:
+        """
+        Calculate similarity score - only called for limited candidates
+        """
+        # Use only the most effective fuzzy matching algorithm
+        return fuzz.token_set_ratio(name1, name2)
+
+    def find_duplicates(self, company_name: str, domain: str = None) -> Tuple[bool, List[Dict]]:
+        """
+        Main method to find duplicates efficiently
+        Time Complexity: O(1) for exact matches + O(log n) for partial matches + O(k) for fuzzy matching
+        where k is limited to ~10 candidates
+        """
+        if not company_name or not company_name.strip():
+            return False, []
+
+        duplicates = []
+
+        # Step 1: Check exact matches (O(1) with database indexes)
+        exact_match = self.check_exact_matches(company_name, domain)
+        if exact_match:
+            match_type = 'domain' if domain and exact_match.domain == VendorCompany.clean_domain(domain) else 'exact_name'
+            duplicates.append({
+                'object': exact_match,
+                'similarity_score': 100,
+                'match_type': match_type,
+                'reason': 'Exact match found'
+            })
+            return True, duplicates
+
+        # Step 2: Check partial matches (single database query)
+        vendor_company_qs = self.check_partial_matches(company_name)
+
+        if not vendor_company_qs:
+            return False, []
+
+        # Step 3: Fuzzy matching only on limited candidates (O(k) where k ≤ 10)
+        normalized_input = VendorCompany.normalize_company_name(company_name)
+
+        for company_obj in vendor_company_qs:
+            similarity = self.calculate_similarity(normalized_input, company_obj.normalized_name)
+
+            if similarity >= self.similarity_threshold:
+                duplicates.append({
+                    'object': company_obj,
+                    'similarity_score': similarity,
+                    'match_type': 'fuzzy_partial',
+                    'reason': f'Partial name match: {similarity}%'
+                })
+
+        # Sort by similarity score
+        duplicates.sort(key=lambda x: x['similarity_score'], reverse=True)
+
+        return len(duplicates) > 0, duplicates

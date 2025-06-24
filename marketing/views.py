@@ -55,7 +55,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             first, last = get_page_limits(request) if query else (0, 20)
             queryset = VendorCompany.objects.filter(name__icontains=query).order_by('id', Lower('name')).distinct('id')
             total = queryset.count()
-            data = queryset[first:last].values('id', 'name', 'created_by')
+            data = queryset[first:last].values('id', 'name', 'domain', 'normalized_name', 'created_by')
             return Response({"data": data, "total": total}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -66,28 +66,60 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
         try:
-            name = request.data.get('name', None)
-            if name:
-                name = name.strip().replace(':amp:', '&')
-                queryset = VendorCompany.objects.filter(name__icontains=name)
-                name = name.strip().replace(':amp:', '&').replace(' ', '').lower()
-                for v in queryset:
-                    vendor = v.name.strip().replace(' ', '').lower()
-                    if name == vendor:
-                        return Response({"message": "Company already exist"}, status=400)
-                    if name + 's' == vendor:
-                        return Response({"message": "Company name already exist with s at the end"}, status=400)
-                    if name == vendor + 's':
-                        return Response({"message": "Company name already exist without s at the end"}, status=400)
-                created_by = str(request.user.employee_id) + " - " + request.user.employee_name
-                company = VendorCompany.objects.create(name=request.data.get('name', None), created_by=created_by)
+            domain = request.data.get('domain', None)
+            company_name = request.data.get('name', None)
+            if not company_name or not domain:
                 return Response(
-                    {"data": VendorCompanySerializer(company).data, "message": "Vendor Company added"}, status=201
+                    {"message": "Company name or domain name not provided"}, status=status.HTTP_400_BAD_REQUEST
                 )
-            return Response({"message": "Enter company name"}, status=400)
+
+            checker = EfficientVendorChecker(similarity_threshold=85)
+            is_duplicate, similar_vendors = checker.find_duplicates(company_name, domain)
+            if is_duplicate:
+                similar_data = [{
+                    'id': match['object'].id, 'match_type': match['match_type'],
+                    'reason': match['reason'], 'domain': match['object'].domain,
+                    'similarity_score': match['similarity_score'], 'company_name': match['object'].name
+                } for match in similar_vendors]
+
+                return Response(
+                    {'message': 'Similar vendor(s) found', 'similar_vendors': similar_data},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            created_by = str(request.user.employee_id) + " - " + request.user.employee_name
+            company = VendorCompany.objects.create(name=company_name, created_by=created_by, domain=domain)
+            return Response(
+                {"data": VendorCompanySerializer(company).data, "message": "Vendor Company added"}, status=201
+            )
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["GET"], detail=False, url_path='check_similar')
+    def check_similar(self, request, *args, **kwargs):
+        company_name = request.GET.get('name', '').strip()
+        domain = request.GET.get('domain', '').strip() or None
+
+        if not company_name:
+            return Response({'message': 'Company name required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            checker = EfficientVendorChecker()
+            is_duplicate, similar_vendors = checker.find_duplicates(company_name, domain)
+
+            similar_data = [{
+                'id': match['object'].id,
+                'company_name': match['object'].company_name,
+                'domain': match['object'].domain,
+                'similarity_score': match['similarity_score'],
+                'match_type': match['match_type']
+            } for match in similar_vendors]
+
+            return Response(
+                {'is_duplicate': is_duplicate, 'similar_vendors': similar_data}, status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /vendor_contact/
