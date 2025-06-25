@@ -62,53 +62,32 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
-        if not ('admin' in request.user.roles or 'superadmin' in request.user.roles):
-            return Response({"message": DONT_HAVE_ACCESS}, status=403)
+        user_roles = request.user.roles
+        if not ('admin' in user_roles or 'superadmin' in user_roles):
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            domain = request.data.get('domain', None)
-            company_name = request.data.get('name', None)
-            if not company_name or not domain:
+            # Extract and validate request data
+            input_domain = request.data.get('domain')
+            input_company_name = request.data.get('name')
+
+            # Basic input validation
+            if not input_company_name or not input_domain:
                 return Response(
-                    {"message": "Company name or domain name not provided"}, status=status.HTTP_400_BAD_REQUEST
+                    {"message": "Company name and domain name are required"},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
-            checker = EfficientVendorChecker(similarity_threshold=85)
-            is_duplicate, similar_vendors = checker.find_duplicates(company_name, domain)
-            if is_duplicate:
-                similar_data = [{
-                    'id': match['object'].id, 'match_type': match['match_type'],
-                    'reason': match['reason'], 'domain': match['object'].domain,
-                    'similarity_score': match['similarity_score'], 'company_name': match['object'].name
-                } for match in similar_vendors]
+            # Strip whitespace after validation
+            input_company_name = input_company_name.strip()
+            input_domain = input_domain.strip()
 
-                return Response(
-                    {'message': 'Similar vendor(s) found', 'similar_vendors': similar_data},
-                    status=status.HTTP_409_CONFLICT
-                )
+            # Check for existing duplicates
+            vendor_checker = EfficientVendorChecker(similarity_threshold=85)
+            is_duplicate_found, vendor_match_results = vendor_checker.find_duplicates(input_company_name, input_domain)
 
-            created_by = str(request.user.employee_id) + " - " + request.user.employee_name
-            company = VendorCompany.objects.create(name=company_name, created_by=created_by, domain=domain)
-            return Response(
-                {"data": VendorCompanySerializer(company).data, "message": "Vendor Company added"}, status=201
-            )
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=["GET"], detail=False, url_path='check_similar')
-    def check_similar(self, request, *args, **kwargs):
-        company_name = request.GET.get('name', '').strip()
-        domain = request.GET.get('domain', '').strip() or None
-
-        if not company_name:
-            return Response({'message': 'Company name required'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            checker = EfficientVendorChecker()
-            is_duplicate, similar_vendors = checker.find_duplicates(company_name, domain)
-
-            all_matches = {
-                'duplicates': [{
+            if is_duplicate_found:
+                existing_duplicate_details = [{
                     'id': match['object'].id,
                     'company_name': match['object'].name,
                     'domain': match['object'].domain,
@@ -116,23 +95,58 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
                     'match_type': match['match_type'],
                     'reason': match['reason'],
                     'category': 'duplicate'
-                } for match in similar_vendors['duplicates']],
-                'similar': [{
-                    'id': match['object'].id,
-                    'company_name': match['object'].name,
-                    'domain': match['object'].domain,
-                    'similarity_score': match['similarity_score'],
-                    'match_type': match['match_type'],
-                    'reason': match['reason'],
-                    'category': 'similar'
-                } for match in similar_vendors['similar']]
-            }
+                } for match in vendor_match_results["duplicates"]]
+
+                return Response(
+                    {'message': 'Duplicate vendor(s) found', 'conflicting_vendors': existing_duplicate_details},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            # If no duplicates, proceed with creation
+            current_user_id = str(request.user.employee_id)
+            current_user_name = request.user.employee_name
+            created_by_info = f"{current_user_id} - {current_user_name}"
+
+            new_vendor_company = VendorCompany.objects.create(
+                name=input_company_name, created_by=created_by_info, domain=input_domain
+            )
+
+            return Response({
+                "data": VendorCompanySerializer(new_vendor_company).data, "message": "Vendor Company added successfully"
+            },status=status.HTTP_201_CREATED)
+        except Exception as e:
+            write_exception(e, request)
+            return Response({"message": ERROR_MSG, "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(methods=["GET"], detail=False, url_path='check_similar')
+    def check_similar(self, request, *args, **kwargs):
+        input_company_name = request.GET.get('name', '').strip()
+        input_domain = request.GET.get('domain', '').strip() or None
+
+        if not input_company_name:
+            return Response({'message': 'Company name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            vendor_checker = EfficientVendorChecker()
+            is_duplicate_found, match_results = vendor_checker.find_duplicates(input_company_name, input_domain)
+
+            # Helper to format individual match objects
+            def _format_match(match_item, category):
+                return {
+                    'id': match_item['object'].id, 'company_name': match_item['object'].name,
+                    'domain': match_item['object'].domain,'similarity_score': match_item['similarity_score'],
+                    'match_type': match_item['match_type'], 'reason': match_item['reason'], 'category': category
+                }
+
+            all_formatted_matches = []
+            all_formatted_matches.extend([_format_match(m, 'duplicate') for m in match_results['duplicates']])
+            all_formatted_matches.extend([_format_match(m, 'similar') for m in match_results['similar']])
 
             return Response(
-                {'is_duplicate': is_duplicate, 'similar_vendors': all_matches}, status=status.HTTP_200_OK
+                {'is_duplicate': is_duplicate_found, 'found_vendors': all_formatted_matches}, status=status.HTTP_200_OK
             )
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /vendor_contact/
