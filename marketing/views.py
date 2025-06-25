@@ -107,16 +107,29 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             checker = EfficientVendorChecker()
             is_duplicate, similar_vendors = checker.find_duplicates(company_name, domain)
 
-            similar_data = [{
-                'id': match['object'].id,
-                'company_name': match['object'].company_name,
-                'domain': match['object'].domain,
-                'similarity_score': match['similarity_score'],
-                'match_type': match['match_type']
-            } for match in similar_vendors]
+            all_matches = {
+                'duplicates': [{
+                    'id': match['object'].id,
+                    'company_name': match['object'].name,
+                    'domain': match['object'].domain,
+                    'similarity_score': match['similarity_score'],
+                    'match_type': match['match_type'],
+                    'reason': match['reason'],
+                    'category': 'duplicate'
+                } for match in similar_vendors['duplicates']],
+                'similar': [{
+                    'id': match['object'].id,
+                    'company_name': match['object'].name,
+                    'domain': match['object'].domain,
+                    'similarity_score': match['similarity_score'],
+                    'match_type': match['match_type'],
+                    'reason': match['reason'],
+                    'category': 'similar'
+                } for match in similar_vendors['similar']]
+            }
 
             return Response(
-                {'is_duplicate': is_duplicate, 'similar_vendors': similar_data}, status=status.HTTP_200_OK
+                {'is_duplicate': is_duplicate, 'similar_vendors': all_matches}, status=status.HTTP_200_OK
             )
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

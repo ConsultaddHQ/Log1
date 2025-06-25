@@ -770,113 +770,115 @@ def send_slack_message(test_obj, request):
 
 
 class EfficientVendorChecker:
-    """
-    Efficient vendor duplication checker using Django ORM and minimal fuzzy matching
-    """
-
     def __init__(self, similarity_threshold: int = 85):
         self.similarity_threshold = similarity_threshold
 
-    def check_exact_matches(self, company_name: str, domain: str = None) -> Optional[VendorCompany]:
-        """
-        Check for exact matches using Django filters - O(1) database query
-        """
+    def check_exact_matches(self, company_name: str, domain: str = None) -> List[VendorCompany]:
         normalized_name = VendorCompany.normalize_company_name(company_name)
-
-        # Build query conditions
         query = Q()
 
-        # Check normalized name match
         if normalized_name:
             query |= Q(normalized_name=normalized_name)
 
-        # Check domain match (highest priority)
         if domain:
             clean_domain = VendorCompany.clean_domain(domain)
             if clean_domain:
                 query |= Q(domain=clean_domain)
 
         if query:
-            return VendorCompany.objects.filter(query).first()
-
-        return None
+            return list(VendorCompany.objects.filter(query))
+        return []
 
     def check_partial_matches(self, company_name: str) -> List[VendorCompany]:
-        """
-        Use Django's icontains for partial matches - single database query
-        """
         normalized_name = VendorCompany.normalize_company_name(company_name)
-
-        if len(normalized_name) < 3:  # Skip very short names
+        if len(normalized_name) < 3:
             return []
 
-        # Split normalized name into significant words (length > 2)
         words = [word for word in normalized_name.split() if len(word) > 2]
-
         if not words:
             return []
 
-        # Build query for partial matches using the longest word
         longest_word = max(words, key=len)
-
-        # Use Django's icontains for efficient partial matching
         vendor_company_qs = VendorCompany.objects.filter(normalized_name__icontains=longest_word).exclude(
             normalized_name=normalized_name
         )[:10]
-
         return list(vendor_company_qs)
 
     def calculate_similarity(self, name1: str, name2: str) -> int:
-        """
-        Calculate similarity score - only called for limited candidates
-        """
-        # Use only the most effective fuzzy matching algorithm
         return fuzz.token_set_ratio(name1, name2)
 
-    def find_duplicates(self, company_name: str, domain: str = None) -> Tuple[bool, List[Dict]]:
-        """
-        Main method to find duplicates efficiently
-        Time Complexity: O(1) for exact matches + O(log n) for partial matches + O(k) for fuzzy matching
-        where k is limited to ~10 candidates
-        """
+    def find_duplicates(self, company_name: str, domain: str = None) -> Tuple[bool, Dict]:
         if not company_name or not company_name.strip():
-            return False, []
+            return False, {"duplicates": [], "similar": []}
 
-        duplicates = []
+        similar_results = {"duplicates": [], "similar": []}
+        normalized_input_name = VendorCompany.normalize_company_name(company_name)
+        cleaned_input_domain = VendorCompany.clean_domain(domain) if domain else None
 
-        # Step 1: Check exact matches (O(1) with database indexes)
+        # Step 1: Check for exact matches (company name or domain)
         exact_match = self.check_exact_matches(company_name, domain)
         if exact_match:
-            match_type = 'domain' if domain and exact_match.domain == VendorCompany.clean_domain(domain) else 'exact_name'
-            duplicates.append({
-                'object': exact_match,
-                'similarity_score': 100,
-                'match_type': match_type,
-                'reason': 'Exact match found'
-            })
-            return True, duplicates
+            match_type = ''
+            if cleaned_input_domain and exact_match.domain == cleaned_input_domain:
+                match_type = 'exact_domain'
+            elif exact_match.normalized_name == normalized_input_name:
+                match_type = 'exact_name'
 
-        # Step 2: Check partial matches (single database query)
-        vendor_company_qs = self.check_partial_matches(company_name)
-
-        if not vendor_company_qs:
-            return False, []
-
-        # Step 3: Fuzzy matching only on limited candidates (O(k) where k ≤ 10)
-        normalized_input = VendorCompany.normalize_company_name(company_name)
-
-        for company_obj in vendor_company_qs:
-            similarity = self.calculate_similarity(normalized_input, company_obj.normalized_name)
-
-            if similarity >= self.similarity_threshold:
-                duplicates.append({
-                    'object': company_obj,
-                    'similarity_score': similarity,
-                    'match_type': 'fuzzy_partial',
-                    'reason': f'Partial name match: {similarity}%'
+            if match_type:  # Ensure there's a specific match type
+                similar_results["duplicates"].append({
+                    'object': exact_match,
+                    'similarity_score': 100,
+                    'match_type': match_type,
+                    'reason': f'Exact match found by {match_type.replace("_", " ")}'
                 })
 
-        # Sort by similarity score
-        duplicates.sort(key=lambda x: x['similarity_score'], reverse=True)
+        # Step 2: Check for potential duplicates/similarities
+        # Combine partial name matches and domain-based searches
+        all_potential_matches = set()  # Use a set to avoid duplicates from different queries
 
-        return len(duplicates) > 0, duplicates
+        # Add partial name matches
+        partial_name_matches = self.check_partial_matches(company_name)
+        all_potential_matches.update(partial_name_matches)
+
+        # Add domain-based partial/fuzzy matches if a domain is provided
+        if cleaned_input_domain:
+            # Look for companies with similar domains
+            domain_query_set = VendorCompany.objects.filter(domain__icontains=cleaned_input_domain)
+            all_potential_matches.update(domain_query_set)
+
+            # Also consider permutations/typos of domain if needed, though icontains handles some
+            # For more advanced domain fuzzy matching, external libraries might be needed
+            # For now, rely on icontains for efficiency
+
+        # Exclude the exact match if it was already added to duplicates
+        if exact_match and exact_match in all_potential_matches:
+            all_potential_matches.remove(exact_match)
+
+        # Step 3: Fuzzy matching on remaining queryset
+        for company_obj in all_potential_matches:
+            # Check company name similarity
+            name_similarity = self.calculate_similarity(normalized_input_name, company_obj.normalized_name)
+            if name_similarity >= self.similarity_threshold:
+                similar_results["similar"].append({
+                    'object': company_obj,
+                    'similarity_score': name_similarity,
+                    'match_type': 'fuzzy_name',
+                    'reason': f'Fuzzy name match: {name_similarity}%'
+                })
+
+            # Check domain similarity (if both domains exist)
+            if cleaned_input_domain and company_obj.domain:
+                domain_similarity = self.calculate_similarity(cleaned_input_domain, company_obj.domain)
+                if domain_similarity >= self.similarity_threshold and domain_similarity != 100:  # Exclude exact domain match already handled
+                    similar_results["similar"].append({
+                        'object': company_obj,
+                        'similarity_score': domain_similarity,
+                        'match_type': 'fuzzy_domain',
+                        'reason': f'Fuzzy domain match: {domain_similarity}%'
+                    })
+
+        # Sort results
+        similar_results["duplicates"].sort(key=lambda x: x['similarity_score'], reverse=True)
+        similar_results["similar"].sort(key=lambda x: x['similarity_score'], reverse=True)
+
+        return len(similar_results["duplicates"]) > 0, similar_results

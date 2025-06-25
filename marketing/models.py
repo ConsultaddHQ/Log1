@@ -56,7 +56,7 @@ class VendorCompany(models.Model):
 
     def save(self, *args, **kwargs):
         # Auto-generate normalized name on save
-        self.normalized_name = self.normalize_company_name(self.company_name)
+        self.normalized_name = self.normalize_company_name(self.name)
         if self.domain:
             self.domain = self.clean_domain(self.domain)
         super().save(*args, **kwargs)
