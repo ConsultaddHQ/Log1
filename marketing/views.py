@@ -113,10 +113,40 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
 
             return Response({
                 "data": VendorCompanySerializer(new_vendor_company).data, "message": "Vendor Company added successfully"
-            },status=status.HTTP_201_CREATED)
+            }, status=status.HTTP_201_CREATED)
         except Exception as e:
             write_exception(e, request)
             return Response({"message": ERROR_MSG, "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def update(self, request, *args, **kwargs):
+        user_roles = request.user.roles
+        if not ('admin' in user_roles or 'superadmin' in user_roles):
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            vendor_company_id = kwargs.get("pk")
+
+            if not vendor_company_id:
+                return Response(
+                    {"message": "Vendor company ID is required for update."}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Use get_object_or_404 for clean error handling
+            vendor_company = get_object_or_404(VendorCompany, id=vendor_company_id)
+
+            # Use the serializer for validation and updating
+            serializer = self.get_serializer(vendor_company, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+
+            # Add `modified_by` before saving
+            serializer.save()
+
+            return Response({
+                "data": serializer.data, "message": "Vendor Company updated successfully"
+            }, status=status.HTTP_202_ACCEPTED)
+        except Exception as e:
+            write_exception(e, request)
+            return Response({"message": ERROR_MSG, "detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=["GET"], detail=False, url_path='check_similar')
     def check_similar(self, request, *args, **kwargs):
@@ -1763,6 +1793,8 @@ class InterviewViewSets(ModelViewSet):
             # Saving Interview
             serializer = InterviewCreateSerializer(data=request.data, partial=True)
             if not serializer.is_valid():
+                if any("Call Type Otter AI is not allowed" in err for err in serializer.errors.get("call_type", [])):
+                    return Response({"message": "Call Type validation failed"}, status=status.HTTP_400_BAD_REQUEST)
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
 
