@@ -199,6 +199,14 @@ class InterviewCreateSerializer(serializers.ModelSerializer):
         model = Interview
         exclude = ('calendar_id',)
 
+    def validate_call_type(self, value):
+        """
+        Custom validation for the call_type field.
+        """
+        if value.name == "otter.ai":
+            raise serializers.ValidationError("Call Type Otter AI is not allowed. Please change call type.")
+        return value
+
 
 class InterviewGetSerializer(serializers.ModelSerializer):
     guest = UserSerializer(many=True)
