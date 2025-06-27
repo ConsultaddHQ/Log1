@@ -445,6 +445,7 @@ class TestUpdateSerializer(serializers.ModelSerializer):
 
 class SubmissionV2Serializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
+    marketing_team = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     vendor_layer = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
@@ -453,7 +454,11 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type')
+                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type', 'marketing_team')
+
+    @staticmethod
+    def get_marketing_team(obj):
+        return obj.marketing_team.name if obj.marketing_team else None
 
     @staticmethod
     def get_vendor_layer(obj):
