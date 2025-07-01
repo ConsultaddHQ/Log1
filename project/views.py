@@ -139,8 +139,8 @@ class ProjectViewSets(ModelViewSet):
             path, recordings = [], []
             resume = submission.attachments.filter(attachment_type='resume')
 
-            recordings = [interview.attachment_link for interview in submission.screening.all()
-                          if interview.attachment_link is not None]
+            recordings = [interview.interview_recording_link for interview in submission.screening.all()
+                          if interview.interview_recording_link is not None]
             recordings = ", ".join(recordings) if len(recordings) != 0 else "NA"
 
             notes = [interview.notes for interview in submission.screening.all() if interview.notes is not None]
