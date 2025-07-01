@@ -10,7 +10,7 @@ class VendorCompanyAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('created_by',)
     search_fields = ('id', 'name', 'created_by')
-    list_display = ('id', 'name', 'created_by', 'vendor_display')
+    list_display = ('id', 'name', 'created_by', 'normalized_name', 'domain', 'vendor_display')
 
     def vendor_display(self, obj):
         return ", ".join([

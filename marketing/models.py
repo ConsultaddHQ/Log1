@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import ContentType
@@ -41,7 +43,9 @@ GUEST_TYPE = [
 
 class VendorCompany(models.Model):
     name = models.CharField(_('Company'), max_length=100)
+    domain = models.TextField(_('Domain'), null=True, blank=True)
     created_by = models.CharField(_('Created By'), max_length=50, null=True, blank=True)
+    normalized_name = models.CharField(_('Normalized Company Name'), max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f'{self.id}:{self.name}'
@@ -49,6 +53,52 @@ class VendorCompany(models.Model):
     class Meta:
         verbose_name = _("Vendor Company")
         verbose_name_plural = _("Vendor Companies")
+
+    def save(self, *args, **kwargs):
+        # Auto-generate normalized name on save
+        self.normalized_name = self.normalize_company_name(self.name)
+        if self.domain:
+            self.domain = self.clean_domain(self.domain)
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def normalize_company_name(name):
+        """Normalize company name for database storage and matching"""
+        if not name:
+            return ""
+
+        # Convert to lowercase and strip
+        normalized = name.lower().strip()
+
+        # Remove common suffixes in one regex
+        normalized = re.sub(
+            r'\b(inc|ltd|llc|corp|corporation|company|co|limited|pvt|private|technologies|technology'
+            r'|tech|systems|solutions|services|group|international|global)\.?\b',
+            '', normalized, flags=re.IGNORECASE
+        )
+
+        # Clean up special characters and extra spaces
+        normalized = re.sub(r'[^\w\s]', '', normalized)
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+
+        return normalized
+
+    @staticmethod
+    def clean_domain(domain_input):
+        """Clean domain for consistent storage"""
+        if not domain_input:
+            return ""
+
+        domain = domain_input.lower().strip()
+        # Remove protocol and www in one step
+        domain = re.sub(r'^(https?://)?(www\.)?', '', domain)
+        # Extract domain from email
+        if '@' in domain:
+            domain = domain.split('@')[1]
+        # Remove path/query
+        domain = domain.split('/')[0].split('?')[0]
+
+        return domain
 
 
 class VendorContact(TimeStampedModel):

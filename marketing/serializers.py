@@ -199,6 +199,14 @@ class InterviewCreateSerializer(serializers.ModelSerializer):
         model = Interview
         exclude = ('calendar_id',)
 
+    def validate_call_type(self, value):
+        """
+        Custom validation for the call_type field.
+        """
+        if value.name == "otter.ai":
+            raise serializers.ValidationError("Call Type Otter AI is not allowed. Please change call type.")
+        return value
+
 
 class InterviewGetSerializer(serializers.ModelSerializer):
     guest = UserSerializer(many=True)
@@ -437,6 +445,7 @@ class TestUpdateSerializer(serializers.ModelSerializer):
 
 class SubmissionV2Serializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
+    marketing_team = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     vendor_layer = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
@@ -445,7 +454,11 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type')
+                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type', 'marketing_team')
+
+    @staticmethod
+    def get_marketing_team(obj):
+        return obj.marketing_team.name if obj.marketing_team else None
 
     @staticmethod
     def get_vendor_layer(obj):
@@ -813,7 +826,7 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        if user == obj.submission.created_by or 'finance' in user.roles:
+        if user == obj.submission.created_by or 'finance' in user.roles or 'retention' in user.roles:
             return {'update': True}
         authentic_user_id = []
         authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))

@@ -55,39 +55,128 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             first, last = get_page_limits(request) if query else (0, 20)
             queryset = VendorCompany.objects.filter(name__icontains=query).order_by('id', Lower('name')).distinct('id')
             total = queryset.count()
-            data = queryset[first:last].values('id', 'name', 'created_by')
+            data = queryset[first:last].values('id', 'name', 'domain', 'normalized_name', 'created_by')
             return Response({"data": data, "total": total}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
-        if not ('admin' in request.user.roles or 'superadmin' in request.user.roles):
-            return Response({"message": DONT_HAVE_ACCESS}, status=403)
+        user_roles = request.user.roles
+        if not ('admin' in user_roles or 'superadmin' in user_roles):
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            name = request.data.get('name', None)
-            if name:
-                name = name.strip().replace(':amp:', '&')
-                queryset = VendorCompany.objects.filter(name__icontains=name)
-                name = name.strip().replace(':amp:', '&').replace(' ', '').lower()
-                for v in queryset:
-                    vendor = v.name.strip().replace(' ', '').lower()
-                    if name == vendor:
-                        return Response({"message": "Company already exist"}, status=400)
-                    if name + 's' == vendor:
-                        return Response({"message": "Company name already exist with s at the end"}, status=400)
-                    if name == vendor + 's':
-                        return Response({"message": "Company name already exist without s at the end"}, status=400)
-                created_by = str(request.user.employee_id) + " - " + request.user.employee_name
-                company = VendorCompany.objects.create(name=request.data.get('name', None), created_by=created_by)
+            # Extract and validate request data
+            input_domain = request.data.get('domain')
+            input_company_name = request.data.get('name')
+
+            # Basic input validation
+            if not input_company_name or not input_domain:
                 return Response(
-                    {"data": VendorCompanySerializer(company).data, "message": "Vendor Company added"}, status=201
+                    {"message": "Company name and domain name are required"},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-            return Response({"message": "Enter company name"}, status=400)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+            # Strip whitespace after validation
+            input_company_name = input_company_name.strip()
+            input_domain = input_domain.strip()
+
+            # Check for existing duplicates
+            vendor_checker = EfficientVendorChecker(similarity_threshold=85)
+            is_duplicate_found, vendor_match_results = vendor_checker.find_duplicates(input_company_name, input_domain)
+
+            if is_duplicate_found:
+                existing_duplicate_details = [{
+                    'id': match['object'].id,
+                    'company_name': match['object'].name,
+                    'domain': match['object'].domain,
+                    'similarity_score': match['similarity_score'],
+                    'match_type': match['match_type'],
+                    'reason': match['reason'],
+                    'category': 'duplicate'
+                } for match in vendor_match_results["duplicates"]]
+
+                return Response(
+                    {'message': 'Duplicate vendor(s) found', 'conflicting_vendors': existing_duplicate_details},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            # If no duplicates, proceed with creation
+            current_user_id = str(request.user.employee_id)
+            current_user_name = request.user.employee_name
+            created_by_info = f"{current_user_id} - {current_user_name}"
+
+            new_vendor_company = VendorCompany.objects.create(
+                name=input_company_name, created_by=created_by_info, domain=input_domain
+            )
+
+            return Response({
+                "data": VendorCompanySerializer(new_vendor_company).data, "message": "Vendor Company added successfully"
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            write_exception(e, request)
+            return Response({"message": ERROR_MSG, "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def update(self, request, *args, **kwargs):
+        user_roles = request.user.roles
+        if not ('admin' in user_roles or 'superadmin' in user_roles):
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            vendor_company_id = kwargs.get("pk")
+
+            if not vendor_company_id:
+                return Response(
+                    {"message": "Vendor company ID is required for update."}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Use get_object_or_404 for clean error handling
+            vendor_company = get_object_or_404(VendorCompany, id=vendor_company_id)
+
+            # Use the serializer for validation and updating
+            serializer = self.get_serializer(vendor_company, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+
+            # Add `modified_by` before saving
+            serializer.save()
+
+            return Response({
+                "data": serializer.data, "message": "Vendor Company updated successfully"
+            }, status=status.HTTP_202_ACCEPTED)
+        except Exception as e:
+            write_exception(e, request)
+            return Response({"message": ERROR_MSG, "detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["GET"], detail=False, url_path='check_similar')
+    def check_similar(self, request, *args, **kwargs):
+        input_company_name = request.GET.get('name', '').strip()
+        input_domain = request.GET.get('domain', '').strip() or None
+
+        if not input_company_name:
+            return Response({'message': 'Company name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            vendor_checker = EfficientVendorChecker()
+            is_duplicate_found, match_results = vendor_checker.find_duplicates(input_company_name, input_domain)
+
+            # Helper to format individual match objects
+            def _format_match(match_item, category):
+                return {
+                    'id': match_item['object'].id, 'company_name': match_item['object'].name,
+                    'domain': match_item['object'].domain,'similarity_score': match_item['similarity_score'],
+                    'match_type': match_item['match_type'], 'reason': match_item['reason'], 'category': category
+                }
+
+            all_formatted_matches = []
+            all_formatted_matches.extend([_format_match(m, 'duplicate') for m in match_results['duplicates']])
+            all_formatted_matches.extend([_format_match(m, 'similar') for m in match_results['similar']])
+
+            return Response(
+                {'is_duplicate': is_duplicate_found, 'found_vendors': all_formatted_matches}, status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response({'error': ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /vendor_contact/
@@ -1704,6 +1793,8 @@ class InterviewViewSets(ModelViewSet):
             # Saving Interview
             serializer = InterviewCreateSerializer(data=request.data, partial=True)
             if not serializer.is_valid():
+                if any("Call Type Otter AI is not allowed" in err for err in serializer.errors.get("call_type", [])):
+                    return Response({"message": "Call Type validation failed"}, status=status.HTTP_400_BAD_REQUEST)
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
 
