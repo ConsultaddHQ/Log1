@@ -58,14 +58,14 @@ def get_users_and_attendees(request, interview):
             attendees.append({'email': interview.supervisor.email})
         if 'engineer' not in request.user.roles:
             scrum_masters = User.objects.filter(
-                team=request.user.team, role__name__in=['admin', 'proxy'], account_login=True
+                team=request.user.team, role__name__in=['scrum_master'], account_login=True
             )
             for user in scrum_masters:
                 user_list.append(user)
                 attendees.append({"email": user.email})
         else:
             scrum_masters = User.objects.filter(
-                team=interview.submission.marketing_team, role__name__in=['admin', 'proxy'], account_login=True
+                team=interview.submission.marketing_team, role__name__in=['scrum_master'], account_login=True
             )
             for user in scrum_masters:
                 user_list.append(user)

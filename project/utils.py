@@ -499,17 +499,19 @@ class ProjectUtil:
                 else:
                     latest = consultant_leave.order_by('-id').first()
                     if latest.on_hold:
-                        perv_granted = latest.granted
                         prev_balance = latest.balance
                         if leave_choice.name == 'pto':
                             desired_leaves = (12 - datetime.now().month + 1) * 8
                             balance = min(desired_leaves, prev_balance)
                         else:
                             balance = prev_balance
-                        ConsultantLeave.objects.create(
-                            consultant=consultant, leave_type=leave_choice, granted=perv_granted,
-                            balance=balance, year=date.today().year
-                        )
+                        latest.balance = balance
+                        latest.on_hold = False
+                        latest.save()
+                        # ConsultantLeave.objects.create(
+                        #     consultant=consultant, leave_type=leave_choice, granted=perv_granted,
+                        #     balance=balance, year=date.today().year
+                        # )
         except Exception as error:
             write_exception(message=error, request=self.request)
             return error, "error"
@@ -803,7 +805,7 @@ def update_leave_status(obj, request=None):
             result[consultant] = False
 
         sub_consultant = obj.submission.consultant
-        if not check_has_active(consultant, request):
+        if not check_has_active(sub_consultant, request):
             mark_consultant_leave_on_hold(sub_consultant, request)
             result[sub_consultant] = True
             send_leave_expire_notification(sub_consultant, obj, request)

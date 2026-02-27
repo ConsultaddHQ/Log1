@@ -379,7 +379,7 @@ class ConsultantLeaveSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_leave_type(obj):
-        return obj.leave_type.display_name
+        return f"{obj.leave_type.display_name} - {obj.leave_type.year}"
 
     @staticmethod
     def get_lapsed(obj):

@@ -1071,11 +1071,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            pending_before = date.today() - timedelta(days=25)
-            test_lst = Test.objects.exclude(submission__created_by__employee_id=3136).filter(
+            pending_before = date.today() - timedelta(days=30)
+            test_lst = Test.objects.filter(
                 status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
-            interview_lst = Interview.objects.exclude(submission__created_by__employee_id=3136).filter(
+            interview_lst = Interview.objects.filter(
                 status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
 
@@ -2288,8 +2288,11 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "This is not your Interview"}, status=404)
 
             interview = queryset.first()
+            payload = {}
+            payload["end_time"] = request.data.get("start_time")
+            payload["start_time"] = request.data.get("end_time")
             prev_guest_type = interview.guest_type
-            serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
+            serializer = InterviewCreateSerializer(interview, data=payload, partial=True)
             if serializer.is_valid():
                 serializer.save()
 
