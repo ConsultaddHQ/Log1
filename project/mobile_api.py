@@ -17,7 +17,7 @@ from constance import config
 
 from employee.models import User
 from attachment.models import Attachment
-from consultant.models import Consultant
+from consultant.models import Consultant, PayrollEmployer
 from utils_app.thred_mail import send_email
 from log1.utils import write_exception, ERROR_MSG
 from consultant.permissions import ConsultantIsAuthenticated
@@ -530,7 +530,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     DURATION_TYPES = {'hourly': 'hours', 'half': 4, 'full': 8}
 
     @staticmethod
-    def validate_dates(from_date, to_date, current_date):
+    def validate_dates(from_date, to_date, leave_type):
         """
 
         :rtype: object
@@ -538,7 +538,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         try:
             from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
             to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            current_date_obj = datetime.strptime(current_date, "%Y-%m-%d").date()
+            current_date_obj = date.today()
         except ValueError:
             return "Invalid date format: Dates should be in YYYY-MM-DD format.", 400
 
@@ -547,18 +547,14 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             return "Invalid input: 'from_date' cannot be after 'to_date'.", 400
 
         # Determine the leave year and the cutoff date for previous year's leave
-        leave_year = from_date_obj.year
-        cutoff_date = date(leave_year + 1, 1, 30)
+        cutoff_date = date(leave_type.year + 1, 1, 16)
 
         # Validation conditions
         if from_date_obj.year != to_date_obj.year:
             return "Leave cannot span multiple calendar years.", 400
 
-        if current_date_obj <= cutoff_date and leave_year == current_date_obj.year - 1:
+        if to_date_obj <= cutoff_date:
             return "Leave application for the previous year is allowed.", 200
-
-        if leave_year == current_date_obj.year:
-            return "Leave application for the current year is allowed.", 200
 
         return "Leave validity has expired", 400
     # def validate_dates(data, current_year):
@@ -584,12 +580,16 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                 path.append(response)
             except Exception as error:
                 write_exception(error)
-
+        employers = PayrollEmployer.objects.filter(consultant=consultant).order_by('-created').first()
+        if employers and employers.name == "CAPS":
+            to = "darshan.t@consultadd.com"
+        else:
+            to = "siddharth.g@consultadd.com"
         mail_data = {
             "template": "../templates/leave_request.html",
             "attachments": path,
             "subject": f"Leave Requested from {consultant.name}",
-            "to": ["siddharth.g@consultadd.com"],
+            "to": [to],
             "cc": ["finance@consultadd.com"],
             "bcc": [],
             "context": {
@@ -646,8 +646,9 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False, on_hold=False)
 
             # Validate leave type and dates
-            validation_msg, status = self.validate_dates(from_date=data.get('from_date'), to_date=data.get('to_date'),
-                                                         current_date=str(datetime.now().date()))
+            validation_msg, status = self.validate_dates(
+                from_date=data.get('from_date'), to_date=data.get('to_date'), leave_type=leave_type
+            )
 
             if status == 400:
                 return Response({"message": validation_msg}, status=status)

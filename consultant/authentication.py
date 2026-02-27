@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 from rest_framework import exceptions
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from rest_framework.authentication import get_authorization_header
 
 from consultant.models import Consultant

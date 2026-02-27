@@ -16,7 +16,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q, F, Value, CharField
 from django.contrib.auth.hashers import make_password
 from rest_framework.permissions import IsAuthenticated
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet

@@ -1,4 +1,4 @@
-FROM python:3.9.6-alpine
+FROM python:3.12.9-alpine
 
 # Set work directory
 RUN mkdir -p /home/app
@@ -21,7 +21,7 @@ RUN apk update && apk add libpq postgresql-dev gcc python3-dev musl-dev
 
 # Install dependencies
 COPY ./requirements.txt $APP_HOME/requirements.txt
-RUN pip install --upgrade pip
+RUN pip install --upgrade "pip==24.0"
 RUN pip install -r requirements.txt
 
 # copy entrypoint.prod.sh

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
@@ -43,6 +43,16 @@ class UserCreationFormExtended(UserCreationForm):
         self.fields['employee_id'] = forms.IntegerField(label=_("Employee ID"))
         self.fields['username'] = forms.IntegerField(label=_("User Name"))
         self.fields['email'] = forms.EmailField(label=_("Email"), max_length=75)
+
+    def clean_username(self):
+        # Get the integer value of the username
+        username = self.cleaned_data.get('username')
+
+        # Convert the username to a string
+        if username is not None:
+            username = str(username)
+
+        return username
 
 
 UserAdmin.add_form = UserCreationFormExtended

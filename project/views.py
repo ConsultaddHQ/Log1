@@ -809,7 +809,7 @@ class ProjectViewSets(ModelViewSet):
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                    project.support.update(end=datetime.now())
+                    project.support.filter(end__isnull=True).update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
@@ -822,7 +822,7 @@ class ProjectViewSets(ModelViewSet):
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                    project.support.update(end=datetime.now())
+                    project.support.filter(end__isnull=True).update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     po_status = project_status_obj.get_status_display()
@@ -835,7 +835,7 @@ class ProjectViewSets(ModelViewSet):
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                    project.support.update(end=datetime.now())
+                    project.support.filter(end__isnull=True).update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
@@ -2588,3 +2588,11 @@ class ProjectAssociatesViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixi
             return Response({"data": user_data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+#
+# DB_PORT=5432
+# DB_NAME=dblog1
+# DB_USER=postgres
+# DB_PASSWORD=caincadmin2025!
+# DB_HOST=log1dbrds.c9cs09dndkcs.ap-south-1.rds.amazonaws.com
