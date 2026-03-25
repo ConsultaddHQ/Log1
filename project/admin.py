@@ -88,7 +88,7 @@ class ConsultantFeedbackAdmin(ExportActionModelAdmin):
 @admin.register(ConsultantLeave)
 class ConsultantLeaveAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_filter = ('year', 'leave_type')
+    list_filter = ('year', 'on_hold')
     search_fields = ('id', 'consultant__name', 'year', 'leave_type__name')
     list_display = ('id', 'leave_type', 'consultant', 'granted', 'balance', 'is_expired', 'year', 'on_hold')
 
