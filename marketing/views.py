@@ -52,8 +52,8 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get("query", "").lstrip().replace(':amp:', '&')
-            first, last = get_page_limits(request) if query else (0, 20)
-            queryset = VendorCompany.objects.filter(name__icontains=query).order_by('id', Lower('name')).distinct('id')
+            first, last = 0, 20
+            queryset = VendorCompany.objects.filter(name__icontains=query).order_by('-id', Lower('name')).distinct('id')
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'domain', 'normalized_name', 'created_by')
             return Response({"data": data, "total": total}, status=200)
@@ -1071,11 +1071,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            pending_before = date.today() - timedelta(days=25)
-            test_lst = Test.objects.exclude(submission__created_by__employee_id=3136).filter(
+            pending_before = date.today() - timedelta(days=30)
+            test_lst = Test.objects.exclude(submission__created_by__employee_id=3572).filter(
                 status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
-            interview_lst = Interview.objects.exclude(submission__created_by__employee_id=3136).filter(
+            interview_lst = Interview.objects.exclude(submission__created_by__employee_id=3572).filter(
                 status='feedback_due', submission__created_by=request.user, created__gte=check_after
             ).exclude(modified__gte=pending_before)
 
@@ -2289,7 +2289,12 @@ class InterviewViewSets(ModelViewSet):
 
             interview = queryset.first()
             prev_guest_type = interview.guest_type
-            serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
+
+            payload = dict()
+            payload["end_time"] = request.data.get("end_time")
+            payload["start_time"] = request.data.get("start_time")
+
+            serializer = InterviewCreateSerializer(interview, data=payload, partial=True)
             if serializer.is_valid():
                 serializer.save()
 

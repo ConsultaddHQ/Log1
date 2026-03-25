@@ -530,7 +530,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     DURATION_TYPES = {'hourly': 'hours', 'half': 4, 'full': 8}
 
     @staticmethod
-    def validate_dates(from_date, to_date, current_date):
+    def validate_dates(from_date, to_date, leave_type):
         """
 
         :rtype: object
@@ -538,7 +538,6 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         try:
             from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
             to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            current_date_obj = datetime.strptime(current_date, "%Y-%m-%d").date()
         except ValueError:
             return "Invalid date format: Dates should be in YYYY-MM-DD format.", 400
 
@@ -547,33 +546,16 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             return "Invalid input: 'from_date' cannot be after 'to_date'.", 400
 
         # Determine the leave year and the cutoff date for previous year's leave
-        leave_year = from_date_obj.year
-        cutoff_date = date(leave_year + 1, 1, 30)
+        cutoff_date = date(leave_type.year + 1, 1, 16)
 
         # Validation conditions
         if from_date_obj.year != to_date_obj.year:
             return "Leave cannot span multiple calendar years.", 400
 
-        if current_date_obj <= cutoff_date and leave_year == current_date_obj.year - 1:
+        if to_date_obj <= cutoff_date:
             return "Leave application for the previous year is allowed.", 200
 
-        if leave_year == current_date_obj.year:
-            return "Leave application for the current year is allowed.", 200
-
         return "Leave validity has expired", 400
-    # def validate_dates(data, current_year):
-    #     from_date = data.get('from_date')
-    #     if date.today().strftime("%Y-%m-%d") > f"{current_year}-01-20":
-    #         if from_date < f"{current_year}-12-01":
-    #             return f"{current_year-1} year leaves have been expired.", 400
-    #         else:
-    #             return True, 200
-    #     else:
-    #         if from_date > f"{current_year}-01-20":
-    #             return True, 200
-    #         else:
-    #             return False, 200
-
 
     @staticmethod
     def send_leave_email(consultant, leave, attachment):
@@ -647,7 +629,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
 
             # Validate leave type and dates
             validation_msg, status = self.validate_dates(from_date=data.get('from_date'), to_date=data.get('to_date'),
-                                                         current_date=str(datetime.now().date()))
+                                                         leave_type=leave_type)
 
             if status == 400:
                 return Response({"message": validation_msg}, status=status)
@@ -722,8 +704,10 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['GET'], detail=True, url_path='type')
     def type(self, request, pk):
         try:
-            year = request.GET.get("year", date.today().year)
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year)
+            # year = request.GET.get("year", date.today().year)
+            # if int(year) == 2026:
+            #     year = 2025
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False)
             serial = ConsultantLeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
         except Exception as error:

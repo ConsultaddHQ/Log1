@@ -821,13 +821,15 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             # Order the queryset based on custom_order and created date
             leave_qs = leave_qs.annotate(custom_order=custom_order).order_by('custom_order', '-created')
             petition = Petition.objects.filter(beneficiary=consultant, is_active=True).first()
+            employers = PayrollEmployer.objects.filter(consultant=consultant).order_by('-created')
             data = {
                 "id": consultant.id,
                 "name": consultant.name,
                 "email": consultant.email,
                 "team": petition.employer if petition else None,
                 "approval_required": consultant.approval_required,
-                "leaves": LeaveSerializer(leave_qs[first:last], many=True).data
+                "leaves": LeaveSerializer(leave_qs[first:last], many=True).data,
+                "employer": employers.first().name if employers.first() else None
             }
             return Response({"data": data, 'total': len(leave_qs)}, status=status.HTTP_200_OK)
         except Exception as error:

@@ -809,7 +809,7 @@ class ProjectViewSets(ModelViewSet):
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                    project.support.update(end=datetime.now())
+                    project.support.filter(end__isnull=True).update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
@@ -822,7 +822,7 @@ class ProjectViewSets(ModelViewSet):
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                    project.support.update(end=datetime.now())
+                    project.support.filter(end__isnull=True).update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     po_status = project_status_obj.get_status_display()
@@ -835,7 +835,7 @@ class ProjectViewSets(ModelViewSet):
                     if not check_has_active(project.consultant, request):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                    project.support.update(end=datetime.now())
+                    project.support.filter(end__isnull=True).update(end=datetime.now())
                     activity_created = True
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)

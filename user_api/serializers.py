@@ -125,7 +125,7 @@ class VendorCompanySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VendorCompany
-        fields = ["id", "name", "created_by"]
+        fields = ["id", "name", "created_by", "domain"]
 
 
 class VendorContactSerializer(serializers.ModelSerializer):
