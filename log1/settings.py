@@ -6,10 +6,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
 env_path = Path(BASE_DIR, '.env')
 load_dotenv(dotenv_path=env_path)
+
+# SECRET_KEY must come from the environment (never committed). Rotate the
+# previously-committed key: it is exposed in git history.
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -337,7 +340,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
-    ('SLACK_TOKEN', ('xoxb-3680421803520-3714045757607-z1nUh9vv8DifWmSOBNlgpMg5',
+    ('SLACK_TOKEN', (os.environ.get('SLACK_TOKEN', ''),
                           'SLACK TOKEN')),
 
     ('LEGAL', ('legal@consultadd.com', 'Legal team Email ID')),

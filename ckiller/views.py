@@ -1,3 +1,4 @@
+import os
 import json
 import requests
 
@@ -108,8 +109,8 @@ class CkillerSubmissionViewSet(ModelViewSet):
                         'Content-Type': "application/json",
                     }
                     payload = {
-                        "username": "bharat.b@consultadd.com",
-                        "password": "bharat.bhate"
+                        "username": os.environ.get("CKILLER_USERNAME", ""),
+                        "password": os.environ.get("CKILLER_PASSWORD", ""),
                     }
                     res = requests.request("POST", login_url, data=json.dumps(payload), headers=header)
                     if res.status_code == 200:
