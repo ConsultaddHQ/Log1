@@ -17,6 +17,7 @@ class Command(BaseCommand):
             type=int,
             help='Project IDs to send emails to (space-separated). Required.'
         )
+
         parser.add_argument(
             '--dry-run',
             action='store_true',
@@ -24,7 +25,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--set-password',
-            action='store_tru ae',
+            action='store_true',
             help='Generate and set a new password for consultants.'
         )
 
@@ -45,7 +46,7 @@ class Command(BaseCommand):
                 'subject': f'Your account created on Consultadd Time Track App',
                 'to': [project.consultant.email],
                 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
-                'bcc': ['piyush.y@consultadd.com'],
+                'bcc': ['mansi.j@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK,
                     'android_link': config.ANDROID_APP_LINK,

@@ -1,0 +1,45 @@
+import csv
+from django.core.management import BaseCommand
+
+from marketing.models import Answer, Question
+
+
+class Command(BaseCommand):
+    def handle(self, *args, **options):
+        try:
+            ans_mapper = {}
+            file = open('Log1.csv', 'r')
+            reader = csv.reader(file)
+            updated_choices = []
+            for row in reader:
+                updated_choices.append(row[1])
+                ans_mapper[row[0]] = row[1]
+
+            answer_qs = Answer.objects.filter(question_id=48)
+            print(f"total Count - {answer_qs.count()}")
+            count = 0
+            for obj in answer_qs:
+                updated_answer = []
+                if obj.answer in [[], None, 'None']:
+                    continue
+                if type(obj.answer) is str:
+                    answers = obj.answer.split(", ")
+                elif type(obj.answer) is list:
+                    answers = obj.answer
+                else:
+                    continue
+                for ans in answers:
+                    if ans_mapper.get(ans):
+                        updated_answer.append(ans_mapper[ans])
+                    else:
+                        continue
+                obj.answer = ", ".join(updated_answer)
+                obj.save()
+                count += 1
+            print(count)
+
+            question = Question.objects.get(id=48)
+            question.options = updated_choices
+            question.save()
+        except Exception as error:
+            print(error)
