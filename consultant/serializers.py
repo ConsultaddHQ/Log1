@@ -76,6 +76,7 @@ class ConsultantUpdateSerializer(serializers.ModelSerializer):
 class POCSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
+        ref_name = 'ConsultantUserPOC'
         fields = ('id', 'employee_name', 'email', 'phone')
 
 
@@ -164,6 +165,7 @@ class PayrollEmployerSerializer(serializers.ModelSerializer):
 class ConsultantPOCSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantPOC
+        ref_name = 'ConsultantPOCRelation'
         exclude = ('created', 'modified')
 
 
