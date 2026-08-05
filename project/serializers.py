@@ -24,6 +24,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
+        ref_name = 'ProjectSummary'
         fields = ('id', 'status', 'created', 'submission', 'start_date', 'client', 'city', 'end_date', 'work_type',
                   'consultant_name', 'marketer_name', 'company_name', 'is_remote', 'check_list', 'employer', 'rate',
                   'duration')
@@ -160,6 +161,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimeSheet
+        ref_name = 'ProjectFinanceTimeSheet'
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
                   'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
 
@@ -260,6 +262,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 class SupportStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupportStatus
+        ref_name = 'ProjectSupportStatus'
         fields = '__all__'
 
 
@@ -400,6 +403,7 @@ class LeaveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Leave
+        ref_name = 'ProjectLeave'
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
                   'description', 'attachment', 'duration_type')
 
@@ -445,6 +449,7 @@ class TimesheetRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimesheetRequest
+        ref_name = 'ProjectTimesheetRequest'
         fields = ('id', 'start', 'end', 'status', 'submitted_at', 'attachments', 'project', 'reviewer_comment',
                   'consultant_comment', 'reviewed_by')
 
@@ -492,6 +497,7 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimetrackEvent
+        ref_name = 'ProjectTimetrackEvent'
         fields = ('id', 'start', 'end', 'title', 'description', 'action_link', 'event_type', 'image',
                   'feedback_type', 'consultants', 'is_active')
 

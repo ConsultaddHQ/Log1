@@ -17,12 +17,14 @@ CONSULTANT_EMPLOYEE_ID = 9999
 class VendorCompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = VendorCompany
+        ref_name = 'MarketingVendorCompany'
         fields = '__all__'
 
 
 class VendorContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = VendorContact
+        ref_name = 'MarketingVendorContact'
         fields = '__all__'
 
 
@@ -58,6 +60,7 @@ class LeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
+        ref_name = 'MarketingLead'
         fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
                   'owner', 'status', 'created', 'modified', 'is_w2', 'position_name', 'position_type')
 
@@ -76,6 +79,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
+        ref_name = 'MarketingProject'
         fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
                   'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list',
                   'reporting_details', 'rate', 'employer', 'attachments', 'is_remote', 'consultant_name')
@@ -889,6 +893,7 @@ class TeamStructureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
+        ref_name = 'MarketingTeamStructure'
         fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_offers', 'assign_consultant',
                   'team', 'is_scrum')
 

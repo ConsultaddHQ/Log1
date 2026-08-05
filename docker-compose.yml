@@ -1,37 +1,56 @@
-version: '3.7'
-
 services:
   web:
     build: .
 #    command: gunicorn log1.wsgi:application --bind 0.0.0.0:5000
     volumes:
       - ./:/usr/src/app/
-      - static_volume:/home/app/web/static
     expose:
       - 5000
     ports:
-      - "5000:5000"
+      - "5001:5000"
     env_file:
       - ./.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       - db
+      - redis
     image: log1app
     container_name: web_app
     networks:
       - nginx_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nginx_network
+    restart: always
+
   db:
     image: "postgres:13.0-alpine"
     env_file:
       - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5433:5432"
+    networks:
+      - nginx_network
 
   nginx:
     build: ./nginx
-    volumes:
-      - ./config/nginx:/etc/nginx/conf.d
-      - static_volume:/home/app/web/static
     expose:
       - 80
     ports:
@@ -44,7 +63,7 @@ services:
 
 volumes:
   postgres_data:
-  static_volume:
+  redis_data:
 
 networks:
    nginx_network:

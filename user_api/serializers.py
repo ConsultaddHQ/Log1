@@ -118,6 +118,7 @@ class LeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
+        ref_name = 'UserApiLead'
         fields = ["id", "position"]
 
 
@@ -125,6 +126,7 @@ class VendorCompanySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VendorCompany
+        ref_name = 'UserApiVendorCompany'
         fields = ["id", "name", "created_by"]
 
 
@@ -133,6 +135,7 @@ class VendorContactSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VendorContact
+        ref_name = 'UserApiVendorContact'
         fields = ["id", "created_by", "company_id", "source_link", "email", "region", "name"]
 
 

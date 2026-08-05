@@ -13,6 +13,7 @@ from engineering.models import ProjectDescription, ProjectUpdate, TrainingCheckL
 class POCSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
+        ref_name = 'EngineeringPOC'
         fields = ('id', 'employee_name', 'email')
 
 
@@ -198,6 +199,7 @@ class SupportSerializer(serializers.ModelSerializer):
 class SupportStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupportStatus
+        ref_name = 'EngineeringSupportStatus'
         fields = ('id', 'frequency', 'change_date')
 
 
@@ -495,6 +497,7 @@ class TeamStructureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
+        ref_name = 'EngineeringTeamStructure'
         fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_project', 'team', 'is_scrum')
 
     @staticmethod
