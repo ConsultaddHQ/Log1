@@ -41,7 +41,7 @@ THIRD_PARTY_APPS = [
     'constance',
     'corsheaders',
     'import_export',
-    'rest_framework_swagger',
+    'drf_yasg',
     'constance.backends.database',
 ]
 
@@ -109,7 +109,7 @@ WSGI_APPLICATION = 'log1.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', ''),
         'USER': os.environ.get('DB_USER', ''),
         'PORT': os.environ.get('DB_PORT', ''),
@@ -127,7 +127,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication'
@@ -171,7 +171,7 @@ SWAGGER_SETTINGS = {
 
     "api_key": '',
     "is_superuser": False,
-    'USE_SESSION_AUTH': True,
+    'USE_SESSION_AUTH': False,
     "is_authenticated": True,
 }
 
@@ -195,6 +195,8 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 # Django Explorer Setup
 EXPLORER_CONNECTIONS = {'Default': 'default'}

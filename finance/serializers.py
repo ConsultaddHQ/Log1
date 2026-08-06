@@ -13,6 +13,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
+        ref_name = 'FinanceProject'
         fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'request_timesheet',
                   'timesheet_frequency', 'consultant', 'submission')
 
@@ -121,6 +122,7 @@ class LeaveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Leave
+        ref_name = 'FinanceLeave'
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
                   'description', 'attachment', 'duration_type', "remarks")
 
@@ -169,6 +171,7 @@ class TimesheetRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimesheetRequest
+        ref_name = 'FinanceTimesheetRequest'
         fields = ('id', 'start', 'end', 'status', 'submitted_at', 'attachments', 'reviewer_comment',
                   'consultant_comment', 'reviewed_by')
 
@@ -213,6 +216,7 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimetrackEvent
+        ref_name = 'FinanceTimetrackEvent'
         fields = ('id', 'start', 'end', 'title', 'description', 'action_link', 'event_type', 'image',
                   'feedback_type', 'consultants', 'is_active')
 
