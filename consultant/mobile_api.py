@@ -16,6 +16,7 @@ from project.models import Project
 # from utils_app.mailing import send_email
 from utils_app.thred_mail import send_email
 from log1.utils import write_exception, write_info
+from consultant.utils import is_caps_consultant
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.serializers import ConsultantLoginSerializer
 from employee.models import clear_expired, get_token_expiry_time
@@ -115,6 +116,7 @@ class ConsultantAuthViewSet(GenericViewSet):
                     'email': consultant.email,
                     'is_active': consultant.is_active,
                     'first_login': consultant.first_login,
+                    'isCAPS': is_caps_consultant(consultant),
                 }
                 return Response({"result": data}, status=202)
             except Exception as error:
