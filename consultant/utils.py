@@ -19,7 +19,7 @@ from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
 from utils_app.aws_utils import download_s3_object_beats
 from utils_app.slack_notification import MessageCard as slack
-from log1.utils import html_to_text, write_exception, write_info
+from log1.utils import html_to_text, password_generator, write_exception, write_info
 from notification.utils import create_notification, push_notification
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
@@ -37,6 +37,112 @@ def create_activity(object_id, model, user, desc, activity_type):
     except Exception as error:
         write_exception(message=error)
         return None
+
+
+def is_caps_consultant(consultant):
+    user = consultant.internal_user_profile
+    return bool(
+        user and user.team and user.team.name and user.team.name.lower() == 'caps'
+    )
+
+
+def is_caps_user(user):
+    return bool(user and user.team and user.team.name and user.team.name.lower() == 'caps')
+
+
+def assign_caps_sick_leave(consultant):
+    from project.models import ConsultantLeave
+    from utils_app.models import Choice
+
+    content_type = ContentType.objects.get(model='consultantleave')
+    sick_leave, _ = Choice.objects.get_or_create(
+        content_type=content_type,
+        field='leave',
+        name='sick_leave',
+        defaults={'display_name': 'Sick Leave'}
+    )
+    return ConsultantLeave.objects.get_or_create(
+        consultant=consultant,
+        leave_type=sick_leave,
+        year=date.today().year,
+        is_expired=False,
+        defaults={'granted': 48.0, 'balance': 48.0}
+    )
+
+
+def ensure_caps_consultant_for_user(user, request=None):
+    if not is_caps_user(user):
+        return None, False, False
+
+    consultant = Consultant.objects.filter(internal_user_profile=user).first()
+    created = False
+    linked_existing = False
+    if not consultant:
+        consultant = Consultant.objects.filter(email__iexact=user.email).first()
+        if consultant and consultant.internal_user_profile_id not in [None, user.id]:
+            raise ValueError("A consultant with this CAPS user's email is already linked to another user.")
+        if consultant:
+            consultant.internal_user_profile = user
+            consultant.internal_employee = True
+            consultant.name = consultant.name or user.employee_name
+            consultant.phone_no = consultant.phone_no or user.phone
+            consultant.gender = consultant.gender or user.gender
+            consultant.save()
+            linked_existing = True
+        else:
+            consultant = Consultant.objects.create(
+                name=user.employee_name,
+                email=user.email,
+                phone_no=user.phone,
+                gender=user.gender,
+                internal_employee=True,
+                internal_user_profile=user,
+                status='on_bench',
+                work_type='full_time',
+            )
+            created = True
+
+    assign_caps_sick_leave(consultant)
+    mail_sent = False
+    if created or linked_existing:
+        mail_sent, _ = send_caps_timetrack_access_mail(consultant, request)
+    return consultant, created, mail_sent
+
+
+def send_caps_timetrack_access_mail(consultant, request=None):
+    try:
+        if not is_caps_consultant(consultant):
+            return False, "not_caps"
+
+        password = password_generator(password_length=10, strength=3)
+        consultant.set_password(password)
+        consultant.is_active = True
+        consultant.first_login = True
+        consultant.save()
+
+        mail_data = {
+            'template': '../templates/caps_timetrack_access.html',
+            'subject': 'Your Consultadd TimeTrack mobile app access',
+            'to': [consultant.email],
+            'cc': [],
+            'bcc': [config.TIMESHEET_APP_ADMIN],
+            'context': {
+                'iphone_link': config.IPHONE_APP_LINK,
+                'android_link': config.ANDROID_APP_LINK,
+                'password': password,
+                'new_user': True,
+                'consultant_name': consultant.name,
+                'consultant_email': consultant.email,
+            },
+        }
+        msg, resp, _ = send_email_(mail_data, config.RELATIONS, request)
+        if not resp:
+            write_exception(msg, request)
+            return False, "error"
+        return True, "ok"
+    except Exception as error:
+        write_exception(error, request)
+        return False, "error"
 
 
 def beats_to_log1(file_path, file_name, obj_id, model):

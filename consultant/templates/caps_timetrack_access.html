@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Consultadd TimeTrack Access</title>
+</head>
+<body style="margin:0;background:#f8f9fa;color:#3c4043;font-family:Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:24px;">
+  <table style="width:100%;border-collapse:collapse;background:#f8f9fa;">
+    <tbody>
+      <tr>
+        <td style="padding:24px;">
+          <table style="max-width:620px;width:100%;margin:0 auto;border-collapse:collapse;background:#ffffff;border:1px solid #e8eaed;">
+            <tbody>
+              <tr>
+                <td style="padding:28px 36px 12px;">
+                  <img src="https://consultadd.com/wp-content/uploads/2017/04/admin-ajax.png" alt="Consultadd" style="max-width:160px;height:auto;">
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:12px 36px 32px;">
+                  <p>Hello <strong>{{ consultant_name }}</strong>,</p>
+                  <p>Your Consultadd TimeTrack mobile app access has been enabled for leave applications.</p>
+                  <p><strong>Download/Update the application according to your device type:</strong></p>
+                  <p><strong>Android:</strong> {{ android_link }}</p>
+                  <p><strong>iPhone:</strong> {{ iphone_link }}</p>
+                  <p><strong>Login details:</strong></p>
+                  <p><strong>Email:</strong> {{ consultant_email }}</p>
+                  <p><strong>Password:</strong> {{ password }}</p>
+                  {% if new_user %}
+                  <p>Please change your password after your first login.</p>
+                  {% endif %}
+                  <p>If you have any doubts or issues, please contact finance@consultadd.com.</p>
+                  <p style="margin-bottom:0;"><strong>Warm Regards,</strong><br>Consultadd Inc.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

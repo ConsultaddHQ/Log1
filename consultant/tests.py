@@ -1,10 +1,13 @@
 import json
+from unittest.mock import patch
+from types import SimpleNamespace
 from datetime import timedelta, date
 from rest_framework.test import APITestCase, APIClient
 
-from employee.models import Role
+from employee.models import Role, Team, User
 from consultant.factories import Setup
 from activity.views import create_activity
+from project.models import ConsultantLeave
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, WorkAuth, ConsultantExit, ExitReason
 
 
@@ -182,6 +185,7 @@ class ConsultantTest(APITestCase):
             "visa_end": "2024-09-09",
             'email': 'rober@gmail.com',
             "visa_start": "2020-01-01",
+            'country': 'USA',
             'current_city': 'West Coast',
             'date_of_birth': "1988-02-02",
             'recruiter': self.setup.user.id,
@@ -193,12 +197,93 @@ class ConsultantTest(APITestCase):
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.status_code, 201)
 
+    def create_caps_team(self):
+        return Team.objects.create(name='CAPS')
+
+    @patch.dict('consultant.utils.__dict__', {
+        'config': SimpleNamespace(
+            TIMESHEET_APP_ADMIN='timesheet-admin@example.com',
+            IPHONE_APP_LINK='https://apps.apple.com/timetrack',
+            ANDROID_APP_LINK='https://play.google.com/timetrack',
+            RELATIONS='relations@example.com',
+        )
+    })
+    @patch('consultant.utils.send_email_', return_value=("sent", True, None))
+    def test_create_caps_employee_creates_consultant_and_sends_timetrack_mail(self, send_email_mock):
+        self.create_caps_team()
+        role = Role.objects.create(name='engineer')
+        payload = {
+            "role": [role.id],
+            "name": "CAPS User",
+            "email": "caps_user@gmail.com",
+            "phone": "1234567890",
+            "gender": "male",
+            "password": "consultadd123",
+            "employee_id": 9001,
+            "team": "CAPS",
+        }
+        res = self.client.post("/api/employee/", data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res.status_code, 201)
+        user = User.objects.get(employee_id=payload['employee_id'])
+        consultant = Consultant.objects.get(email=user.email)
+        self.assertEqual(consultant.internal_user_profile, user)
+        self.assertTrue(consultant.internal_employee)
+        self.assertTrue(consultant.is_active)
+        self.assertTrue(consultant.has_usable_password())
+        self.assertTrue(
+            ConsultantLeave.objects.filter(
+                consultant=consultant, leave_type__name='sick_leave', balance=48.0, granted=48.0
+            ).exists()
+        )
+        self.assertEqual(send_email_mock.call_count, 1)
+        mail_data = send_email_mock.call_args[0][0]
+        self.assertEqual(mail_data['template'], '../templates/caps_timetrack_access.html')
+        self.assertEqual(mail_data['to'], [consultant.email])
+        self.assertTrue(mail_data['context']['new_user'])
+
     def test_update_consultant(self):
         route = f"/api/consultant/{self.consultant.first().id}/"
         res = self.client.put(route, data={"skills": 'Python', 'skype': "robert_jr"})
         self.assertEqual(res.data['message'], "Consultant Updated")
         self.assertEqual(res.data['data']['skills'], 'Python')
         self.assertEqual(res.status_code, 202)
+
+    @patch.dict('consultant.utils.__dict__', {
+        'config': SimpleNamespace(
+            TIMESHEET_APP_ADMIN='timesheet-admin@example.com',
+            IPHONE_APP_LINK='https://apps.apple.com/timetrack',
+            ANDROID_APP_LINK='https://play.google.com/timetrack',
+            RELATIONS='relations@example.com',
+        )
+    })
+    @patch('consultant.utils.send_email_', return_value=("sent", True, None))
+    def test_update_employee_to_caps_creates_consultant_and_sends_timetrack_mail(self, send_email_mock):
+        user = User.objects.create(
+            team=Team.objects.create(name='Engineering'),
+            employee_id=9002,
+            username=9002,
+            email='caps_update@gmail.com',
+            employee_name='CAPS Update User',
+            gender='male',
+        )
+        caps_team = self.create_caps_team()
+        route = "/api/employee/profile/"
+        res = self.client.put(
+            route,
+            data=json.dumps({"user_id": user.id, "team_id": caps_team.id}),
+            content_type="application/json"
+        )
+        self.assertEqual(res.status_code, 202)
+        consultant = Consultant.objects.get(email=user.email)
+        self.assertEqual(consultant.internal_user_profile, user)
+        self.assertTrue(consultant.is_active)
+        self.assertTrue(consultant.has_usable_password())
+        self.assertTrue(
+            ConsultantLeave.objects.filter(
+                consultant=consultant, leave_type__name='sick_leave', balance=48.0, granted=48.0
+            ).exists()
+        )
+        self.assertEqual(send_email_mock.call_count, 1)
 
     def test_documents(self):
         route = f"/api/consultant/{self.consultant.first().id}/documents/"
@@ -218,6 +303,69 @@ class ConsultantTest(APITestCase):
         data = {"email1": "consultant@email.com", "password": "123456789"}
         res = self.client.post(route, data=json.dumps(data), content_type='application/json')
         self.assertEqual(res.status_code, 400)
+
+
+class ConsultantMobileAuthTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    @staticmethod
+    def create_login_consultant(email, team_name=None):
+        internal_user = None
+        if team_name:
+            team = Team.objects.create(name=team_name)
+            internal_user = User.objects.create(
+                team=team,
+                employee_id=9100 + Team.objects.count(),
+                username=9100 + Team.objects.count(),
+                email=f"user_{email}",
+                employee_name='Mobile Internal User',
+            )
+        consultant = Consultant.objects.create(
+            name='Mobile Consultant',
+            email=email,
+            is_active=True,
+            first_login=False,
+            internal_user_profile=internal_user,
+            internal_employee=bool(internal_user),
+        )
+        consultant.set_password('consultadd123')
+        consultant.save()
+        return consultant
+
+    def login(self, email):
+        return self.client.post(
+            "/api/consultant_auth/login/",
+            data=json.dumps({
+                "email": email,
+                "password": "consultadd123",
+                "uuid": "test-uuid",
+                "fcm_token": f"fcm-{email}",
+                "device_type": "android",
+            }),
+            content_type="application/json"
+        )
+
+    def test_mobile_login_response_includes_caps_true_for_caps_team(self):
+        consultant = self.create_login_consultant('mobile_caps@example.com', team_name='CAPS')
+        res = self.login(consultant.email)
+        self.assertEqual(res.status_code, 202)
+        self.assertIn('isCAPS', res.data['result'])
+        self.assertTrue(res.data['result']['isCAPS'])
+
+    def test_mobile_login_response_includes_caps_false_by_default(self):
+        consultant = self.create_login_consultant('mobile_default@example.com')
+        res = self.login(consultant.email)
+        self.assertEqual(res.status_code, 202)
+        self.assertIn('isCAPS', res.data['result'])
+        self.assertFalse(res.data['result']['isCAPS'])
+
+    def test_mobile_login_response_includes_caps_false_for_non_caps_team(self):
+        consultant = self.create_login_consultant('mobile_non_caps@example.com', team_name='Engineering')
+        res = self.login(consultant.email)
+        self.assertEqual(res.status_code, 202)
+        self.assertIn('isCAPS', res.data['result'])
+        self.assertFalse(res.data['result']['isCAPS'])
 
 
 class ConsultantBenchTest(APITestCase):

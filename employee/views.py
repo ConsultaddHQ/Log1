@@ -25,6 +25,7 @@ from api_key.models import APIKey
 from .utils import valid_password
 from activity.models import Activity
 from consultant.models import Consultant
+from consultant.utils import ensure_caps_consultant_for_user, is_caps_user
 from notification.models import FCMDevice
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
@@ -72,6 +73,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             for i in role:
                 r = Role.objects.get(name=i)
                 user.role.add(r)
+            ensure_caps_consultant_for_user(user, request)
             return Response({"message": "Success", "data": self.serializer_class(user).data},
                             status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -263,6 +265,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             for i in role:
                 r = Role.objects.get(id=i)
                 user.role.add(r)
+            ensure_caps_consultant_for_user(user, request)
             return Response({"message": "Success", "data": self.serializer_class(user).data},
                             status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -320,6 +323,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                         user.save()
                         role = Role.objects.get(name=row['role'])
                         user.role.add(role)
+                        ensure_caps_consultant_for_user(user, request)
                         created += 1
                 except Exception as e:
                     failed += 1
@@ -345,6 +349,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             team_id = request.data.get('team_id', None)
             if 'superadmin' in request.user.roles:
                 user = get_object_or_404(User, id=user_id)
+                was_caps = is_caps_user(user)
                 desc = ""
                 if team_id:
                     prev_team = user.team.name
@@ -364,6 +369,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                         desc += f"{request.user.employee_name} changed role to {', '.join(role_names)}"
 
                 user.save()
+                if not was_caps and is_caps_user(user):
+                    ensure_caps_consultant_for_user(user, request)
                 if len(desc) > 0:
                     create_activity(user.id, 'user', request.user, desc, 'updated')
                 return Response({"message": f"{user.employee_name}'s Profile updated"}, status=status.HTTP_202_ACCEPTED)
@@ -1177,6 +1184,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 user_role = get_object_or_404(Role, name=role)
                 user.role.add(user_role)
                 user.save()
+            ensure_caps_consultant_for_user(user, request)
 
             return Response({"message": "User Created in Log1", "user_id": user.id}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -1199,6 +1207,8 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 is_active = True if record.get('log1') == 'TRUE' or record.get('log1') is True else False
                 if record.get('role', []):
                     roles.append(record.get('role', []).replace(' ', '').split(","))
+                else:
+                    roles.append([])
                 record_list.append(User(
                     is_active=is_active,
                     email=record.get('email'),
@@ -1212,11 +1222,12 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                         name=record.get('team')).first() if isinstance(record.get('team'), str) else None
                 ))
             users = User.objects.bulk_create(record_list)
-            for user, role in zip(record_list, roles):
+            for user, role in zip(users, roles):
                 for role_name in role:
                     role_object = Role.objects.filter(name=role_name.lower().strip()).first()
                     if role_object:
                         user.role.add(role_object)
+                ensure_caps_consultant_for_user(user, request)
             users = [user.employee_id for user in users]
             result["users"] = users
             result["msg"] = f"{len(users)} users  Created"
@@ -1273,6 +1284,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             if not user:
                 return Response({"message": "User not exists"}, status=status.HTTP_400_BAD_REQUEST)
 
+            was_caps = is_caps_user(user)
             user_roles = request.data.get('role', [])
             user_previous_role = user.role.all()
             if user_roles and user_roles != user_previous_role:
@@ -1290,6 +1302,8 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             if user_previous_data[0].get('is_active') != user.is_active:
                 user.account_login = user.is_active
             user.save()
+            if not was_caps and is_caps_user(user):
+                ensure_caps_consultant_for_user(user, request)
             return Response({'data': user_previous_data, 'role': user_previous_role.values(),
                              "result": "User updated on log1 successfully"}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -1308,6 +1322,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user = User.objects.filter(employee_id=pk).first()
             if not user:
                 return Response({"message": "User not found in log1"}, status=status.HTTP_400_BAD_REQUEST)
+            was_caps = is_caps_user(user)
             roles = user.role.filter().values_list('name', flat=True)
 
             data = request.data.get('log1', {})
@@ -1330,6 +1345,8 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 else:
                     user.is_active = False
                 user.save()
+                if not was_caps and is_caps_user(user):
+                    ensure_caps_consultant_for_user(user, request)
                 return Response({"message": "User access updated"}, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response({"message": "No change recorded"}, status=status.HTTP_204_NO_CONTENT)
