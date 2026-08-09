@@ -335,7 +335,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('ATTIO_URL', ('attio url', 'Attio Api URL')),
     ('VENDOR_LIST_NAME', ('attio vendor list name', 'Attio Vendor List Name')),
     ('MAIL_LOGGER', ('mail_delivery_status.csv', 'MAIL LOGGER')),
-    ('DEVELOPER', ('shreyas.k@consultadd.com', 'DEVELOPER MAIL')),
+    ('DEVELOPER', (os.environ.get('DEVELOPER_EMAIL', ''), 'DEVELOPER MAIL')),
     ('GOOGLE_SERVICE_FILE', ('service.json', 'Google Service File')),
     ('ATTIO_API_KEY', ('attio api key', 'Attio Service Account API Key')),
     ('ATTIO_DEAL_NAME', ('attio deal name', 'Attio Service Account Deal Name')),
@@ -353,7 +353,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('RELATIONS', ('relations@consultadd.com', 'Relations team Email ID')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team Email ID')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team Email ID')),
-    ('TIMESHEET_APP_ADMIN', ('aditi.so@consultadd.com', 'Timesheet Admin Email ID')),
+    ('TIMESHEET_APP_ADMIN', ('productadmin@consultadd.com', 'Timesheet Admin Email ID')),
     ('VENDOR_MANAGEMENT', ('vendormanagement@consultadd.com', 'Vendor Management Email ID')),
 
     ('general_url', ('URL', 'General Channel')),
