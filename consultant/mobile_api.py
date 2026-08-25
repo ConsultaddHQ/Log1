@@ -93,14 +93,24 @@ class ConsultantAuthViewSet(GenericViewSet):
             uuid = request.data.get('uuid', '')
             try:
                 token, created = ConsultantToken.objects.get_or_create(consultant=consultant, uuid=uuid)
-                content_type = ContentType.objects.get(model='consultanttoken')
-                fcm_device, created = FCMDevice.objects.get_or_create(
-                    device_id=request.data.get('fcm_token', None),
-                    type=request.data.get('device_type', 'android'),
-                    content_type=content_type
-                )
-                fcm_device.object_id = token.key
-                fcm_device.save()
+                fcm_token = (request.data.get("fcm_token") or "").strip()
+                if fcm_token:
+                    try:
+                        content_type = ContentType.objects.get(model='consultanttoken')
+                        fcm_device, created = FCMDevice.objects.get_or_create(
+                            device_id=fcm_token,
+                            type=request.data.get('device_type', 'android'),
+                            content_type=content_type
+                        )
+                        fcm_device.object_id = token.key
+                        fcm_device.save()
+                    except Exception as error:
+                        write_exception(
+                            f"FCM registration failed during consultant login. "
+                            f"consultant_id={consultant.id}, device_type={request.data.get('device_type', 'android')}, "
+                            f"fcm_token_present={bool(fcm_token)}, error={error}",
+                            request
+                        )
                 project_data = Project.objects.filter(
                     consultant=consultant,
                     statuses__status='joined',

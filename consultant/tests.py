@@ -8,7 +8,7 @@ from employee.models import Role, Team, User
 from consultant.factories import Setup
 from activity.views import create_activity
 from project.models import ConsultantLeave
-from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, WorkAuth, ConsultantExit, ExitReason
+from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, WorkAuth, ConsultantExit, ExitReason, FCMDevice
 
 
 class ConsultantV2VTest(APITestCase):
@@ -333,18 +333,58 @@ class ConsultantMobileAuthTest(APITestCase):
         consultant.save()
         return consultant
 
-    def login(self, email):
+    def login(self, email, password='consultadd123', fcm_token=None, include_fcm_token=True):
+        data = {
+            "email": email,
+            "password": password,
+            "uuid": "test-uuid",
+            "device_type": "android",
+        }
+        if include_fcm_token:
+            data["fcm_token"] = fcm_token if fcm_token is not None else f"fcm-{email}"
         return self.client.post(
             "/api/consultant_auth/login/",
-            data=json.dumps({
-                "email": email,
-                "password": "consultadd123",
-                "uuid": "test-uuid",
-                "fcm_token": f"fcm-{email}",
-                "device_type": "android",
-            }),
+            data=json.dumps(data),
             content_type="application/json"
         )
+
+    def test_mobile_login_with_empty_fcm_token_returns_success(self):
+        consultant = self.create_login_consultant('mobile_empty_fcm@example.com')
+        res = self.login(consultant.email, fcm_token='')
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['result']['id'], consultant.id)
+        self.assertFalse(FCMDevice.objects.filter(device_id='').exists())
+
+    def test_mobile_login_with_missing_fcm_token_returns_success(self):
+        consultant = self.create_login_consultant('mobile_missing_fcm@example.com')
+        res = self.login(consultant.email, include_fcm_token=False)
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['result']['id'], consultant.id)
+        self.assertFalse(FCMDevice.objects.filter(device_id='').exists())
+
+    def test_mobile_login_with_whitespace_fcm_token_returns_success(self):
+        consultant = self.create_login_consultant('mobile_whitespace_fcm@example.com')
+        res = self.login(consultant.email, fcm_token='   ')
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['result']['id'], consultant.id)
+        self.assertFalse(FCMDevice.objects.filter(device_id='').exists())
+
+    def test_mobile_login_with_valid_fcm_token_registers_device(self):
+        consultant = self.create_login_consultant('mobile_valid_fcm@example.com')
+        fcm_token = 'valid-fcm-token'
+        res = self.login(consultant.email, fcm_token=fcm_token)
+        self.assertEqual(res.status_code, 202)
+        device = FCMDevice.objects.get(device_id=fcm_token)
+        self.assertEqual(device.type, 'android')
+        self.assertEqual(device.object_id, res.data['result']['token'])
+        self.assertEqual(device.content_type.model, 'consultanttoken')
+
+    def test_mobile_login_with_invalid_credentials_still_fails(self):
+        consultant = self.create_login_consultant('mobile_invalid_credentials@example.com')
+        res = self.login(consultant.email, password='wrong-password', fcm_token='')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data['error'], 'Incorrect Email Id OR Password')
+        self.assertFalse(FCMDevice.objects.filter(device_id='').exists())
 
     def test_mobile_login_response_includes_caps_true_for_caps_team(self):
         consultant = self.create_login_consultant('mobile_caps@example.com', team_name='CAPS')
