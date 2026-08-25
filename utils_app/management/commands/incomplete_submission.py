@@ -5,6 +5,7 @@ from django.core.management import BaseCommand
 from marketing.models import Submission
 from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.utils import create_cron_error, create_cron_object, delete_temp_file
+from constance import config
 
 
 class Command(BaseCommand):
@@ -50,7 +51,7 @@ class Command(BaseCommand):
                 data.append(submission_data)
 
             mail_data = {
-                'bcc': ['shreyas.k@consultadd.com'],
+                'bcc': [config.DEVELOPER],
                 'cc': [], 'attachments': [f'{file.name}'],
                 'to': ['marketing@consultadd.com', 'recruitment@consultadd.com'],
                 'subject': f"Consultant incomplete submission data {str(last_2_days.strftime('%m/%d/%Y'))} -"

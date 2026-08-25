@@ -251,7 +251,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 mail_data = {
                     'to': to,
                     'cc': [],
-                    'bcc': ['shreyas.k@consultadd.com'],
+                    'bcc': [config.DEVELOPER],
                     'subject': 'Reset Timetrack Application Password',
                     'template': '../templates/con_password_reset.html',
                     'context': {

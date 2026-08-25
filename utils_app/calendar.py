@@ -10,6 +10,7 @@ from googleapiclient import discovery
 from google.auth.exceptions import RefreshError
 from log1.utils import write_exception, write_info
 from google.oauth2.service_account import Credentials
+from constance import config
 
 SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
@@ -72,7 +73,7 @@ class GoogleCalendar:
     def get_body(self, data):
         description = self.calendar_description(data)
         if os.environ.get('ENV', 'local') != 'prod':
-            data['attendees'] = [{'email': 'shivam.k@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'}]
+            data['attendees'] = [{'email': 'shivam.k@consultadd.com'}, {'email': config.DEVELOPER}]
         return {
             'summary': data["summary"],
             'description': description,
@@ -99,7 +100,7 @@ class GoogleCalendar:
     def book_calendar(self, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id = "shreyas.k@consultadd.com"
+                calendar_id = config.DEVELOPER
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
             try:
@@ -116,7 +117,7 @@ class GoogleCalendar:
     def update_calendar(self, event_id, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id = "shreyas.k@consultadd.com"
+                calendar_id = config.DEVELOPER
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
             try:
