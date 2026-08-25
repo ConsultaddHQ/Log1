@@ -46,7 +46,7 @@ class Command(BaseCommand):
                 'subject': f'Your account created on Consultadd Time Track App',
                 'to': [project.consultant.email],
                 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
-                'bcc': ['mansi.j@consultadd.com'],
+                'bcc': [config.DEVELOPER],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK,
                     'android_link': config.ANDROID_APP_LINK,

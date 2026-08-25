@@ -55,7 +55,7 @@ class Command(BaseCommand):
                         data.append({'name': consultant.name.title(), 'end_date': expiry_date})
             if len(data) > 0:
                 mail_data = {
-                    'cc': [], 'bcc': ['shreyas.k@consultadd.com'],
+                    'cc': [], 'bcc': [config.DEVELOPER],
                     'template': '../templates/visa_reminder.html',
                     'to': [config.SUPERADMIN, config.RECRUITMENT, config.RELATIONS],
                     'subject': f"Reminder: Visa expiry reminder of On-Project consultants",

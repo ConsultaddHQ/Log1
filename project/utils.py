@@ -681,7 +681,7 @@ def timesheet_submission_mail(obj, request=None):
             app_link = f"https://d2us7jrqrv1djj.cloudfront.net/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
 
         mail_data = {
-            'cc': [], 'bcc': ['shreyas.k@consultadd.com'],
+            'cc': [], 'bcc': [config.DEVELOPER],
             'template': '../templates/timesheet_submission.html',
             'to': ['finance@consultadd.com'],
             'subject': f"{project_type} submission Info",

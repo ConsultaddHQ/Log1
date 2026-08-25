@@ -9,6 +9,7 @@ from project.models import Project
 from utils_app.thred_mail import send_email_attachment_multiple
 from consultant.models import Consultant, ConsultantRateRevision, ConsultantPOC
 from utils_app.utils import create_cron_error, create_cron_object, delete_temp_file
+from constance import config
 
 
 class Command(BaseCommand):
@@ -82,7 +83,7 @@ class Command(BaseCommand):
                 ).values_list('email', flat=True)
                 to.extend(scrum_master)
             else:
-                to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
+                to = ['suman.m@consultadd.com', config.DEVELOPER, 'shivam.k@consultadd.com']
             mail_data = {
                 'attachments': [file.name],
                 'to': to, 'cc': [], 'bcc': [],

@@ -4,6 +4,7 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 
 from log1.utils import write_exception, write_info
+from constance import config
 
 
 @shared_task
@@ -15,7 +16,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
     else:
         cc, bcc = [], []
         from_email = 'suman.m@consultadd.com'
-        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'piyush.y@consultadd.com', 'gufran.a@cosnultadd.com']
+        to = ['suman.m@consultadd.com', config.DEVELOPER, 'piyush.y@consultadd.com', 'gufran.a@cosnultadd.com']
 
     if reply_to is None:
         reply_to = []
