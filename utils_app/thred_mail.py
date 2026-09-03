@@ -184,7 +184,7 @@ def create_message(from_email, mail_data):
                 message[key] = ','.join(active_users.get(key, []))
 
         else:
-            message['to'] = ','.join(['snehal.s@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+            message['to'] = ','.join(['snehal.s@consultadd.com', config.DEVELOPER, 'shivam.k@consultadd.com'])
             message['cc'] = ''
             message['bcc'] = ''
 
@@ -207,7 +207,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
         else:
             obj['cc'] = ','.join(['snehal.s@consultadd.com'])
             obj['bcc'] = ','.join(['shivam.k@consultadd.com'])
-            obj['to'] = ','.join(['shreyas.k@consultadd.com'])
+            obj['to'] = ','.join([config.DEVELOPER])
         return obj, None
     except Exception as error:
         return None, str(error)
