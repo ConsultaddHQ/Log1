@@ -53,7 +53,7 @@ def send_email_without_template(mail_data, from_email, request=None):
             bcc = mail_data["bcc"]
         else:
             cc, bcc = [], []
-            to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@cosnultadd.com']
+            to = ['suman.m@consultadd.com', config.DEVELOPER, 'shivam.k@consultadd.com', 'gufran.a@cosnultadd.com']
 
         msg = EmailMultiAlternatives(
             to=to, cc=cc, bcc=bcc,
@@ -79,7 +79,7 @@ def send_email_attachment_multiple(mail_data, from_email, reply_to=None, request
         bcc = mail_data["bcc"]
     else:
         cc, bcc = [], []
-        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@cosnultadd.com']
+        to = ['suman.m@consultadd.com', config.DEVELOPER, 'shivam.k@consultadd.com', 'gufran.a@cosnultadd.com']
 
     if reply_to is None:
         reply_to = []
