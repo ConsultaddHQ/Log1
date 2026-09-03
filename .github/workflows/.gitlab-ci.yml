@@ -18,16 +18,16 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.8.10
+          python-version: 3.12.3
 
       - name: Copy to project directory
         run: sudo cp -R . /home/ubuntu/log1
 
       - name: Change directory
-        run: | 
+        run: |
          cd /home/ubuntu/log1
-          source ../env/bin/activate
-          python -m pip install --upgrade pip==23.0.1 
+          source ../venv_py312/bin/activate
+          python -m pip install --upgrade pip==24.0
           pip install -r requirements.txt
           python manage.py makemigrations
           python manage.py migrate
