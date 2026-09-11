@@ -207,6 +207,8 @@ class InterviewCreateSerializer(serializers.ModelSerializer):
         """
         Custom validation for the call_type field.
         """
+        if value is None:
+            return value
         if value.name == "otter.ai":
             raise serializers.ValidationError("Call Type Otter AI is not allowed. Please change call type.")
         return value

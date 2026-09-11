@@ -2290,9 +2290,26 @@ class InterviewViewSets(ModelViewSet):
 
             interview = queryset.first()
             prev_guest_type = interview.guest_type
-            serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
+            request_data = request.data.copy()
+            is_consultant = request_data.get('is_consultant', False)
+            requested_call_type = request_data.get('call_type', None)
+            if is_consultant and not requested_call_type:
+                call_type = interview.call_type or Choice.objects.filter(
+                    name='consultant', content_type__model='interview'
+                ).first()
+                if not call_type:
+                    return Response({"message": "Call Type info is missing"}, status=400)
+                request_data['call_type'] = call_type.id
+            elif 'call_type' in request_data and not requested_call_type:
+                return Response({"message": "Call Type info is missing"}, status=400)
+
+            serializer = InterviewCreateSerializer(interview, data=request_data, partial=True)
+            if not serializer.is_valid():
+                return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
+            serializer.save()
+
+            if not interview.call_type:
+                return Response({"message": "Call Type info is missing"}, status=400)
 
             interview.status = 'rescheduled'
             if interview.guest_type in ['Coder', 'Assistance'] or 'Assigned' in interview.guest_type:
