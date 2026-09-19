@@ -596,11 +596,77 @@ class ConsultantMarketingTest(APITestCase):
         }]
 
     def test_global_assignment_manager_roles_are_allowed(self):
-        for index, role_name in enumerate(['superadmin', 'admin', 'finance', 'recruiter'], start=1):
+        for index, role_name in enumerate(['superadmin', 'finance', 'recruiter'], start=1):
             with self.subTest(role=role_name):
                 user = self.create_employee(2000 + index, [role_name], self.setup.team)
                 res = self.update_marketers(user, self.current_assignment())
                 self.assertEqual(res.status_code, 202)
+
+    def test_admin_can_only_update_own_team_marketers(self):
+        other_team = Team.objects.create(name='admin-other-team', dept='Marketing')
+        other_marketer = self.create_employee(2200, ['marketer'], other_team)
+        admin = self.create_employee(2201, ['admin'], self.setup.team)
+        new_marketer = self.create_employee(2202, ['marketer'], self.setup.team)
+        self.marketing.teams.add(other_team)
+        self.marketing.marketer.add(other_marketer)
+        assignments = [{
+            "team": self.setup.team.id,
+            "marketers": [new_marketer.id],
+        }, {
+            "team": other_team.id,
+            "marketers": [other_marketer.id],
+        }]
+
+        res = self.update_marketers(admin, assignments)
+        self.assertEqual(res.status_code, 202)
+        expected_marketers = {new_marketer.id, other_marketer.id}
+        self.assertEqual(set(self.marketing.marketer.values_list('id', flat=True)), expected_marketers)
+
+        for invalid_assignments in [
+            assignments[:1],
+            [assignments[0], {"team": other_team.id, "marketers": []}],
+        ]:
+            with self.subTest(assignments=invalid_assignments):
+                res = self.update_marketers(admin, invalid_assignments)
+                self.assertEqual(res.status_code, 403)
+                self.assertEqual(
+                    set(self.marketing.teams.values_list('id', flat=True)),
+                    {self.setup.team.id, other_team.id},
+                )
+                self.assertEqual(
+                    set(self.marketing.marketer.values_list('id', flat=True)), expected_marketers,
+                )
+
+    def test_admin_requires_own_team_on_marketing_record(self):
+        other_team = Team.objects.create(name='unassigned-admin-team', dept='Marketing')
+        for index, team in enumerate([other_team, None]):
+            with self.subTest(team=team):
+                admin = self.create_employee(2210 + index, ['admin'], team)
+                res = self.update_marketers(admin, self.current_assignment())
+                self.assertEqual(res.status_code, 403)
+                self.assertEqual(
+                    set(self.marketing.teams.values_list('id', flat=True)), {self.setup.team.id},
+                )
+                self.assertEqual(
+                    set(self.marketing.marketer.values_list('id', flat=True)), {self.setup.user.id},
+                )
+
+    def test_admin_cannot_remove_marketer_from_unassigned_team(self):
+        other_team = Team.objects.create(name='former-marketing-team', dept='Marketing')
+        other_marketer = self.create_employee(2220, ['marketer'], other_team)
+        admin = self.create_employee(2221, ['admin'], self.setup.team)
+        self.marketing.marketer.add(other_marketer)
+
+        res = self.update_marketers(admin, self.current_assignment())
+
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(
+            set(self.marketing.teams.values_list('id', flat=True)), {self.setup.team.id},
+        )
+        self.assertEqual(
+            set(self.marketing.marketer.values_list('id', flat=True)),
+            {self.setup.user.id, other_marketer.id},
+        )
 
     def test_unauthorized_role_cannot_update_marketing_assignments(self):
         user = self.create_employee(2010, ['marketer'], self.setup.team)
@@ -613,24 +679,24 @@ class ConsultantMarketingTest(APITestCase):
             {self.setup.user.id},
         )
 
-    def test_recruiter_scrum_master_uses_global_scope(self):
+    def test_recruiter_with_team_scoped_role_uses_global_scope(self):
         other_team = Team.objects.create(name='other-marketing-team', dept='Marketing')
         other_marketer = self.create_employee(2020, ['marketer'], other_team)
-        user = self.create_employee(
-            2021,
-            ['recruiter', 'scrum_master'],
-            self.setup.team,
-        )
         assignments = self.current_assignment() + [{
             "team": other_team.id,
             "marketers": [other_marketer.id],
         }]
 
-        res = self.update_marketers(user, assignments)
+        for index, role_name in enumerate(['scrum_master', 'admin']):
+            with self.subTest(role=role_name):
+                self.marketing.teams.set([self.setup.team])
+                self.marketing.marketer.set([self.setup.user])
+                user = self.create_employee(2021 + index, ['recruiter', role_name], self.setup.team)
+                res = self.update_marketers(user, assignments)
 
-        self.assertEqual(res.status_code, 202)
-        self.assertTrue(self.marketing.teams.filter(id=other_team.id).exists())
-        self.assertTrue(self.marketing.marketer.filter(id=other_marketer.id).exists())
+                self.assertEqual(res.status_code, 202)
+                self.assertTrue(self.marketing.teams.filter(id=other_team.id).exists())
+                self.assertTrue(self.marketing.marketer.filter(id=other_marketer.id).exists())
 
     def test_scrum_master_can_update_own_team_marketers(self):
         scrum_master = self.create_employee(2030, ['scrum_master'], self.setup.team)
@@ -708,11 +774,10 @@ class ConsultantMarketingTest(APITestCase):
             {self.setup.team.id},
         )
 
-    def test_scrum_master_cannot_change_shared_marketer_on_another_team(self):
+    def test_team_scoped_roles_cannot_change_shared_marketer_on_another_team(self):
         other_team = Team.objects.create(name='shared-marketer-team', dept='Marketing')
         shared_marketer = self.create_employee(2080, ['marketer'], self.setup.team)
         shared_marketer.associated_to.add(other_team)
-        scrum_master = self.create_employee(2081, ['scrum_master'], self.setup.team)
         self.marketing.teams.add(other_team)
         assignments = [{
             "team": self.setup.team.id,
@@ -722,10 +787,19 @@ class ConsultantMarketingTest(APITestCase):
             "marketers": [],
         }]
 
-        res = self.update_marketers(scrum_master, assignments)
+        for index, role_name in enumerate(['scrum_master', 'admin', 'proxy']):
+            with self.subTest(role=role_name):
+                user = self.create_employee(2081 + index, [role_name], self.setup.team)
+                res = self.update_marketers(user, assignments)
 
-        self.assertEqual(res.status_code, 403)
-        self.assertFalse(self.marketing.marketer.filter(id=shared_marketer.id).exists())
+                self.assertEqual(res.status_code, 403)
+                self.assertEqual(
+                    set(self.marketing.teams.values_list('id', flat=True)),
+                    {self.setup.team.id, other_team.id},
+                )
+                self.assertEqual(
+                    set(self.marketing.marketer.values_list('id', flat=True)), {self.setup.user.id},
+                )
 
     def test_existing_inactive_marketer_can_be_preserved(self):
         inactive_marketer = self.create_employee(2090, ['marketer'], self.setup.team)
@@ -781,8 +855,6 @@ class ConsultantMarketingTest(APITestCase):
         self.assertFalse(assignments[duplicate_team.id]['is_all'])
 
     def test_legacy_marketing_mutations_reject_unauthorized_roles(self):
-        user = self.create_employee(2110, ['marketer'], self.setup.team)
-        self.client.force_authenticate(user=user)
         base = f"/api/consultant_marketing/{self.marketing.id}"
         requests = [
             ('post', '/api/consultant_marketing/', {}),
@@ -795,14 +867,23 @@ class ConsultantMarketingTest(APITestCase):
             ('put', f'{base}/in_pool/', {}),
         ]
 
-        for method, route, payload in requests:
-            with self.subTest(route=route):
-                res = getattr(self.client, method)(
-                    route,
-                    data=json.dumps(payload),
-                    content_type="application/json",
-                )
-                self.assertEqual(res.status_code, 403)
+        for index, role_name in enumerate(['marketer', 'admin']):
+            user = self.create_employee(2110 + index, [role_name], self.setup.team)
+            self.client.force_authenticate(user=user)
+            for method, route, payload in requests:
+                with self.subTest(role=role_name, route=route):
+                    res = getattr(self.client, method)(
+                        route,
+                        data=json.dumps(payload),
+                        content_type="application/json",
+                    )
+                    self.assertEqual(res.status_code, 403)
+                    self.assertEqual(
+                        set(self.marketing.teams.values_list('id', flat=True)), {self.setup.team.id},
+                    )
+                    self.assertEqual(
+                        set(self.marketing.marketer.values_list('id', flat=True)), {self.setup.user.id},
+                    )
 
     def test_legacy_assignment_routes_validate_team_membership(self):
         recruiter = self.create_employee(2120, ['recruiter'], self.setup.team)

@@ -26,9 +26,9 @@ from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_A
 
 
 MARKETING_ASSIGNMENT_MANAGER_ROLES = frozenset({
-    'superadmin', 'admin', 'finance', 'recruiter'
+    'superadmin', 'finance', 'recruiter'
 })
-MARKETING_ASSIGNMENT_OWN_TEAM_ROLES = frozenset({'scrum_master', 'proxy'})
+MARKETING_ASSIGNMENT_OWN_TEAM_ROLES = frozenset({'admin', 'scrum_master', 'proxy'})
 
 
 def can_manage_all_marketing_assignments(user):
@@ -1417,6 +1417,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 if can_manage_own_team:
                     own_team_id = request.user.team_id
                     if updated_team_ids != existing_team_ids:
+                        return Response({"message": DONT_HAVE_ACCESS}, status=403)
+                    changed_marketer_ids = existing_marketer_ids ^ updated_marketer_ids
+                    if not changed_marketer_ids.issubset(team_member_ids[own_team_id]):
                         return Response({"message": DONT_HAVE_ACCESS}, status=403)
                     for team_id in existing_team_ids - {own_team_id}:
                         members = team_member_ids[team_id]
