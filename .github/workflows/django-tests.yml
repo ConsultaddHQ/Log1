@@ -65,4 +65,12 @@ jobs:
           DB_PORT: 5432
           ENV: local
           FCM_SERVER_KEY: ci-dummy-fcm-key
-        run: python manage.py test --noinput
+        run: |
+          # Migrations are gitignored in this repo, so generate them before the test DB is built.
+          for app in */; do
+            if [ -f "${app}models.py" ] || [ -d "${app}models" ]; then
+              mkdir -p "${app}migrations" && touch "${app}migrations/__init__.py"
+            fi
+          done
+          python manage.py makemigrations --noinput
+          python manage.py test --noinput
