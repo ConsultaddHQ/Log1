@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Iterable, Optional, Tuple
 
 from django.db import models
 from django.utils import timezone
@@ -6,6 +6,23 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from api_key.crypto import concatenate, KeyGenerator, split
+
+
+class APIKeyScope(models.TextChoices):
+    """Scopes understood by the API-key boundary.
+
+    ``legacy`` is the compatibility scope for keys created before scoped keys
+    existed. New integrations must opt into a narrower scope explicitly.
+    """
+
+    LEGACY = "legacy", "Legacy integrations"
+    NIGHTSHIFT_BENCH_CONSULTANTS_READ = (
+        "nightshift.bench-consultants.read",
+        "NightShift bench consultants (read-only)",
+    )
+
+
+KNOWN_API_KEY_SCOPES = frozenset(scope.value for scope in APIKeyScope)
 
 
 class BaseAPIKeyManager(models.Manager):
@@ -50,21 +67,44 @@ class BaseAPIKeyManager(models.Manager):
         except self.model.DoesNotExist:
             return False
 
-    def is_valid(self, key: str) -> bool:
+    def get_valid_key(self, key: Optional[str]) -> Optional["AbstractAPIKey"]:
+        if not key:
+            return None
+
         prefix, _, _ = key.partition(".")
         queryset = self.get_usable_keys()
         try:
             api_key = queryset.get(prefix=prefix)  # type: AbstractAPIKey
         except self.model.DoesNotExist:
-            return False
+            return None
 
         if not api_key.is_valid(key):
+            return None
+
+        if api_key.has_expired or api_key.scope not in KNOWN_API_KEY_SCOPES:
+            return None
+
+        return api_key
+
+    def is_valid(
+        self,
+        key: Optional[str],
+        allowed_scopes: Optional[Iterable[str]] = None,
+    ) -> bool:
+        """Validate a key and its scope for an existing integration boundary.
+
+        Existing callers remain limited to legacy keys by default. A scoped
+        integration must pass its explicitly allowed scopes, so adding a new
+        scope cannot silently grant access to old endpoints.
+        """
+
+        api_key = self.get_valid_key(key)
+        if api_key is None:
             return False
 
-        if api_key.has_expired:
-            return False
-
-        return True
+        if allowed_scopes is None:
+            allowed_scopes = (APIKeyScope.LEGACY,)
+        return api_key.scope in set(allowed_scopes)
 
 
 class APIKeyManager(BaseAPIKeyManager):
@@ -87,6 +127,16 @@ class AbstractAPIKey(models.Model):
             "A free-form name for the API key. "
             "Need not be unique. "
             "50 characters max."
+        ),
+    )
+    scope = models.CharField(
+        _('Scope'),
+        max_length=64,
+        choices=APIKeyScope.choices,
+        default=APIKeyScope.LEGACY,
+        help_text=(
+            "Permission scope for this key. Legacy keys preserve existing "
+            "integration behavior; scoped keys are limited to their endpoint."
         ),
     )
     revoked = models.BooleanField(
@@ -128,11 +178,18 @@ class AbstractAPIKey(models.Model):
         return type(self).objects.key_generator.verify(key, self.hashed_key)
 
     def clean(self):
+        super().clean()
+        self._validate_scope()
         self._validate_revoked()
 
     def save(self, *args, **kwargs):
+        self._validate_scope()
         self._validate_revoked()
         super().save(*args, **kwargs)
+
+    def _validate_scope(self):
+        if self.scope not in KNOWN_API_KEY_SCOPES:
+            raise ValidationError({"scope": "Unknown API key scope."})
 
     def _validate_revoked(self):
         if self._initial_revoked and not self.revoked:

@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from employee.models import User
-from api_key.models import APIKey
+from api_key.models import APIKey, APIKeyScope
 from user_api.models import UserAPIKey
 
 from marketing.utils import date_filter
@@ -71,13 +71,19 @@ class UserApiKeyViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Destro
 class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
     queryset = Submission.objects.all()
     serializer_class = MarketingTriggerSerializer
+    nightshift_read_scopes = (
+        APIKeyScope.LEGACY,
+        APIKeyScope.NIGHTSHIFT_BENCH_CONSULTANTS_READ,
+    )
 
-    @staticmethod
-    def verify_api_key(auth_header):
+    @classmethod
+    def verify_api_key(cls, auth_header, allowed_scopes=None):
+        if allowed_scopes is None:
+            allowed_scopes = (APIKeyScope.LEGACY,)
         if auth_header and auth_header.startswith("Token "):
             try:
                 api_key = auth_header.split("Token ")[1]
-                if not APIKey.objects.is_valid(api_key):
+                if not APIKey.objects.is_valid(api_key, allowed_scopes=allowed_scopes):
                     return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
                 return None
             except IndexError:
@@ -173,7 +179,10 @@ class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
     @action(methods=['get'], detail=False, url_path='marketing_data')
     def get_marketing_data(self, request):
         # API key verification
-        auth_response = self.verify_api_key(request.headers.get("Api-Key"))
+        auth_response = self.verify_api_key(
+            request.headers.get("Api-Key"),
+            allowed_scopes=self.nightshift_read_scopes,
+        )
         if auth_response:
             return auth_response
 
@@ -321,7 +330,10 @@ class MarketingPublicApiViewSet(GenericViewSet, ListModelMixin):
 
     @action(methods=['get'], detail=False, url_path='interview')
     def get_interview(self, request):
-        auth_response = self.verify_api_key(request.headers.get("Api-Key"))
+        auth_response = self.verify_api_key(
+            request.headers.get("Api-Key"),
+            allowed_scopes=self.nightshift_read_scopes,
+        )
         if auth_response:
             return auth_response
         serializer_class = InterviewSerializer
