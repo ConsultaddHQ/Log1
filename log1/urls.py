@@ -41,6 +41,7 @@ from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, Consul
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
 from user_api.views import UserApiKeyViewSet, MarketingPublicApiViewSet
+from nightshift_api.views import BenchConsultantSnapshotView
 
 router = DefaultRouter()
 schema_view = get_schema_view(
@@ -174,6 +175,7 @@ router_v2.register(r"consultant", ConsultantV2ViewSets, basename="consultant_v2"
 
 urlpatterns = [
     path("api/", include(router.urls)),
+    path("api/nightshift/bench-consultants/", BenchConsultantSnapshotView.as_view(), name="nightshift-bench-consultants"),
     path("api/admin/", admin.site.urls),
     path("api/v2/", include(router_v2.urls)),
     path("api/explorer/", include("explorer.urls")),

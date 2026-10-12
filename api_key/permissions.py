@@ -60,3 +60,21 @@ class BaseHasAPIKey(permissions.BasePermission):
 
 class HasAPIKey(BaseHasAPIKey):
     model = APIKey
+
+
+class HasReadOnlyAPIKey(HasAPIKey):
+    """Authenticate API clients for endpoints that must never mutate data."""
+
+    def get_key(self, request: HttpRequest) -> typing.Optional[str]:
+        key = super().get_key(request)
+        if key:
+            return key
+
+        # NightShift uses the header accepted by the existing public API.
+        api_key_header = request.META.get("HTTP_API_KEY", "")
+        if api_key_header.startswith("Token "):
+            return api_key_header[len("Token "):]
+        return None
+
+    def has_permission(self, request: HttpRequest, view: typing.Any) -> bool:
+        return request.method in permissions.SAFE_METHODS and super().has_permission(request, view)
