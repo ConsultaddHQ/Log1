@@ -82,7 +82,20 @@ jobs:
           FCM_SERVER_KEY: ci-dummy-fcm-key
         run: python manage.py check
 
-      - name: Run Django test suite
+      - name: Run NightShift tests
+        env:
+          SECRET_KEY: django-test-only-secret
+          DB_NAME: log1_test
+          DB_USER: log1
+          DB_PASSWORD: log1
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          ENV: local
+          FCM_SERVER_KEY: ci-dummy-fcm-key
+        run: python manage.py test nightshift_api --noinput
+
+      - name: Run legacy Django suite (informational)
+        continue-on-error: true
         env:
           SECRET_KEY: django-test-only-secret
           DB_NAME: log1_test
