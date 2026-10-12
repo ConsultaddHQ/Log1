@@ -40,8 +40,34 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Create log directory
-        run: mkdir -p logs
+      - name: Prepare runtime directories and migrations
+        env:
+          SECRET_KEY: django-test-only-secret
+          DB_NAME: log1_test
+          DB_USER: log1
+          DB_PASSWORD: log1
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          ENV: local
+        run: |
+          mkdir -p logs media
+          python - <<'PY'
+          import os
+          import subprocess
+          import sys
+
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "log1.settings")
+          import django
+
+          django.setup()
+          from django.apps import apps
+
+          for config in apps.get_app_configs():
+              subprocess.run(
+                  [sys.executable, "manage.py", "makemigrations", config.label, "--noinput"],
+                  check=True,
+              )
+          PY
 
       - name: Run Django checks
         env:
@@ -52,7 +78,6 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           ENV: local
-          FCM_SERVER_KEY: ci-dummy-fcm-key
         run: python manage.py check
 
       - name: Run Django test suite
@@ -64,13 +89,4 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           ENV: local
-          FCM_SERVER_KEY: ci-dummy-fcm-key
-        run: |
-          # Migrations are gitignored in this repo, so generate them before the test DB is built.
-          for app in */; do
-            if [ -f "${app}models.py" ] || [ -d "${app}models" ]; then
-              mkdir -p "${app}migrations" && touch "${app}migrations/__init__.py"
-            fi
-          done
-          python manage.py makemigrations --noinput
-          python manage.py test --noinput
+        run: python manage.py test --noinput
