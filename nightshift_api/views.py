@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api_key.models import APIKeyScope
 from api_key.permissions import HasReadOnlyAPIKey
 from consultant.models import ConsultantMarketing
 
@@ -14,6 +15,12 @@ class BenchConsultantSnapshotView(APIView):
 
     authentication_classes = ()
     permission_classes = (HasReadOnlyAPIKey,)
+    # Keep legacy integrations working while limiting the new NightShift key
+    # to this explicitly read-only endpoint.
+    api_key_scopes = (
+        APIKeyScope.LEGACY,
+        APIKeyScope.NIGHTSHIFT_BENCH_CONSULTANTS_READ,
+    )
 
     def get(self, request, *args, **kwargs):
         today = timezone.localdate()

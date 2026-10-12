@@ -1,10 +1,11 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from api_key.models import APIKey
+from api_key.models import APIKey, APIKeyScope
 from consultant.models import Consultant, ConsultantMarketing
 from employee.models import Team, User
 from marketing.models import Lead, Submission
@@ -71,9 +72,16 @@ class BenchConsultantSnapshotTests(APITestCase):
         Submission.objects.filter(id=incomplete_submission.id).update(created=now)
         Submission.objects.filter(id=previous_submission.id).update(created=now - timedelta(days=14))
         self.api_key, self.raw_key = APIKey.objects.create_key(name="nightshift-read-only")
+        self.scoped_key, self.raw_scoped_key = APIKey.objects.create_key(
+            name="nightshift-scoped",
+            scope=APIKeyScope.NIGHTSHIFT_BENCH_CONSULTANTS_READ,
+        )
 
     def authenticate(self):
         self.client.credentials(HTTP_AUTHORIZATION="Api-Key {}".format(self.raw_key))
+
+    def authenticate_scoped(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Api-Key {}".format(self.raw_scoped_key))
 
     def test_requires_a_valid_api_key(self):
         response = self.client.get(self.url)
@@ -105,6 +113,96 @@ class BenchConsultantSnapshotTests(APITestCase):
 
     def test_accepts_existing_public_api_key_header(self):
         self.client.credentials(HTTP_API_KEY="Token {}".format(self.raw_key))
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_scoped_key_reads_nightshift_route(self):
+        self.authenticate_scoped()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_scoped_key_accepts_existing_api_key_token_header(self):
+        self.client.credentials(HTTP_API_KEY="Token {}".format(self.raw_scoped_key))
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_scoped_key_reads_existing_public_interview_route(self):
+        self.client.credentials(HTTP_API_KEY="Token {}".format(self.raw_scoped_key))
+
+        response = self.client.get("/api/public_api/interview/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_scoped_key_reads_existing_public_marketing_data_route(self):
+        self.client.credentials(HTTP_API_KEY="Token {}".format(self.raw_scoped_key))
+
+        response = self.client.get("/api/public_api/marketing_data/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_other_public_api_actions_remain_legacy_only(self):
+        self.client.credentials(HTTP_API_KEY="Token {}".format(self.raw_scoped_key))
+
+        for path in (
+            "/api/public_api/submission/",
+            "/api/public_api/test/",
+            "/api/public_api/vendor_contact/",
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_scoped_key_is_rejected_by_write_capable_legacy_route(self):
+        response = self.client.post(
+            "/api/beats_consultant/?api_key={}".format(self.raw_scoped_key),
+            data={},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_scoped_key_is_rejected_by_legacy_api_key_permission(self):
+        self.authenticate_scoped()
+
+        response = self.client.get("/api/eng_project/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unknown_scope_is_rejected(self):
+        APIKey.objects.filter(pk=self.scoped_key.pk).update(scope="unknown.scope")
+        self.authenticate_scoped()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        with self.assertRaises(ValidationError):
+            APIKey.objects.create_key(name="invalid-scope", scope="unknown.scope")
+
+    def test_revoked_scoped_key_is_rejected(self):
+        self.scoped_key.revoked = True
+        self.scoped_key.save(update_fields=("revoked",))
+        self.authenticate_scoped()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_expired_scoped_key_is_rejected(self):
+        _expired_key, raw_expired_key = APIKey.objects.create_key(
+            name="nightshift-expired",
+            scope=APIKeyScope.NIGHTSHIFT_BENCH_CONSULTANTS_READ,
+            expiry_date=timezone.now() - timedelta(seconds=1),
+        )
+        self.client.credentials(HTTP_AUTHORIZATION="Api-Key {}".format(raw_expired_key))
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_legacy_key_remains_compatible_with_nightshift_route(self):
+        self.authenticate()
 
         response = self.client.get(self.url)
 

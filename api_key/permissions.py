@@ -4,7 +4,7 @@ from django.conf import settings
 from django.http import HttpRequest
 from rest_framework import permissions
 
-from .models import AbstractAPIKey, APIKey
+from .models import APIKey, APIKeyScope, AbstractAPIKey
 
 if typing.TYPE_CHECKING:
     from django.db import models
@@ -24,12 +24,11 @@ class KeyParser:
         if not authorization:
             return None
 
-        try:
-            _, key = authorization.split("Api-Key ")
-        except ValueError:
-            key = None
-
-        return key
+        prefix = "Api-Key "
+        if not authorization.startswith(prefix):
+            return None
+        key = authorization[len(prefix):].strip()
+        return key or None
 
     def get_from_header(self, request: HttpRequest, name: str) -> typing.Optional[str]:
         return request.META.get(name) or None
@@ -38,6 +37,7 @@ class KeyParser:
 class BaseHasAPIKey(permissions.BasePermission):
     model = None  # type: typing.Type[models.Model]
     key_parser = KeyParser()
+    allowed_scopes = (APIKeyScope.LEGACY,)
 
     def get_key(self, request: HttpRequest) -> typing.Optional[str]:
         return self.key_parser.get(request)
@@ -50,7 +50,8 @@ class BaseHasAPIKey(permissions.BasePermission):
         key = self.get_key(request)
         if not key:
             return False
-        return self.model.objects.is_valid(key)
+        allowed_scopes = getattr(view, "api_key_scopes", self.allowed_scopes)
+        return self.model.objects.is_valid(key, allowed_scopes=allowed_scopes)
 
     def has_object_permission(
             self, request: HttpRequest, view: typing.Any, obj: AbstractAPIKey
@@ -70,10 +71,11 @@ class HasReadOnlyAPIKey(HasAPIKey):
         if key:
             return key
 
-        # NightShift uses the header accepted by the existing public API.
+        # Existing public API clients send: Api-Key: Token <key>.
         api_key_header = request.META.get("HTTP_API_KEY", "")
         if api_key_header.startswith("Token "):
-            return api_key_header[len("Token "):]
+            key = api_key_header[len("Token "):].strip()
+            return key or None
         return None
 
     def has_permission(self, request: HttpRequest, view: typing.Any) -> bool:

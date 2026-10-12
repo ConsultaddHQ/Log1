@@ -9,6 +9,7 @@ class APIKeyModelAdmin(ExportActionModelAdmin):
     list_display = (
         "prefix",
         "name",
+        "scope",
         "api_key",
         "hashed_key",
         "created",
