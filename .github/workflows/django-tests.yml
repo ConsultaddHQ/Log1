@@ -49,6 +49,7 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           ENV: local
+          FCM_SERVER_KEY: ci-dummy-fcm-key
         run: |
           mkdir -p logs media
           python - <<'PY'
@@ -78,6 +79,7 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           ENV: local
+          FCM_SERVER_KEY: ci-dummy-fcm-key
         run: python manage.py check
 
       - name: Run Django test suite
@@ -89,4 +91,5 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           ENV: local
+          FCM_SERVER_KEY: ci-dummy-fcm-key
         run: python manage.py test --noinput
